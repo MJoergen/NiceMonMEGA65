@@ -242,11 +242,14 @@ mem_top
                 SUB     R2, R2, FRAMES
                 RET
 
-; drop_run: no frames, no CONT, and READ from the first DATA. Uses R2.
+; drop_run: no frames, no CONT, no TRAP and no error that waits for its
+; RESUME, and READ from the first DATA. Uses R2.
 drop_run
                 CALL    himem
                 MOVE    @V_FP, R2
                 CLR     @V_CONTL
+                CLR     @V_TRAP
+                CLR     @V_RTOK
                 CLR     @V_DPTR
                 CLR     @V_DTOK
                 RET
@@ -718,6 +721,8 @@ lt_go
         ?!Z     CMP     R1, T_HIMEM
         ?!Z     CMP     R1, T_PI
         ?!Z     CMP     R1, T_TI
+        ?!Z     CMP     R1, T_ER
+        ?!Z     CMP     R1, T_EL
         ?!Z     CMP     R1, T_TIMES
         ?Z      JMP     :+
                 SHR     R1, R1, 24

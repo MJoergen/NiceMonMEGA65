@@ -3,6 +3,7 @@
 - [The statements](#the-statements)
 - [Numbers](#numbers)
 - [Programs](#programs)
+- [Errors in a program](#errors-in-a-program)
 - [Strings](#strings)
 - [The screen and the time](#the-screen-and-the-time)
 - [The disassembler](#the-disassembler)
@@ -270,7 +271,7 @@ keeps the variables, but `CONT` cannot go on after it.
 | `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. CTRL-C stops it. |
 | `NEW` | Deletes the program and its variables and arrays. |
 | `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (Files above). |
-| `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, and `ELSE` with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
+| `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, `ELSE`, `TRAP`, and `RESUME` with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
 | `AUTO [N] [, S]` | Types the number of each line before it: `N` first, then that of the line stored last plus `S`, 10 and 10 when not given. A line with nothing after its number ends `AUTO` and deletes no line, and so does CTRL-C, an empty line, a statement typed with no number, and an error. |
 | `CLR` | Clears the variables, drops the arrays, and ends the loops and subroutines. |
 | `GOTO N` | Goes on at line `N`. |
@@ -303,7 +304,8 @@ programs are `Undefined line`, `NEXT without FOR`, `RETURN without
 GOSUB`, `LOOP without DO`, `EXIT without DO`, `Missing LOOP`, `Missing
 ENDIF`, `ENDPROC without PROC`, `= without FN`, `FN without =`, `LOCAL
 without PROC`, `Can't continue`, `Undefined array`, `Bad subscript`,
-and `Redimensioned array`.
+and `Redimensioned array`. A program can catch them with `TRAP` (Errors
+in a program below).
 
 The program's lines start at `0x8000`, a word for each token and
 constant, and the variables follow them, then the arrays, each element
@@ -319,6 +321,85 @@ MEGA65's 128K words of RAM, and 58368 (`0xE400`) on the Nexys4DDR's
 above the default. An empty program writes
 no word at `0x8000`, so after `NEW` a `.bin` program there stays as it
 was.
+
+## Errors in a program
+
+An error stops a program, unless the program has a `TRAP`. Then the
+error goes on at a line of the program instead, the handler, which can
+look at the error, and go back with `RESUME`. The names are those of
+BASIC 65, the MEGA65's own BASIC.
+
+| Statement | What it does |
+|---|---|
+| `TRAP N` | From now on, an error while the program runs goes on at line `N`, and does not stop the program. `TRAP` alone turns this off. |
+| `RESUME` | In the handler: runs the statement of the error again, such as after the handler fixed its cause. |
+| `RESUME NEXT` | In the handler: goes on at the statement after the one of the error. After an error in an `IF`, that is the next line. |
+| `RESUME N` | In the handler: goes on at line `N`. |
+| `ER`, `EL` | The number of the last error, and the number of its line. Both are numbers in an expression with no parentheses, as `TI` is. Before any error, `ER` is 0 and `EL` is -1, and after an error in a line typed `EL` is -1. |
+| `ERR$(N)` | The message of the error number `N`: `ERR$(20)` is `Division by zero`, and `ERR$(0)` is `""`. A number of no error is an `Illegal quantity`. |
+
+A program that asks again when the input is wrong:
+
+```
+10 TRAP 100
+20 INPUT "DIVIDE BY"; D
+30 PRINT 100 / D
+40 END
+100 PRINT ERR$(ER); " in "; EL
+110 RESUME 20
+```
+
+The handler keeps the loops, the subroutines, and the procedures that
+were running, so a `RESUME` goes back into them. What the statement of
+the error had started is dropped, such as the subroutine of a `GOSUB`
+to a line that is not there.
+
+An error in the handler, before its `RESUME`, stops the program with
+its message, so a handler that fails does not run again and again. A
+`TRAP` in the handler ends the handler too, so a handler may go on with
+`GOTO` instead of `RESUME`, when the program runs a `TRAP` again.
+`RESUME` with no error to go back to is `Can't resume`.
+
+An error in a function over lines, `DEF FNA(X)` above, cannot go back
+into the function. `RESUME` runs the statement again that called the
+function, and `RESUME NEXT` goes on after that statement. `EL` is
+still the line in the function.
+
+Only a running program goes to its `TRAP`: an error in a line typed
+prints its message. `RUN`, `CLR`, `NEW`, an edit of the program, and an
+error that stops the program turn the `TRAP` off. CTRL-C is no error:
+it stops a program with a `TRAP` too, and `CONT` goes on. The errors of
+the files and of the network, such as `File error 4`, are messages, and
+the program goes on after them, so a `TRAP` does not see them.
+
+The numbers are those of BASIC 65 for the errors that BASIC 65 has,
+and from 100 on for the others:
+
+| `ER` | Message | `ER` | Message |
+|---:|---|---:|---|
+| 10 | `NEXT without FOR` | 33 | `LOOP without DO` |
+| 11 | `Syntax error` | 100 | `Undefined variable` |
+| 12 | `RETURN without GOSUB` | 101 | `Undefined array` |
+| 13 | `Out of data` | 102 | `Undefined procedure` |
+| 14 | `Illegal quantity` | 103 | `= without FN` |
+| 15 | `Overflow` | 104 | `FN without =` |
+| 16 | `Out of memory` | 105 | `ENDPROC without PROC` |
+| 17 | `Undefined line` | 106 | `LOCAL without PROC` |
+| 18 | `Bad subscript` | 107 | `EXIT without DO` |
+| 19 | `Redimensioned array` | 108 | `Missing ENDIF` |
+| 20 | `Division by zero` | 109 | `Line too long` |
+| 22 | `Type mismatch` | 110 | `Line without a number` |
+| 23 | `String too long` | 111 | `A byte that is no character` |
+| 25 | `Formula too complex` | | |
+| 26 | `Can't continue` | | |
+| 27 | `Undefined function` | | |
+| 31 | `Can't resume` | | |
+| 32 | `Missing LOOP` | | |
+
+`Syntax error; HELP lists the statements` is 11 too. The last three
+come from `LOAD` of a program's text alone, which is no running
+program. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$` are keywords, so `ER`
+and `EL` are no names of variables.
 
 ## Strings
 
@@ -665,6 +746,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `proc` | The ROM alone, with `test/proc.bas` typed | `PROC` with parameters of numbers and strings and `LOCAL`s, the program's variables of their names kept; `FN` over lines calling itself, with `LOCAL`s and a `FOR` loop, and one on one line with `IF` and `ELSE`; `FN`s in expressions with numbers and strings pending; a `PROC` calling itself, `ENDPROC` in an `IF`, and a `GOSUB` in a `PROC`; strings that frames keep over sweeps of a small heap; the errors of `ENDPROC`, `=`, and `LOCAL`, of the calls, and of a `FN` with no `=`, after which `CONT` cannot go on; `ENDPROC` and `=` in a subroutine; and a `FN` 30 and 31 deep. |
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `mach` | The ROM, with `--step-time` and `test/mach.bas` typed | `TI`; `FOREGROUND` and `BACKGROUND` by number and by red, green, and blue, read back from the screen's words; `CURSOR` to a place, its limits, `ON`, `OFF`, and the styles; `RCURSOR`; their errors and `LIST`; and `SLEEP`, timed with `TI`, broken by CTRL-C and gone on with `CONT`. |
+| `trap` | The ROM alone, with `test/trap.bas` typed | `ER`, `EL`, and `ERR$` before any error; each error that a program can come to, trapped once, with its number, its line, and its message, and `RESUME NEXT` after it: after `THEN`, a block `IF`, and a `DO`, in a `FOR` loop, which goes on, in a subroutine, whose `GOSUB` to no line is dropped, in a `FN` over lines, after which its caller goes on with its parameter set again, and in a `PROC`; `RESUME` after a fix, `RESUME N`, `ERR$` of 0 to 112, an error in the handler, `TRAP` alone, `RENUMBER` and `LIST` of the lines, a handler that goes on with `GOTO` and a `TRAP`, and CTRL-C, which a `TRAP` does not take. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
@@ -702,21 +784,22 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2162 | 1376 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1842 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1912 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2243 | 1443 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1857 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1920 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1874 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1194 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1590 | 11 |
-| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1193 | 45 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1591 | 11 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1205 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
+| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$` | 281 | 4 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15010 | 2105 |
+| In all | | 15408 | 2176 |
 <!-- /romsize basic -->

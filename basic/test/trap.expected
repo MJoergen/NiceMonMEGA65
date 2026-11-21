@@ -1,0 +1,244 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+? ER, EL, "["; ERR$(ER); "]"
+0       -1      []
+READY.
+10 TRAP 1000: DIM B(2): D = 0
+20 NEXT
+30 POKE 1
+40 ER = 1
+50 RETURN
+60 READ X
+70 A$ = CHR$(256)
+80 A = 1E300 * 1E300
+90 DIM M(10000000)
+100 GOTO 9999
+110 B(5) = 1
+120 DIM B(3)
+130 A = 1 / D
+140 A = LEN(5)
+150 A$ = "XXXXXXXXXXXXXXXX": A$ = A$ + A$ + A$ + A$: A$ = A$ + A$ + A$ + A$ + A$
+160 A = FNR(1)
+170 CONT
+180 A = FNZZ(1)
+190 RESUME
+200 LOOP
+210 A = ZZ
+220 A = Q(1)
+230 PROCZZ
+240 = 5
+250 A = FNN(1): PRINT "AFTER FNN"
+260 ENDPROC
+270 LOCAL X
+280 EXIT
+290 IF 1 THEN A = 1 / D: PRINT "THEN"
+295 GOSUB 2000
+300 PRINT "ON"
+310 GOSUB 600: PRINT "BACK"
+320 FOR I = 1 TO 3: A = 1 / (I - 2): PRINT "I"; I: NEXT
+330 X = 7: PRINT FNB(0); "NOT"; X
+340 PRINT "X"; X
+350 PROCP(4)
+360 TRAP 1100: A = 1 / D: PRINT "RETRY"; A
+370 TRAP 1200: D = 0: A = 1 / D: PRINT "NOT HERE"
+380 TRAP 1300: FOR I = 0 TO 112: IF ERR$(I) <> "" THEN PRINT I, ERR$(I)
+390 NEXT
+400 TRAP 1400: A = 1 / D
+410 PRINT "NO TRAP": TRAP 1000: TRAP: A = 1 / D
+420 PRINT "NOT REACHED"
+500 DEF FNR(X) = FNR(X + 1)
+600 GOSUB 9999: PRINT "AFTER": RETURN
+700 DEF FNB(X)
+710   LOCAL Y
+720   Y = 1 / X
+730 = Y
+800 DEF PROCP(X)
+810   LOCAL Y: Y = 1 / (X - 4): PRINT "IN PROC"; X
+820 ENDPROC
+1000 PRINT ER, EL, ERR$(ER)
+1010 RESUME NEXT
+1100 PRINT "FIX", ER, EL: D = 2: RESUME
+1200 PRINT "LINE"; EL: RESUME 1210
+1210 PRINT "AT ITS LINE": GOTO 380
+1300 RESUME NEXT
+1400 PRINT "IN HANDLER": A = 1 / D
+2000 DO WHILE 0: PRINT "AFTER DO"
+2010 IF 0 THEN
+2020 RETURN
+9000 DEF FNN(X)
+RUN
+10      20      NEXT without FOR
+11      30      Syntax error
+11      40      Syntax error
+12      50      RETURN without GOSUB
+13      60      Out of data
+14      70      Illegal quantity
+15      80      Overflow
+16      90      Out of memory
+17      100     Undefined line
+18      110     Bad subscript
+19      120     Redimensioned array
+20      130     Division by zero
+22      140     Type mismatch
+23      150     String too long
+25      160     Formula too complex
+26      170     Can't continue
+27      180     Undefined function
+31      190     Can't resume
+33      200     LOOP without DO
+100     210     Undefined variable
+101     220     Undefined array
+102     230     Undefined procedure
+103     240     = without FN
+104     9000    FN without =
+AFTER FNN
+105     260     ENDPROC without PROC
+106     270     LOCAL without PROC
+107     280     EXIT without DO
+20      290     Division by zero
+THEN
+32      2000    Missing LOOP
+AFTER DO
+108     2010    Missing ENDIF
+ON
+17      600     Undefined line
+AFTER
+BACK
+I1
+20      320     Division by zero
+I2
+I3
+20      720     Division by zero
+X7
+20      810     Division by zero
+IN PROC4
+FIX     20      360
+RETRY0.5
+LINE370
+AT ITS LINE
+10      NEXT without FOR
+11      Syntax error
+12      RETURN without GOSUB
+13      Out of data
+14      Illegal quantity
+15      Overflow
+16      Out of memory
+17      Undefined line
+18      Bad subscript
+19      Redimensioned array
+20      Division by zero
+22      Type mismatch
+23      String too long
+25      Formula too complex
+26      Can't continue
+27      Undefined function
+31      Can't resume
+32      Missing LOOP
+33      LOOP without DO
+100     Undefined variable
+101     Undefined array
+102     Undefined procedure
+103     = without FN
+104     FN without =
+105     ENDPROC without PROC
+106     LOCAL without PROC
+107     EXIT without DO
+108     Missing ENDIF
+109     Line too long
+110     Line without a number
+111     A byte that is no character
+IN HANDLER
+Division by zero in 1400
+READY.
+? ER, EL, ERR$(ER)
+20      1400    Division by zero
+READY.
+GOTO 410
+NO TRAP
+Division by zero in 410
+READY.
+? ER, EL, ERR$(ER)
+20      410     Division by zero
+READY.
+RENUMBER 100, 10
+READY.
+LIST 100
+100 TRAP 620: DIM B(2): D = 0
+READY.
+LIST 280
+280 RESUME
+READY.
+LIST 460-510
+460 TRAP 640: A = 1 / D: PRINT "RETRY"; A
+470 TRAP 650: D = 0: A = 1 / D: PRINT "NOT HERE"
+480 TRAP 670: FOR I = 0 TO 112: IF ERR$(I) <> "" THEN PRINT I, ERR$(I)
+490 NEXT
+500 TRAP 680: A = 1 / D
+510 PRINT "NO TRAP": TRAP 620: TRAP: A = 1 / D
+READY.
+LIST 620-680
+620 PRINT ER, EL, ERR$(ER)
+630 RESUME NEXT
+640 PRINT "FIX", ER, EL: D = 2: RESUME
+650 PRINT "LINE"; EL: RESUME 660
+660 PRINT "AT ITS LINE": GOTO 480
+670 RESUME NEXT
+680 PRINT "IN HANDLER": A = 1 / D
+READY.
+NEW
+READY.
+5 N = 0
+10 TRAP 100
+20 N = N + 1: IF N > 3 THEN END
+30 A = 1 / 0
+100 PRINT "TRAPPED"; N: GOTO 10
+RUN
+TRAPPED1
+TRAPPED2
+TRAPPED3
+READY.
+? ER, EL
+20      30
+READY.
+10 TRAP 30
+20 GOTO 20
+30 PRINT "NOT A TRAP"
+RUN
+Break in 20
+READY.
+? ER, EL
+20      30
+READY.
+CONT
+Break in 20
+READY.
+HALT
+Halted
+Screen:
+|30 A = 1 / 0
+|100 PRINT "TRAPPED"; N: GOTO 10
+|RUN
+|TRAPPED1
+|TRAPPED2
+|TRAPPED3
+|READY.
+|? ER, EL
+|20      30
+|READY.
+|10 TRAP 30
+|20 GOTO 20
+|30 PRINT "NOT A TRAP"
+|RUN
+|Break in 20
+|READY.
+|? ER, EL
+|20      30
+|READY.
+|CONT
+|Break in 20
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0

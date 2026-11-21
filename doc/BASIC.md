@@ -796,6 +796,34 @@ message, in full text, and the line, drops the frames, and prints
 `READY.`. With one, the frames
 stay, for `RESUME`.
 
+Stage 9 (#120) is written, in `basic/basic_trap.nasm` (decided on
+2026-11-21), with the names of BASIC 65:
+
+- `ER` is BASIC 65's number of the error, where BASIC 65 has the
+  error, and a number from 100 on for the others, so a program from
+  the C64 or the C128 that tests `IF ER = 20` still works. A table of
+  a word for each error, its message and its number, gives `ER` from
+  the message that the error routine has, and `ERR$` the message from
+  the number.
+- The statement loop keeps the first token of each statement and the
+  pointer of the frames at its start, two stores, which cost the
+  benchmarks 1 to 2 percent. A trapped error unwinds the frames down
+  to that pointer, as `RETURN` unwinds them, so what the statement had
+  started goes, and the frames before it stay. `RESUME` goes back to
+  that token, and `RESUME NEXT` passes over the statement, or the rest
+  of the line after an `IF`.
+- An error in a `FN` over lines cannot go back into the expression
+  that called it, whose processor's stack is gone. So the `FN` frame
+  keeps the token and the pointer of the statement that called it, and
+  a trapped error goes back to that of the outermost `FN`.
+- An error before the handler's `RESUME` is not trapped, as in
+  GW-BASIC, so a handler that fails stops the program. `TRAP` ends
+  the handler too, for the handlers of the C64 that go on with `GOTO`.
+- The break key is no error, unlike BASIC 7.0's `TRAP`, so a program
+  can always be stopped.
+- The errors of the files and the network are messages, after which
+  the statement and the program go on, so a `TRAP` does not see them.
+
 The messages of stage 2 are `Syntax error`, `Illegal quantity`,
 `Division by zero`, `Overflow`, `Formula too complex`, `Undefined
 variable`, and `Out of memory`. A string where a number goes was a
@@ -955,8 +983,8 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   stopped. Only when no key waits, as when a person types: the lines
   that a host pastes come one after the other, and the next would go
   into the one shown (found while writing it, 2026-11-20). The errors
-  that only a parse of the statement finds stay errors at `RUN`, until
-  stage 9.
+  that only a parse of the statement finds stay errors at `RUN`,
+  which stage 9 lets a program trap.
 - `DELETE` takes a string, a file, or a range of lines, such as
   `DELETE 10-50`, so the two share the keyword.
 - `RENUMBER` changes the targets that are numbers in the line, which
@@ -1175,6 +1203,8 @@ Each has an issue, under #54.
    `PROC`, `FN` over lines, and `LOCAL` in 699 more (measured
    2026-11-20).
 9. **Errors**, #120. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`.
+   Written in V2.5, in `basic/basic_trap.nasm`, with the language of
+   [Errors](#errors), in 398 words (measured 2026-11-21).
 10. **The machine**, #121. `TI`, `SLEEP`, the colors, and the cursor.
     Written in V2.5, in `basic/basic_mach.nasm`, with the language of
     [The machine](#the-machine), in 438 words (measured 2026-11-21).
@@ -1295,8 +1325,8 @@ in C that the note had before 2026-11-16:
 | 6. Functions, measured | 113 | 5898 |
 | 7. The editor and its statements, measured | 1071 | 6969 |
 | 8. Structure | 1400 | 8369 |
-| 9. Errors | 400 | 8769 |
-| 10. The machine, measured | 438 | 9207 |
+| 9. Errors, measured | 398 | 8767 |
+| 10. The machine, measured | 438 | 9205 |
 
 Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
 the old line input that it replaced, and the monitor's 50 of
@@ -1316,6 +1346,9 @@ and the messages' text, and leave 6311 free (measured 2026-11-20).
 Stage 10 is 438 words more, from 14572 to 15010, of which 120 are the
 keywords' and the help's text, and leaves 5470 free (measured
 2026-11-21).
+Stage 9 is 398 words more, from 15010 to 15408, of which 71 are the
+keywords', the help's, and the message's text, and leaves 5072 free
+(measured 2026-11-21).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left
@@ -1400,8 +1433,8 @@ that is open when it is done.
   monitor, so it can be a release of BASIC alone, on the bitstreams of
   `V2.4`. Stage 8 comes after stage 5, for an `FN` of a string, and
   stage 9 after stage 8, as `RESUME` keeps the frames that stage 8
-  adds. Stage 10 is written in `V2.5`, and changes the monitor in
-  nothing.
+  adds. Stages 9 and 10 are written in `V2.5`, and change the monitor
+  in nothing.
 - **A stage that changes the monitor waits for a release with a
   bitstream.** Stage 7, the editor, is the first.
 - **#111 and BASIC share the ROM.** #111 is in V2.1, and

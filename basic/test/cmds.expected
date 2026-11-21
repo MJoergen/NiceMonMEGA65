@@ -72,6 +72,9 @@ BACKGROUND N        their background, likewise; 0 black, 1 white, 6 blue
 CURSOR ON | OFF     show the cursor, or hide it
 CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
 RCURSOR C, R        C and R the column and the row of the cursor
+TRAP N              on an error, go on at line N; TRAP alone, stop at errors
+RESUME [NEXT | N]   after TRAP: the statement again, the one after it, or line N
+ER, EL, ERR$(N)     the last error's number and line, and the text of error N
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 READY.

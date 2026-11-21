@@ -386,6 +386,21 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # line after it into the ring of the keys typed ahead, so that it is
 # short; it shows the cursor, which the program hid, again.
 MACH_TAIL = \003CONT\rNEW\r10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000, B - A < 251000\r20 A = TI: SLEEP 0: SLEEP -0: B = TI: PRINT B - A < 1000\r30 A = TI: SLEEP 1.5: B = TI: PRINT B - A >= 1.5E6, B - A < 1501000\r40 CURSOR OFF: SLEEP 0.01: PRINT PEEK(-128)\rRUN\r? PEEK(-128)\rHALT\r
+# trap: the errors in a program of stage 9 (issue #120), test/trap.bas
+# typed line by line. ER, EL, and ERR$ before any error; then a program
+# with a TRAP that makes each error that a program can come to once, and
+# whose handler prints ER, EL, and ERR$(ER), and goes on with RESUME NEXT:
+# after a statement after THEN, the statement after it, and after a
+# block IF and DO, those after them; a GOSUB to a line that is not, whose
+# frame goes; an error in a FOR loop, which goes on; one in a FN over
+# lines, after which the statement after the call runs, its parameter
+# set again; and one in a PROC, which goes on in it. RESUME after the
+# handler fixed the cause, RESUME N, ERR$ of 0 to 112, an error in the
+# handler, which stops the program, and TRAP alone, after which an error
+# stops it too. RENUMBER and LIST of TRAP's and RESUME's lines, ER, EL,
+# and ERR$. A handler that goes on with GOTO and traps again with TRAP;
+# and the break key, which a TRAP does not take, and CONT after it.
+TRAP_TAIL = \003? ER, EL\rCONT\r\003HALT\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -458,7 +473,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -484,6 +499,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
 	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
 	@{ tr '\n' '\r' < test/mach.bas; printf '$(MACH_TAIL)'; } > $(BUILD)/mach.txt
+	@{ tr '\n' '\r' < test/trap.bas; printf '$(TRAP_TAIL)'; } > $(BUILD)/trap.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
@@ -493,13 +509,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr|struct|proc) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap) prog=; dump=;; \
 	    str|mach) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
