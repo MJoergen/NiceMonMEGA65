@@ -41,8 +41,9 @@ or a release's BASIC-V2.3.1.ROM, which goes into BASIC's part of the ROM,
 not fill zeroed, and is read back. The core is held, the memory
 cleared, and the ROM shown, and the core started, unless --hold is
 given, so the monitor boots cold with that BASIC. The ROM keeps it until
-the FPGA is configured again. A ROM that takes no writes, of a bitstream
-older than V2.3.1 or the Nexys4DDR's, is refused, as is no ROM.
+the FPGA is configured again. A ROM that does not take the writes, of a
+bitstream older than V2.4, which takes none below 0x4000, or the
+Nexys4DDR's, is refused, as is no ROM.
 
 Usage: tools/nicemon.py load (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                              | --tcp [HOST:]PORT | --cosim PORT) [--hold]
@@ -230,8 +231,10 @@ def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
     """Holds the core, clears the memory, and writes the image into BASIC's
     part of the ROM, shown, with "keep" set, or as it is when keep is False,
     and 0 in every word of the part that it does not fill, and reads the
-    part back. A bitstream without a ROM, or whose ROM takes no writes, is
-    refused. start(link, rom=True) then boots the monitor with it."""
+    part back. A bitstream without a ROM, or whose ROM does not take the
+    writes, is refused: the Nexys4DDR's takes none, nor does one older
+    than V2.3.1, and V2.3.1 and V2.3.2, with BASIC at 0x4000, take none
+    below it. start(link, rom=True) then boots the monitor with it."""
     image = dict(image)
     if keep:
         basic_rom.set_keep(image)
@@ -244,8 +247,8 @@ def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
                                        words)))
     if read_part(link) != words:
         fail("BASIC's part of the ROM did not keep the words written: the "
-             "ROM takes no writes, as on the Nexys4DDR, or in a bitstream "
-             "older than V2.3.1")
+             "ROM takes no writes, as on the Nexys4DDR, or none below "
+             "0x4000, as in a bitstream older than V2.4")
 
 
 def read_part(link: Link) -> list[int]:

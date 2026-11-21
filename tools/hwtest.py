@@ -2222,9 +2222,10 @@ def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
     check("the monitor's part of the ROM drops a link's write",
           wr(link, basic_rom.BASE - 1, low ^ basic_rom.MASK) and rd(link, basic_rom.BASE - 1) == low)
     first = found[0]
-    check("the first word of BASIC's part takes a link's write",
-          wr(link, basic_rom.BASE, first ^ basic_rom.MASK) and
+    ok = (wr(link, basic_rom.BASE, first ^ basic_rom.MASK) and
           rd(link, basic_rom.BASE) == first ^ basic_rom.MASK)
+    check("the first word of BASIC's part takes a link's write", ok,
+          "" if ok else "a bitstream older than V2.4, with BASIC at 0x4000")
     wr(link, basic_rom.BASE, first)
     image = {basic_rom.BASE + i: w for i, w in enumerate(found) if w}
     if image.get(basic_rom.H_MAGIC) != basic_rom.MAGIC:
