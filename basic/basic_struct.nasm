@@ -43,8 +43,9 @@
 ; DEF's parameters, up to the statement = X, as statements of their own,
 ; in a loop of run on the processor's stack of its call, below V_SBASE.
 ; Its FN frame, after the L frame, has the old V_SBASE, V_CUR, and V_SSB,
-; the function's kind, and the numbers that pended on the FPU's stack at
-; the call, their count, and theirs, the top last. = X drops the frames
+; the function's kind, the numbers that pended on the FPU's stack at
+; the call, their count, the old V_STMT and V_SFP, which a trapped error
+; goes back to (basic_trap.nasm), and the numbers, the top last. = X drops the frames
 ; after it, puts the numbers back below X, and returns from the call
 ; with SP at V_SBASE. A function may call itself while SP is FN_ROOM
 ; words below STACK at most, which leaves an expression EXPR_ROOM words
@@ -55,7 +56,7 @@ FUNC            .EQU    0x400           ; in the length of a function's name
 DO_TAG          .EQU    0x44000000      ; D, a DO frame's
 LOCAL_TAG       .EQU    0x4C000000      ; L, an L frame's
 FN_TAG          .EQU    0x4E000000      ; N, a FN frame's,
-FN_WORDS        .EQU    6               ; and its words, and 2 for each number
+FN_WORDS        .EQU    8               ; and its words, and 2 for each number
 PROC_TAG        .EQU    0x50000000      ; P, a PROC frame's,
 PROC_WORDS      .EQU    3               ; and its words
 FN_ROOM         .EQU    0x200           ; the words of the processor's stack that FNs may take
@@ -164,6 +165,8 @@ fc_body
                 ADD     R2, SP, 1
                 MOVE    @4[R1], @R2     ; the kind
                 MOVE    @5[R1], R4
+                MOVE    @6[R1], @V_STMT  ; for TRAP: the call's statement,
+                MOVE    @7[R1], @V_SFP  ; and its frames
                 DBL     R3, R4
                 ADD     R3, R3, R1
                 ADD     R3, R3, FN_WORDS
@@ -204,6 +207,8 @@ st_fnret
                 CALL    unwind
                 MOVE    @V_CUR, @2[R1]
                 MOVE    @V_SSB, @3[R1]
+                MOVE    @V_STMT, @6[R1]
+                MOVE    @V_SFP, @7[R1]
                 MOVE    R9, @V_SBASE    ; the call's SP
                 MOVE    R2, @1[R1]
                 MOVE    @V_SBASE, R2

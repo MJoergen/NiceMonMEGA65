@@ -40,8 +40,9 @@ the numbers (#113), is written, and so are stage 3, the programs
 strings (#116), stage 6, the functions (#117), and stage 7, the
 screen editor (#118), and stage 8, the structure (#119), with `ON`,
 `DEF FN`, `DEF PROC`, `LOCAL`, `DO` and `LOOP`, and the block `IF`,
-and stage 10, the machine (#121), with `TI`, `SLEEP`, the colors, and
-the cursor.
+stage 9, the errors (#120), with `TRAP`, `RESUME`, `ER`, `EL`, and
+`ERR$`, and stage 10, the machine (#121), with `TI`, `SLEEP`, the
+colors, and the cursor.
 `doc/BASIC_ROM.md` is the design of BASIC's image from a card's
 `BASIC*.ROM`, which replaces BASIC's part of the ROM at the first
 cold start (#153), of which all five stages are written.
@@ -221,9 +222,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `basic_edit.nasm`, and the strings of stage 5 (#116), with
   `DATA`, `READ`, and `TIME$`, in `basic_str.nasm`, and `ON`,
   `DEF FN`, `DEF PROC`, `LOCAL`, `DO` and `LOOP`, and the block `IF`
-  of stage 8 (#119) in `basic_struct.nasm`, and `TI`, `SLEEP`,
-  `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` of stage 10
-  (#121) in `basic_mach.nasm`), on the entries of the dispatch table alone, as a
+  of stage 8 (#119) in `basic_struct.nasm`, and `TRAP`, `RESUME`,
+  `ER`, `EL`, and `ERR$` of stage 9 (#120) in `basic_trap.nasm`, and
+  `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR`
+  of stage 10 (#121) in `basic_mach.nasm`), on the entries of the dispatch table alone, as a
   program is, with its tests of the statements in `basic/test/`, its
   benchmarks in `basic/bench/`, the ECMA-55 suite's runner,
   `basic/test/ecma55.py`, and

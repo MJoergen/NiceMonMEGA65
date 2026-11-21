@@ -23,14 +23,15 @@
 ;            bit 23 for one that divides, and its FPU command in 15..0
 ;   K_PUNCT  ( ) , ; and :, the character in bits 7..0
 ;   K_FN     a function: its FPU command, 0 for PEEK, 0x800000 for RND,
-;            0x400000 for TI, and CONST 3 for PI; TI and PI take no
-;            argument
+;            0x400000 for TI, 0x200000 and 0x200001 for ER and EL, and
+;            CONST 3 for PI; TI, ER, EL, and PI take no argument
 ;   K_NOT    NOT, with its FPU command
 ;   K_KW     a statement: its index in KEYWORDS in bits 15..8, and the
 ;            byte after its keyword, its program of ops, in bits 7..0
 ;   K_PRT    TAB and SPC, which only PRINT takes
 ;   K_SEP    THEN, ELSE, TO, STEP, WHILE, UNTIL, and OFF
-;   K_LINE   a line number after GOTO, GOSUB, RUN, THEN, or ELSE, in
+;   K_LINE   a line number after GOTO, GOSUB, RUN, RESTORE, THEN, ELSE,
+;            TRAP, or RESUME, or in ON's list, in
 ;            bits 23..0, and the address of its line in the word after,
 ;            0 until a jump finds it (basic_prog.nasm)
 ;   K_REM    the text after REM, as K_STR has it
@@ -39,7 +40,7 @@
 ;   K_SARR   an array of strings, as K_ARR
 ;   K_SFN    a function that gives a string, its index in SFNS
 ;            (basic_str.nasm) in bits 7..0: CHR$, STR$, HEX$, LEFT$, MID$,
-;            RIGHT$, and TIME$
+;            RIGHT$, TIME$, and ERR$
 ;   K_SNUM   a function of strings that gives a number, its index in
 ;            SNUMS: LEN, ASC, VAL, and INSTR
 ;   K_DATA   the text of DATA, as K_STR has it, up to the end of the line
@@ -197,7 +198,7 @@ KW_TOK
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP, T_WHILE, T_UNTIL
                 .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
                 .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
-                .DAT    T_TI, T_OFF
+                .DAT    T_TI, T_OFF, T_ER, T_EL, T_ERRS
 KW_TOK_END
 
 ; The characters of one-character tokens, each with its token
@@ -588,8 +589,8 @@ var_new
 tok_number
                 CMP     R8, V_TOK
         ?Z      JMP     :+
-                MOVE    R2, @-1[R8]     ; after GOTO, GOSUB, RUN, RESTORE,
-                CMP     R2, T_THEN      ; THEN, or ELSE a line number
+                MOVE    R2, @-1[R8]     ; after GOTO, GOSUB, RUN, RESTORE, TRAP,
+                CMP     R2, T_THEN      ; RESUME, THEN, or ELSE a line number
         ?!Z     CMP     R2, T_ELSE
         ?Z      JMP     tok_line
                 CMP     R2, T_COMMA     ; and after a comma that a line
@@ -606,6 +607,8 @@ tn_kw
         ?!Z     CMP     R2, K_KW*K+I_GOSUB*0x100
         ?!Z     CMP     R2, K_KW*K+I_RUN*0x100
         ?!Z     CMP     R2, K_KW*K+I_RESTORE*0x100
+        ?!Z     CMP     R2, K_KW*K+I_TRAP*0x100
+        ?!Z     CMP     R2, K_KW*K+I_RESUME*0x100
         ?Z      JMP     tok_line
 :
                 CMP     R1, 0x30
@@ -967,6 +970,8 @@ p_fn
         ?Z      RET
                 CMP     R1, T_TI
         ?Z      JMP     p_ti            ; basic_mach.nasm
+                AND[M]  R0, R1, 0x200000
+        ?!Z     JMP     p_er            ; ER and EL, basic_trap.nasm
                 PUSH    R1
                 CALL    paren
                 POP     R1
@@ -1311,6 +1316,7 @@ err
         ?Z      TST     @V_KW
         ?Z      MOVE    R1, S_UNKNOWN   ; not in a statement
                 MOVE    R7, R1
+                CALL    trap            ; ER and EL, and the TRAP's line (basic_trap.nasm)
                 CALL    drop_run        ; no frames, and no CONT
                 MOVE    R1, R7
                 CALL    put_msg         ; with the line's number in a program
