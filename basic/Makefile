@@ -233,14 +233,18 @@ KEYS = 10 INPUT A, B: PRINT A + B\rRUN\r1, 2\rRUN\r1\r2\rRUN\r1, 2, 3\rRUN\rx\r1
 # of the 3; and 5, two DELs, of which the second is at the prompt and
 # does nothing, and 6. A DEL in the middle of PRINT 12345. A line of
 # two rows, entered again from its first row with RETURN. CTRL-C, and
-# the cursor key down at the last row, which scrolls.
+# the cursor key down at the last row, which scrolls. Before all that,
+# an X that POKE leaves on the row of the next line, at its column 10,
+# is no part of PRINT 1, which the row after READY. takes blank; nor is
+# one after INPUT's prompt of its answer, nor one after AUTO's number of
+# its line, which LIST shows.
 UP = \033[A
 DN = \033[B
 RT = \033[C
 LT = \033[D
 X10 = XXXXXXXXXX
 Y10 = YYYYYYYYYY
-EDIT = cls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)AB\r\r$(DN)RUN\r$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)\r$(DN)$(DN)$(DN)$(DN)$(DN)$(DN)LIST\rRUN\rINPUT A: PRINT A * 2\r21\rINPUT B: PRINT B\r13$(LT)\177\rINPUT C: PRINT C\r5\177\1776\rPRINT 12345$(LT)$(LT)\177\rPRINT "$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)"\r$(UP)$(UP)$(UP)$(UP)$(UP)\rjunk\003$(DN)$(DN)$(DN)HALT\r
+EDIT = cls\rPOKE 0xFFFF00FA, 88\rPRINT 1\rPOKE 0xFFFF0235, 88: INPUT A: PRINT A\r7\rPOKE 0xFFFF0384, 88: AUTO\rREM\r\rLIST\rNEW\rcls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)AB\r\r$(DN)RUN\r$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)\r$(DN)$(DN)$(DN)$(DN)$(DN)$(DN)LIST\rRUN\rINPUT A: PRINT A * 2\r21\rINPUT B: PRINT B\r13$(LT)\177\rINPUT C: PRINT C\r5\177\1776\rPRINT 12345$(LT)$(LT)\177\rPRINT "$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)"\r$(UP)$(UP)$(UP)$(UP)$(UP)\rjunk\003$(DN)$(DN)$(DN)HALT\r
 # lines: DELETE of lines, RENUMBER, and AUTO (issue #118, step 4). A
 # program whose GOTO, GOSUB, THEN, and GOTO after : jump forward and
 # back, RENUMBER 100, 5 of it, which RUN shows unchanged; DELETE of a

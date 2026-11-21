@@ -955,6 +955,7 @@ in_vnext
                 MOVE    R1, S_QUEST
 in_ask
                 CALL    puts_b
+                CALL    ed_fresh        ; the answer on blanks
                 ONE     R1              ; CTRL-C is a break
                 CALL    getline
                 MOVE    R5, V_LINE

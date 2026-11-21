@@ -886,6 +886,14 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   ([What the stages need of the monitor](#the-later-stages)).
 - The keys come through `con_key`, the history through `scr_back`,
   and TAB through `fs_complete`, as the line of stage 3 has them.
+- A line starts on blanks. After `READY.`, `INPUT`'s prompt, `AUTO`'s
+  number, and the line that is shown again after an error, the editor
+  blanks the rest of the cursor's row, and makes the row after it a
+  line of its own. A character that a program or a `POKE` left there
+  was part of the line at RETURN, as on the C64, and a `Syntax error`
+  that nothing on the row explained (found in review, 2026-11-21).
+  The row after a line that was stored keeps its text, as it is the
+  next line of a listing, which RETURN enters again.
 - Typing inserts, and DEL deletes to the left and closes the gap, so
   the editor needs no INST key and has no quote mode. When a line
   grows into the next row and that row holds a line of its own, the

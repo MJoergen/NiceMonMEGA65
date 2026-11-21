@@ -30,7 +30,10 @@ SCR_LAST        .EQU    0xFFFF0780      ; the screen's row 24, the last
 ; waits for the first key, the address that DHCP gets in the background
 ; is shown, but only in a line with no text: not after AUTO's number,
 ; INPUT's prompt, or the line that ed_redo shows again, nor on a row with
-; text from before, which it would go over.
+; text from before, which it would go over. The line starts on blanks
+; after READY., AUTO's number, INPUT's prompt, and the line that ed_redo
+; shows again (ed_fresh), so only the row after a line that was stored
+; keeps its text, the next line of a listing, which RETURN enters again.
 ; Uses R1-R10.
 getline
                 MOVE    R10, R1         ; INPUT's
@@ -379,6 +382,7 @@ ed_redo
                 CALL    MON_PUTC
                 JMP     :-
 :
+                CALL    ed_fresh        ; no text from before after it
                 SUB     R7, R7, V_LINE+1  ; the characters
                 CALL    SCR_GETXY
                 CALL    ed_x80
@@ -387,6 +391,36 @@ ed_redo
                 ADD     R1, R1, R8      ; and its error
                 CLR     R3
                 JMP     ed_to
+
+; ed_fresh: blanks from the cursor to the end of its row, in the current
+; color, and the row after it a line of its own, its bit of scr_links
+; cleared, for the line that is typed next: what a program, a POKE, or a
+; line from before left there would be part of it at RETURN, which takes
+; the line from the screen. Uses R1-R6.
+ed_fresh
+                CALL    SCR_GETXY
+                MOVE    R5, R1
+                MOVE    R6, R2
+                CLR     R1
+                CALL    SCR_COLOR
+                MOVE    R3, R1          ; the color, which scr_color uses not
+                CALL    SCR_COLOR       ; back
+                OR      R3, R3, 0x20
+                MOVE    R1, R6
+                CALL    ed_row
+                ADD     R2, R1, 80      ; the word after the row
+                ADD     R1, R1, R5
+:
+                MOVE    @R1++, R3
+                CMP     R1, R2
+        ?!Z     JMP     :-
+                NOT     R1, R0
+                CALL    SCR_LINKS
+                MOVE    R2, 2
+                SHL     R2, R2, R6
+                NOT     R2, R2
+                AND     R1, R1, R2
+                JMP     SCR_LINKS
 
 ; ed_ext: the logical line of the cursor's row, from scr_links: R3 its
 ; first row, R4 its last, R5 the cursor's position in it, and R6 the end
@@ -747,13 +781,16 @@ st_auto
                 SUB     @V_LNUM, R10, R11
                 JMP     main_auto
 
-; auto_put: the next line's number and a blank, for AUTO, or AUTO off
-; past LINE_LAST. Uses R1-R7.
+; auto_put: the next line's number and a blank, for AUTO, on a row of
+; blanks (ed_fresh), or AUTO off past LINE_LAST. Uses R1-R7.
 auto_put
                 ADD     R1, @V_LNUM, @V_AUTO
                 CMP     R1, LINE_LAST+1
         ?!C     CLR     @V_AUTO
         ?!C     RET
+                PUSH    R1
+                CALL    ed_fresh
+                POP     R1
                 CALL    putdec
                 JMP     put_blank
 

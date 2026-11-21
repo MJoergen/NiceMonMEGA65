@@ -150,8 +150,9 @@ bas_start
                 MOVE    R1, S_HINT
                 CALL    puts_b_crlf
 
-; main: READY., on a row of its own, and the lines, each tokenized and
-; run with a fresh SP
+; main: READY., on a row of its own, the row after it blank, whatever
+; was left there (ed_fresh), and the lines, each tokenized and run with a
+; fresh SP
 main            CLR     @V_AUTO         ; READY. ends AUTO
 main_auto
                 MOVE    SP, STACK
@@ -173,6 +174,7 @@ main_auto
         ?!Z     JMP     main_line       ; AUTO, with no READY.
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
+                CALL    ed_fresh        ; the line on a row of blanks
                 TST     @V_EPOS         ; after an error of the tokenizer,
         ?!Z     CALL    ed_redo         ; the line again, the cursor at the error
 main_line

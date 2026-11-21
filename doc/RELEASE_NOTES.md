@@ -81,6 +81,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `DIR "IP"` that failed, with no IP address or no answer, after a
   `LOAD` that wrote a word below `HIMEM`, did a `NEW`, and so lost the
   program typed since.
+- A character that a program or a `POKE` left on the row where the
+  next line is typed was part of that line at RETURN, and so a
+  `Syntax error` that the line did not explain. BASIC blanks the rest
+  of the row after `READY.`, `INPUT`'s prompt, and `AUTO`'s number
+  ([basic/README.md](../basic/README.md)).
 
 **Tests.**
 

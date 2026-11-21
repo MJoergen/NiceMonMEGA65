@@ -95,6 +95,14 @@ When a line grows into a row that holds other text,
 that row and those below it move down. At `INPUT` the answer starts
 after the prompt. There is no INST key and no quote mode.
 
+RETURN takes what the screen shows, so the row that a line starts on
+must not hold text from before. After `READY.`, after `INPUT`'s
+prompt, and after `AUTO`'s number, BASIC blanks the rest of the row,
+so what a program, a `POKE`, or an older line left there is no part
+of the line. Only after a line that was stored does the next row keep
+its text: it is the next line of a listing, and RETURN enters it
+again.
+
 A line that the tokenizer refuses, such as `10 PRINT 1 @ 2`, is not
 stored. After the error and `READY.`, the line is shown again with the
 cursor at the error, so that it can be fixed and entered with RETURN.
@@ -599,7 +607,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
 | `funcs` | The ROM alone | The functions: their values, in either case, `PI`, the order of `^` and the signs, `RND`'s range and its numbers again after a negative argument, names that start with a function's, `LIST` of each function and of the keywords after them, and the errors of an argument a function does not take, `LOG(0)`, an overflow, and a function without its parentheses. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
-| `edit` | The ROM alone | The screen editor: a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
+| `edit` | The ROM alone | The screen editor: a character that `POKE` left on the row of the next line, after `READY.`, `INPUT`'s prompt, and `AUTO`'s number, which is no part of the line; a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
 | `long` | The ROM alone | The editor's limit: a listed line of 254 characters, changed at its last character and entered again, and one of 255, which is `Line too long` and stays as it was. |
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
@@ -644,14 +652,14 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2015 | 1256 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2019 | 1256 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1831 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1906 | 46 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1910 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1874 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1194 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1122 | 0 |
+| `basic_edit.nasm` | The screen editor | 1174 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1590 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1193 | 45 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
@@ -659,5 +667,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 14504 | 1985 |
+| In all | | 14564 | 1985 |
 <!-- /romsize basic -->
