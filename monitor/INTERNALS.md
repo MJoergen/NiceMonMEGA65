@@ -556,7 +556,7 @@ versions, the newest broken,
 all broken, the same version on both slots, a newer one on slot 1,
 slot 1 only, `SYS 0` with and without "keep" in the file, and BASIC's
 RAM at 4K words and 2K words, with `mon_exit`'s stack and `LOAD`'s end
-after each. Then it runs a program at `0x8000`, and a word at `0xBFFF`
+after each. Then it runs a program at `0x8000`, and a word at `0xCFFF`
 alone, which keep the ROM's BASIC, the program with a BASIC in the ROM
 that is not whole, with a card and without one, and `BL_BUSY` set with
 words in the staging area, with a card and without one. Its output is
