@@ -68,6 +68,7 @@ board that was not built then.
 | 2026-11-15 | The FPU of nice_cpu V2.2 (#136), with the ROM and `FLOW=timing`; the R3 0.120 / 0.036. A trial with nice_cpu at `7593bbc`, before the FPU registered each request, missed by 0.651 ns on the R3, in the FPU's rounding and `DIGITS`, the word operators, and the core's store into the FPU's registers | 0.076 / 0.036 | 0.017 / 0.031 |
 | 2026-11-20 | nice_cpu V2.4, whose `DIGITS` rounds once (#154), with the ROM and `FLOW=timing` | 0.010 / 0.056 | 0.042 / 0.042 |
 | 2026-11-20 | BASIC's part of the ROM from `0x3000` (40e66f6), which takes writes on the MEGA65 from an address at or above `G_ROM_BASIC`, a comparison where it was address bit 14, with the ROM and `FLOW=timing`; the R3 0.178 / 0.048. The paths to the ROM's write enables and to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3 | 0.100 / 0.046 | 0.077 / 0.022 |
+| 2026-11-21 | nice_cpu V2.5 and the screen of 80×28 characters (#157), with the ROM and `FLOW=timing` | 0.290 / 0.056 | 0.028 / 0.036 |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.

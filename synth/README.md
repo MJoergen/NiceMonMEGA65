@@ -327,15 +327,17 @@ These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.100 | 0.046 |
+| R6, pipelined | 100 MHz | 0.290 | 0.056 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
 | R3, pipelined | 100 MHz | 0.178 | 0.048 |
-| Nexys4DDR, pipelined | 90 MHz | 0.077 | 0.022 |
+| Nexys4DDR, pipelined | 90 MHz | 0.028 | 0.036 |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-The pipelined builds are those of 2026-11-20, with nice_cpu V2.4,
-BASIC's part of the ROM from `0x3000`, and `FLOW=timing`; the
-multi-cycle ones are older and have no FPU. The pipelined core meets its clock on
+The pipelined builds of the R6 and the Nexys4DDR are those of
+2026-11-21, with nice_cpu V2.5, the screen of 80×28 characters, and
+`FLOW=timing`; the R3's is of 2026-11-20, with nice_cpu V2.4 and
+BASIC's part of the ROM from `0x3000`. The multi-cycle ones are older
+and have no FPU. The pipelined core meets its clock on
 every board with `FLOW=timing` only, and the R6 and the Nexys4DDR with
 little to spare. In the default flow, the R6 misses by about 0.15 ns
 inside the core, in the check of a store into fetched code (issue #107).
