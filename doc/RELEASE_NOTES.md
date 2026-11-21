@@ -54,6 +54,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#158](https://github.com/MJoergen/NiceMonMEGA65/issues/158)). A
   line typed prints the same message as before, but stops there, so
   the statements after it on the line do not run.
+- BASIC has new keywords, which are no longer names of variables:
+  `TRAP`, `RESUME`, `ER`, `EL`, `ERR$`, `DS`, `DS$`, `TI`, `SLEEP`,
+  `FOREGROUND`, `BACKGROUND`, `CURSOR`, `RCURSOR`, and `OFF`. A saved
+  program with a variable of one of these names still loads, but the
+  statement that sets the variable is a `Syntax error` when it runs,
+  and runs once the variable is renamed. No names are reserved for
+  later keywords
+  ([#160](https://github.com/MJoergen/NiceMonMEGA65/issues/160)).
 
 **New.**
 

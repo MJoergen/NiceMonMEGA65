@@ -33,8 +33,8 @@ Made on 2026-11-11, but for the first two, which are of 2026-11-12,
 the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
 2026-11-16, the four after them, which are of 2026-11-18, the
-one after them, which is of 2026-11-20, and the last, which is of
-2026-11-21.
+one after them, which is of 2026-11-20, and the last two, which are
+of 2026-11-21.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -110,6 +110,17 @@ settle the three open questions of #54.
   `Illegal quantity`. The arithmetic stays on doubles, so `%` is a way
   of storing a number and not a second kind of number
   ([Numbers](#numbers)).
+- **No names are reserved** for the keywords of later stages
+  ([#160](https://github.com/MJoergen/NiceMonMEGA65/issues/160)). A
+  new keyword is a break, which the notes of its release list, as
+  those of `V2.5` list `TI`, `OFF`, and the others. The break is not
+  silent: a statement that sets a variable of the keyword's name, by
+  `=`, `FOR`, `READ`, `INPUT`, `GET`, or `DIM`, is a `Syntax error`
+  when it runs, and a keyword is a whole name, so only a variable of
+  exactly that name breaks.
+  [#164](https://github.com/MJoergen/NiceMonMEGA65/issues/164) makes
+  the error say so. The names of graphics, sprites, and sound wait for
+  their design, and the virtual screens (#163) have none yet.
 
 ## What it runs on
 
@@ -609,7 +620,8 @@ BASIC uses the FPU's.
   the editor. `POKE 0xFFFFFF85` reaches it, and the virtual screens of
   stage 11 are the place for one.
 - **`TI` and `OFF`** are new keywords, so a saved program with a
-  variable of either name gets a `Syntax error` (open question 5).
+  variable of either name gets a `Syntax error` (open question 5,
+  settled: no names are reserved).
   `ON` is the statement's keyword, read again after `CURSOR`.
 
 ### What changed in the list of #54
@@ -1528,9 +1540,9 @@ that is open when it is done.
 4. ~~**`PROC` and `FN`**.~~ Settled on 2026-11-20: as BBC BASIC
    writes them, `DEF PROCname` and `PROCname`, `DEF FNname` and
    `FNname`, so a variable's name cannot start with `PROC` or `FN`.
-5. **Reserved names**, #160. A keyword of a later stage, `SPRITE` or
-   `SOUND`, breaks a saved program that has a variable of that name.
-   The names could be refused as variables before they come.
+5. ~~**Reserved names**, #160.~~ Settled on 2026-11-21: none are
+   reserved, and a new keyword is a break that its release's notes
+   list ([Decisions](#decisions)).
 6. ~~**The digits of a constant**, so that `LIST` gives the program
    back.~~ Settled on 2026-11-18: the token of a constant keeps its
    digits beside the double ([Lines and tokens](#lines-and-tokens)), as
