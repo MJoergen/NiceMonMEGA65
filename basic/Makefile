@@ -146,7 +146,7 @@ BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\r
 # to the next column of 8, the CR LF that ; or a comma at the end leaves
 # out, before which READY. starts a row of its own, TAB and SPC, and
 # their counts of 0 to 255. Variables: names in either case, of 16
-# characters, not 17, no %, and A$, a string, LET and the assignment without it, a
+# characters, not 17, no % in a function's name, and A$, a string, LET and the assignment without it, a
 # keyword that is no name, an undefined one, made by its = alone, and
 # colons. The errors: division by zero by /, DIV, and MOD, an overflow
 # in a computation and in a constant, the Illegal quantity of SQR, of a
@@ -158,7 +158,7 @@ BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\r
 # word, here with no card, ends the line, and keeps the variables. After
 # a NEW, a table with a length of 99 at its start is cut there. Last, RAM_WORDS is set so that there
 # is room for four variables, B, E, F, and G, and H is Out of memory.
-EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rNEW\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9E10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
+EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rFNA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rNEW\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9E10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
 # funcs: the functions of stage 6 (issue #117), whose values
 # test/functions.py checks bit for bit. Each function, in upper and in
 # lower case, and PI. ^ binds more than the signs and groups to the
@@ -315,6 +315,18 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # an array, its data, and a variable after it. Last, LOAD of lines above
 # HIMEM, which keeps the program, and below, which does NEW, then the
 # same in a running program, which goes on, and ends at READY.
+# int: the names with % (issue #161), test/int.bas typed line by line.
+# A variable with %, beside one of the same name without, rounded toward
+# zero, -0.5 to 0, the largest and smallest word, and the Illegal
+# quantity of a value past them, and of an overflow; % in a function's
+# and a procedure's name, and $ after %, Syntax errors; an array with %
+# before DIM; arrays with % of one and of two dimensions, a value
+# rounded, -1 from hex, a value past a word, a subscript outside and of
+# 1.5, and a second DIM; INPUT, GET, FOR with a step of -1.5, and
+# RCURSOR into them. A program with % in a function's and a procedure's
+# parameters, LOCAL, READ, and three variables of one name, LIST and RUN,
+# CLR. Last the layout: an array of doubles and one with %, whose data
+# is a word an element.
 # str: the strings of stage 5 (issue #116), test/str.bas typed line by
 # line, with --step-time, so that TIME$ is the same in each run. String
 # variables, +, and each function, with the edges of their arguments:
@@ -487,7 +499,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/int.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -512,6 +524,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/str.bas > $(BUILD)/str.txt
 	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
 	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
+	@tr '\n' '\r' < test/int.bas > $(BUILD)/int.txt
 	@{ tr '\n' '\r' < test/mach.bas; printf '$(MACH_TAIL)'; } > $(BUILD)/mach.txt
 	@{ tr '\n' '\r' < test/trap.bas; printf '$(TRAP_TAIL)'; } > $(BUILD)/trap.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
@@ -523,13 +536,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap int load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap|int) prog=; dump=;; \
 	    str|mach) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \

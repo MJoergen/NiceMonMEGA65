@@ -298,7 +298,9 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   with no rounding, so an array of flags or of words is half as large,
   which counts in the Nexys4DDR's 26K words. The arithmetic stays on
   doubles: `%` is how a number is stored, not a second kind of number,
-  and no operator has a second path. A 32-bit float, through
+  and no operator has a second path. A `FOR` of a `%` variable rounds
+  each value that `NEXT` stores, as `I% = I% + S` would, so a step
+  below 1 never ends the loop, as a step of 0 does not. A 32-bit float, through
   `FPU_X_S`, costs the same, but holds whole numbers only up to 2^24,
   so an address or a word from `PEEK` would lose bits, and `PRINT`'s
   15 digits would show its rounding: 0.1 prints as
@@ -1176,6 +1178,15 @@ they were, but for some 90 steps of each program's `PRINT "S"` and
 `PRINT "E"`, as a string now goes through the stack of strings, and
 `tok_skip` takes its words by a table, so a skip is two steps shorter:
 the sieve is 13818577 steps, Rugg/Feldman 7 2270159, and 8 719407.
+
+The names with `%`
+([#161](https://github.com/MJoergen/NiceMonMEGA65/issues/161)) cost
+the other programs 1 to 3 percent of their steps (measured
+2026-11-21): a test in each `NEXT`, two steps in each store, and
+three in each read of an array's element, for the bits of a `%`. The
+sieve is 14323734 steps, and 14468294 with `FLAGS%`, 1 percent more
+for the check of each store, in half the room, 8194 words for its
+array where `FLAGS` takes 16386.
 
 ## Stages
 

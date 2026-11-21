@@ -347,9 +347,7 @@ fa_bind
                 ADD     R1, R1, @V_PEND
                 TST     R2
         ?N      JMP     :+
-                MOVE    @R1, @FPU_X_LO
-                MOVE    @1[R1], @FPU_X_HI
-                MOVE    @FPU_CMD, FPU_DROP
+                CALL    set_num         ; whole for a parameter with %
                 JMP     :-
 :
                 CALL    store_str

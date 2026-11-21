@@ -494,9 +494,7 @@ st_for
         ?!Z     JMP     err_syntax
                 CALL    eval_num
                 ADD     R1, R10, @V_PEND
-                MOVE    @R1, @FPU_X_LO
-                MOVE    @1[R1], @FPU_X_HI
-                MOVE    @FPU_CMD, FPU_DROP
+                CALL    set_num
                 CMP     @R8++, T_TO
         ?!Z     JMP     err_syntax
                 CALL    eval_num        ; the limit
@@ -547,6 +545,8 @@ st_next
                 MOVE    @FPU_X_HI, @5[R9]
                 MOVE    @FPU_CMD, FPU_ADD
                 CALL    check_flags
+                AND[M]  R0, @2[R10], WHOLE
+        ?!Z     CALL    to_whole        ; a variable with %
                 MOVE    @R10, @FPU_X_LO
                 MOVE    @1[R10], @FPU_X_HI
                 MOVE    @FPU_X_LO, @2[R9]
@@ -821,7 +821,8 @@ lt_rem
                 CALL    putc
                 JMP     :-
 
-; A variable's name, from its entry, and a $ after a string's
+; A variable's name, from its entry, and a $ after a string's, or a %
+; after a whole number's
 lt_var
                 AND     R1, R6, 0xFFFFFF
                 ADD     R5, R1, @V_PEND
@@ -837,10 +838,13 @@ lt_var
                 CALL    putc
                 JMP     :-
 :
-                AND[M]  R0, R7, STRING
-        ?Z      RET
                 MOVE    R1, 0x24        ; $
-                JMP     putc
+                AND[M]  R0, R7, STRING
+        ?!Z     JMP     putc
+                MOVE    R1, 0x25        ; %
+                AND[M]  R0, R7, WHOLE
+        ?!Z     JMP     putc
+                RET
 
 ; ( ) , ; and :
 lt_punct
@@ -914,11 +918,42 @@ st_get
         ?N      CLR     R1
                 MOVE    @FPU_X_W, R1
                 POP     R1
-; store_var: the FPU's X to the variable at R1, and off the stack
+; store_var: the FPU's X to the variable at R1, as lvalue gives it, and
+; off the stack. With INT_VAR in R1, a variable with %, X is rounded
+; toward zero first, and with WORD_CELL, an element of an array with %,
+; it goes into the word as a signed word; either is an Illegal quantity
+; when it does not fit a word. Uses R1 and R2.
 store_var
+                AND[M]  R0, R1, INT_VAR+WORD_CELL
+        ?!Z     JMP     sv_whole
+sv_double
                 MOVE    @R1, @FPU_X_LO
                 MOVE    @1[R1], @FPU_X_HI
                 MOVE    @FPU_CMD, FPU_DROP
+                RET
+sv_whole
+                AND     R2, R1, 0x3FFFFFFF
+                TST     R1
+        ?N      JMP     :+
+                CALL    to_whole
+                MOVE    R1, R2
+                JMP     sv_double
+:
+                CALL    x_word          ; an element's word
+                MOVE    @R2, R1
+                RET
+; set_num: the FPU's X to the variable of the entry at R1, a number's,
+; rounded as store_var rounds it for a variable with %, and off the
+; stack. Uses R1 and R2.
+set_num
+                AND[M]  R0, @2[R1], WHOLE
+        ?!Z     OR      R1, R1, INT_VAR
+                JMP     store_var
+; to_whole: the FPU's X rounded toward zero, as a signed word, which
+; must fit, or an Illegal quantity; +0 for a -0. Uses R1.
+to_whole
+                CALL    x_word
+                MOVE    @FPU_X_W, R1
                 RET
 
 ; INPUT ["PROMPT";] V [, W$ ...]: the prompt and ? , and a line of items,
@@ -1120,8 +1155,9 @@ load_new
                 RET
 
 ; lvalue: R1 the address of the variable, or of the array's element, at
-; R8, and R8 after it; lvalue_s (basic_str.nasm) is a string's. Uses
-; R1-R12.
+; R8, and R8 after it, for store_var, with INT_VAR for a variable with %
+; and WORD_CELL for an element of an array with %; lvalue_s
+; (basic_str.nasm) is a string's. Uses R1-R12.
 lvalue
                 MOVE    R1, @R8++
                 SHR     R2, R1, 24
@@ -1131,10 +1167,13 @@ lvalue
         ?!Z     JMP     err_syntax
                 AND     R1, R1, 0xFFFFFF
                 ADD     R1, R1, @V_PEND
+                AND[M]  R0, @2[R1], WHOLE
+        ?!Z     OR      R1, R1, INT_VAR
                 RET
 
 ; arr_elem: R1 the address of the element of the array of the token R1,
-; whose subscripts are at R8, and R8 after them. An array that no DIM
+; whose subscripts are at R8, and R8 after them, with WORD_CELL for an
+; array with %, whose elements are one word each. An array that no DIM
 ; made is Undefined array, and a subscript outside, or one too many or
 ; too few, is Bad subscript. Uses R1-R12.
 arr_elem
@@ -1144,13 +1183,16 @@ arr_elem
                 ADD     R1, R1, @V_PEND
                 CMP     @1[R1], 0xFFFFFFFF
         ?Z      JMP     err_array
+                MOVE    R2, @2[R1]
                 MOVE    R1, @R1
                 ADD     R1, R1, @V_VEND  ; the data
+                AND[M]  R0, R2, WHOLE
+        ?!Z     OR      R1, R1, WORD_CELL
                 PUSH    R1
                 CMP     @R8++, T_LPAR
         ?!Z     JMP     err_syntax
                 CALL    eval_word
-                MOVE    R2, @SP
+                AND     R2, @SP, 0x7FFFFFFF
                 CMP     R1, @R2
         ?!C     JMP     err_subscript
                 MOVE    R3, @1[R2]      ; the second size, or 0
@@ -1165,7 +1207,7 @@ arr_elem
                 PUSH    R1
                 CALL    eval_word
                 POP     R3
-                MOVE    R2, @SP
+                AND     R2, @SP, 0x7FFFFFFF
                 CMP     R1, @1[R2]
         ?!C     JMP     err_subscript
                 ADD     R1, R1, R3
@@ -1177,7 +1219,8 @@ arr_elem
                 CMP     @R8++, T_RPAR
         ?!Z     JMP     err_syntax
                 POP     R2
-                DBL     R1, R1
+                TST     R2
+        ?!N     DBL     R1, R1          ; two words for a double
                 ADD     R1, R1, R2
                 ADD     R1, R1, 2
                 RET
@@ -1185,7 +1228,8 @@ arr_elem
 ; DIM A(N) [, B(N, M) ...]: the arrays, A of N + 1 elements, and B of
 ; N + 1 rows of M + 1, each element 0, which is an empty string for an
 ; array of strings. An array's data is its two sizes,
-; the second 0 for one dimension, and its doubles, row by row. A second
+; the second 0 for one dimension, and its doubles, row by row, or its
+; words for an array with %. A second
 ; DIM of an array is Redimensioned array, and a negative N or M an
 ; Illegal quantity.
 st_dim
@@ -1223,7 +1267,8 @@ st_dim
                 MOVE    R7, @MPU_LO     ; the elements
                 AND[M]  R0, R7, 0xE0000000
         ?!Z     JMP     err_memory
-                DBL     R7, R7          ; their words
+                AND[M]  R0, @2[R6], WHOLE
+        ?Z      DBL     R7, R7          ; their words, two for a double
                 ADD     R1, R7, 2
                 ADD     R3, @V_AEND, R1
                 CALL    room

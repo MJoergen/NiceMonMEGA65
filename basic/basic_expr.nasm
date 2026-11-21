@@ -55,8 +55,11 @@
 ; whole name, up to 16 letters and digits.
 ;
 ; A variable is its double, then its name: the name's length, with
-; STRING for a string's, then its characters in upper case, packed four
-; to a word, as .ASCII_B packs them. A string variable has its string's
+; STRING for a string's and WHOLE for one with %, then its characters in
+; upper case, packed four to a word, as .ASCII_B packs them. A variable
+; with % holds a whole number in its double, which a store rounds
+; toward zero, and must fit a word (store_var, basic_prog.nasm). An
+; element of an array with % is one word. A string variable has its string's
 ; address and length in the place of the double (basic_str.nasm). A
 ; variable that was never assigned has 0xFFFFFFFF, a NaN, in the
 ; high word of its double. An array's entry has ARRAY in its length, and
@@ -141,7 +144,10 @@ K_UFN           .EQU    22
 K_SFNU          .EQU    23
 K_BLK           .EQU    24
 ARRAY           .EQU    0x100           ; in the length of an array's name,
-STRING          .EQU    0x200           ; and of a string's
+STRING          .EQU    0x200           ; of a string's,
+WHOLE           .EQU    0x800           ; and of a whole number's, with %
+INT_VAR         .EQU    0x40000000      ; in lvalue's address: a variable with %,
+WORD_CELL       .EQU    0x80000000      ; and an element of an array with %, one word
 NAME_LEN        .EQU    0xFF            ; the length alone
 K               .EQU    0x1000000       ; a kind's unit
 P               .EQU    0x10000         ; a precedence's unit
@@ -405,12 +411,13 @@ tok_data
                 JMP     tok_next
 tok_var
                 ADD     R5, R9, R10
-                CLR     R7              ; 1 after a $, a string's name
-                CMP     @R5, 0x24       ; $
+                CLR     R7              ; 1 after a $ or a %
+                CMP     @R5, 0x24       ; $: a string's name
         ?Z      OR      R10, R10, STRING
         ?Z      ONE     R7
-                CMP     @R5, 0x25       ; %
-        ?Z      JMP     err_syntax
+                CMP     @R5, 0x25       ; %: a whole number's
+        ?Z      OR      R10, R10, WHOLE
+        ?Z      ONE     R7
                 AND     R1, R10, NAME_LEN  ; FN and more: a function's name
                 CMP     R1, 3
         ?C      JMP     :+
@@ -433,6 +440,9 @@ tok_var
         ?Z      CMP     R1, 0x43        ; C
         ?Z      OR      R10, R10, FUNC
 tv_store
+                AND     R1, R10, FUNC+WHOLE
+                CMP     R1, FUNC+WHOLE
+        ?Z      JMP     err_syntax      ; no % in a function's name
                 MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
                 MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT,
                 AND     R3, R2, 0xFFFFFF00  ; READ, or RCURSOR, or with = after it, at the
@@ -502,9 +512,10 @@ tv_name
                 CMP     R3, R5
         ?!Z     JMP     :-
                 CALL    var_find
-                ADD     R5, R5, R7      ; after the $
+                ADD     R5, R5, R7      ; after the $ or the %
                 SUB     R1, R1, @V_PEND
                 SHR     R2, R10, 8
+                AND     R2, R2, 7       ; not WHOLE
                 OR      @R8++, R1, @VAR_KINDS[R2]
                 JMP     tok_next
 ; The kinds of a name's token, by its bits ARRAY, STRING, and FUNC
@@ -512,7 +523,8 @@ VAR_KINDS
                 .DAT    K_VAR*K, K_ARR*K, K_SVAR*K, K_SARR*K, K_UFN*K, 0, K_SFNU*K
 
 ; var_find: R1 = the variable of the name at V_PNAME, of length R10,
-; with ARRAY for an array's and STRING for a string's, found, or made at
+; with ARRAY for an array's, STRING for a string's, and WHOLE for one
+; with %, found, or made at
 ; V_VEND when R11 is not 0, else V_PEND + NO_VAR. Uses R1-R4, R6, and
 ; R12.
 var_find
@@ -524,7 +536,7 @@ var_find
 var_next
                 CMP     R1, R4
         ?!C     JMP     var_new
-                MOVE    R2, @2[R1]      ; the length, ARRAY, and STRING
+                MOVE    R2, @2[R1]      ; the length, ARRAY, STRING, and WHOLE
                 AND[M]  R3, R2, NAME_LEN
         ?Z      JMP     var_cut
                 CMP     R3, 17
@@ -935,8 +947,14 @@ p_var
                 RET
 p_arr
                 CALL    arr_elem
+                TST     R1
+        ?N      JMP     :+
                 MOVE    @FPU_X_LO, @R1
                 MOVE    @FPU_X_HI, @1[R1]
+                RET
+:
+                AND     R1, R1, 0x7FFFFFFF  ; a word, of an array with %
+                MOVE    @FPU_X_W, @R1
                 RET
 p_kw
                 CMP     R1, T_HIMEM

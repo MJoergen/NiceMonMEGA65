@@ -227,8 +227,8 @@ exact.
   with one, as `TOTAL` starts with `TO`. A name that starts with `FN`
   or `PROC` and goes on, such as `FNORD` or `PROCESS`, is a function's
   or a procedure's, and no variable (Programs below). A `$` after a
-  name makes a string's name (Strings below), and a `%` is a `Syntax
-  error`, as whole numbers come later. An
+  name makes a string's name (Strings below), and a `%` a whole
+  number's (below). An
   assignment, `INPUT`, `GET`, and `RCURSOR` make the variable in a line typed,
   and a line of a program makes each of its names. A variable that
   none of them set is an `Undefined variable`. A variable is its
@@ -236,6 +236,18 @@ exact.
   below). When the variables and the arrays reach the frames below
   `HIMEM`, a variable more is `Out of memory`. `CLR` and `RUN` clear
   them, and `NEW` drops them.
+- **A whole number's name** ends with `%`, such as `COUNT%`, and
+  `A%(` is an array of whole numbers. `A`, `A%`, and `A$` are three
+  variables. A number stored in one is cut toward zero, so `A% = 2.7`
+  sets 2 and `A% = -1.5` sets -1, the way `POKE` cuts its value. A
+  number below -2147483648 or above 2147483647 is an `Illegal
+  quantity`. Each element of an array of whole numbers takes one word,
+  where an element of numbers takes two, so `DIM F%(8191)` takes half
+  the room of `DIM F(8191)`. A `%` variable takes the room of any
+  other. The arithmetic is the same for all numbers, so `A% / 2` is
+  1.5 when `A%` is 3. A `FOR` of a `%` variable cuts each value too:
+  `FOR I% = 1 TO 2 STEP 0.5` never ends, as `I%` stays 1. A function's
+  or a procedure's name has no `%`, but their parameters may.
 - **`PRINT`** shows a number as C's `%.15G` does: its first 15
   significant digits, with the trailing zeros dropped, in fixed
   notation while the number is from 1E-4 to below 1E15, with a 0
@@ -288,7 +300,7 @@ keeps the variables, but `CONT` cannot go on after it.
 | `REM TEXT` | A remark, the rest of the line, which `LIST` shows as it was typed. |
 | `INPUT ["P";] V [, W$]` | Prints `? `, or `P` and `? `, and reads a number into `V` and a string into `W$`, with commas between them. A string is the text up to a comma or the end, without the blanks around it, or one in quotes, which may have commas. A line that has no number where one goes, a number in quotes, or text after a closing quote, is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
 | `GET V`, `GET V$` | Sets `V` to the code of the next key typed, or 0 when there is none, and `V$` to the key, or `""`. It does not wait. |
-| `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
+| `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`, and `DIM A%(N)` one of whole numbers, a word each. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
 | `ON X GOTO N, M`, `ON X GOSUB N, M` | Goes to the line of the X-th number, as `GOTO` and `GOSUB` do: `ON 2 GOTO 100, 200` goes to 200. `X` is rounded toward zero. An `X` of 0 or past the list goes on after the statement, and below 0 it is an `Illegal quantity`. A `GOSUB` comes back after the statement. |
 | `DEF FNA(X, Y$) = E` | Defines the function `FNA` of the parameters `X` and `Y$`, with the value of the expression `E`, which `FNA(1, "S")` gives, `E` with `X` 1 and `Y$` `"S"`. `DEF FNP = 3.14` has no parameters, and `FNP` calls it. `DEF FNA$(X) = ...` gives a string. The parameters are variables of numbers or strings, which have their own values again after the call, and the other variables are the program's. A name that starts with `FN` is a function's, and a call finds its `DEF` anywhere in the program; with none it is an `Undefined function`, with another count of arguments a `Syntax error`, and with an argument of the other kind a `Type mismatch`. A `DEF` that runs does nothing, as `REM`. |
 | `DEF FNA(X)`, `= E` | A function over lines: with no `=` after its parameters, a call runs the statements after them up to a statement `= E`, whose `E` is its value, as `IF N < 2 THEN = 1`. A function calls itself about 30 deep, as its calls have 512 words of the processor's stack, past which it is `Formula too complex`. A `DEF` that runs does nothing, so a program that reaches one runs on into the function's lines: they go after the program's `END`. The program's end in one is `FN without =`, and `=` with no function running is `= without FN`. |
@@ -796,6 +808,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `mach` | The ROM, with `--step-time` and `test/mach.bas` typed | `TI`; `FOREGROUND` and `BACKGROUND` by number and by red, green, and blue, read back from the screen's words; `CURSOR` to a place, its limits, `ON`, `OFF`, and the styles; `RCURSOR`; their errors and `LIST`; and `SLEEP`, timed with `TI`, broken by CTRL-C and gone on with `CONT`. |
 | `trap` | The ROM alone, with `test/trap.bas` typed | `ER`, `EL`, and `ERR$` before any error; each error that a program can come to, trapped once, with its number, its line, and its message, and `RESUME NEXT` after it: after `THEN`, a block `IF`, and a `DO`, in a `FOR` loop, which goes on, in a subroutine, whose `GOSUB` to no line is dropped, in a `FN` over lines, after which its caller goes on with its parameter set again, and in a `PROC`; `RESUME` after a fix, `RESUME N`, `ERR$` of 0 to 113, an error in the handler, `TRAP` alone, `RENUMBER` and `LIST` of the lines; `DS` and `DS$` before any failure, the failures with no card and no IP address, of a server and an offset that are not, and of a slot that is not, trapped, with the dump of the program's tokens, with the 0 after each string, which `BSAVE` leaves as they were, a failure with no `TRAP`, and `LOAD` of a program's text, which a `TRAP` does not take; a handler that goes on with `GOTO` and a `TRAP`, and CTRL-C, which a `TRAP` does not take. |
+| `int` | The ROM alone, with `test/int.bas` typed | The names with `%`: a value cut toward zero, the largest and smallest word, and a value past them; `%` in a function's and a procedure's name; arrays with `%` of one and two dimensions, and their errors; `INPUT`, `GET`, `FOR`, `RCURSOR`, `READ`, `LOCAL`, and the parameters into them; `A`, `A%`, and `A$` side by side, `LIST`, and the layout of an array with `%` in memory. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
@@ -834,15 +847,15 @@ table, and `make romsize` writes it again.
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2267 | 1464 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1859 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1924 | 46 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1876 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1986 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1769 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1071 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1592 | 11 |
-| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1205 | 45 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1201 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
 | `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 667 | 20 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
@@ -850,5 +863,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15597 | 2213 |
+| In all | | 15672 | 2213 |
 <!-- /romsize basic -->

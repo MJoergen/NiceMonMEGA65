@@ -55,6 +55,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   line typed prints the same message as before, but stops there, so
   the statements after it on the line do not run.
 
+**New.**
+
+- BASIC has whole numbers: a name with `%`, such as `COUNT%`, and
+  arrays of them, `DIM F%(N)`, whose elements take one word each,
+  half the room of numbers
+  ([#161](https://github.com/MJoergen/NiceMonMEGA65/issues/161),
+  [basic/README.md](../basic/README.md#numbers)). A number stored in
+  one is cut toward zero, as `POKE` cuts it, and one past a signed
+  word is an `Illegal quantity`. A `%` in a name was a `Syntax error`.
+
 **Fixed.**
 
 - `nicemon.py mon --help` has the same form as the other subcommands'
