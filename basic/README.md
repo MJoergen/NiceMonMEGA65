@@ -371,38 +371,82 @@ still the line in the function.
 Only a running program goes to its `TRAP`: an error in a line typed
 prints its message. `RUN`, `CLR`, `NEW`, an edit of the program, and an
 error that stops the program turn the `TRAP` off. CTRL-C is no error:
-it stops a program with a `TRAP` too, and `CONT` goes on. The errors of
-the files and of the network, such as `File error 4`, are messages, and
-the program goes on after them, so a `TRAP` does not see them.
+it stops a program with a `TRAP` too, and `CONT` goes on.
+
+### Failures of the files and the network
+
+A statement of the card or the network that fails, such as `LOAD` of a
+file that is not there, or `DIR` of a TFTP server that does not answer,
+is an error too. Without a `TRAP` it stops the program, and prints the
+line that tells what failed, such as `File error 21, no such file in
+20`. In a line typed it prints the same line, without the line number.
+With a `TRAP` the program goes to the handler, and these tell what
+failed, as BASIC 65's disk status does:
+
+| Function | What it gives |
+|---|---|
+| `DS` | The number of the last failure, or 0 before the first. |
+| `DS$` | The line of the last failure, such as `File error 21, no such file`, or `""` before the first. It keeps 87 characters at most. |
+
+`ER` is one of four errors, by the kind of failure:
+
+| `ER` | Message | When |
+|---:|---|---|
+| 4 | `File not found` | The file is not on the card (`DS` 21), or the TFTP server has no such file (`DS` 64, `TFTP error 1`). |
+| 5 | `Device not present` | No card in the slot, no such slot, no IP address, no DNS server, or no answer to ARP, from the DHCP server, the DNS server, the time server, or the TFTP server. |
+| 112 | `File error` | Any other failure of the card or a file, with `DS` below 40. |
+| 113 | `Network error` | Any other failure of the network. |
+
+`DS` is the number of the error that the monitor gives: 1 to 8 are the
+SD card's, 16 to 32 the files', and 40 to 57 the network's. BASIC's own
+are 60 to 62 for `NTP`, 63 and 64 for TFTP, no answer and an error of
+the server, 65 for a TFTP server that is no `IP[:PORT]`, and 66 for an
+offset of `NTP` that is no `+HH:MM` or `-HH:MM`.
+
+A program that tries a second server when the first does not answer:
+
+```
+10 TRAP 100
+20 LOAD "GAME.BIN", "192.168.1.10"
+30 END
+100 IF ER <> 5 THEN PRINT DS$: END
+110 TRAP: LOAD "GAME.BIN", "192.168.1.11"
+```
+
+`LOAD` and `RUN` of a program's text end the program that runs them, so
+a `TRAP` does not take their failures. A `LOAD` of a `.bin` file that
+wrote a word below `HIMEM` before it failed ends the program too, with
+`NEW`.
 
 The numbers are those of BASIC 65 for the errors that BASIC 65 has,
 and from 100 on for the others:
 
 | `ER` | Message | `ER` | Message |
 |---:|---|---:|---|
-| 10 | `NEXT without FOR` | 33 | `LOOP without DO` |
-| 11 | `Syntax error` | 100 | `Undefined variable` |
-| 12 | `RETURN without GOSUB` | 101 | `Undefined array` |
-| 13 | `Out of data` | 102 | `Undefined procedure` |
-| 14 | `Illegal quantity` | 103 | `= without FN` |
-| 15 | `Overflow` | 104 | `FN without =` |
-| 16 | `Out of memory` | 105 | `ENDPROC without PROC` |
-| 17 | `Undefined line` | 106 | `LOCAL without PROC` |
-| 18 | `Bad subscript` | 107 | `EXIT without DO` |
-| 19 | `Redimensioned array` | 108 | `Missing ENDIF` |
-| 20 | `Division by zero` | 109 | `Line too long` |
-| 22 | `Type mismatch` | 110 | `Line without a number` |
-| 23 | `String too long` | 111 | `A byte that is no character` |
-| 25 | `Formula too complex` | | |
+| 4 | `File not found` | 32 | `Missing LOOP` |
+| 5 | `Device not present` | 33 | `LOOP without DO` |
+| 10 | `NEXT without FOR` | 100 | `Undefined variable` |
+| 11 | `Syntax error` | 101 | `Undefined array` |
+| 12 | `RETURN without GOSUB` | 102 | `Undefined procedure` |
+| 13 | `Out of data` | 103 | `= without FN` |
+| 14 | `Illegal quantity` | 104 | `FN without =` |
+| 15 | `Overflow` | 105 | `ENDPROC without PROC` |
+| 16 | `Out of memory` | 106 | `LOCAL without PROC` |
+| 17 | `Undefined line` | 107 | `EXIT without DO` |
+| 18 | `Bad subscript` | 108 | `Missing ENDIF` |
+| 19 | `Redimensioned array` | 109 | `Line too long` |
+| 20 | `Division by zero` | 110 | `Line without a number` |
+| 22 | `Type mismatch` | 111 | `A byte that is no character` |
+| 23 | `String too long` | 112 | `File error` |
+| 25 | `Formula too complex` | 113 | `Network error` |
 | 26 | `Can't continue` | | |
 | 27 | `Undefined function` | | |
 | 31 | `Can't resume` | | |
-| 32 | `Missing LOOP` | | |
 
-`Syntax error; HELP lists the statements` is 11 too. The last three
-come from `LOAD` of a program's text alone, which is no running
-program. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$` are keywords, so `ER`
-and `EL` are no names of variables.
+`Syntax error; HELP lists the statements` is 11 too. 109 to 111 come
+from `LOAD` of a program's text alone, which is no running program. `TRAP`, `RESUME`, `ER`, `EL`, `ERR$`, `DS`, and
+`DS$` are keywords, so `ER`, `EL`, and `DS` are no names of
+variables.
 
 ## Strings
 
@@ -708,7 +752,9 @@ the default. It runs these steps in order:
    before, and get an ERROR after the first block, an ERROR to the
    WRQ, as a server without `--write` sends it, and no answer; and
    CTRL-C ends a `SAVE` with an ERROR to the server. A `DIR` that
-   fails after a `LOAD` of a word below `HIMEM` keeps the program.
+   fails after a `LOAD` of a word below `HIMEM` keeps the program. A
+   program's `TRAP` takes an ERROR 1, File not found, with a message
+   of 116 characters, of which `DS$` keeps 87.
 7. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
    benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
    with strings until it is swept, in `bench/`, and checks their
@@ -736,7 +782,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | Test | What runs | What it checks |
 |---|---|---|
 | `cmds` | The ROM alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
-| `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and the tokens of a line, with the 0 after each string, which `SAVE` leaves as they were. |
+| `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and four statements that fail with no card or no IP address, whose tokens `trap` dumps. |
 | `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
 | `funcs` | The ROM alone | The functions: their values, in either case, `PI`, the order of `^` and the signs, `RND`'s range and its numbers again after a negative argument, names that start with a function's, `LIST` of each function and of the keywords after them, and the errors of an argument a function does not take, `LOG(0)`, an overflow, and a function without its parentheses. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
@@ -749,12 +795,12 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `proc` | The ROM alone, with `test/proc.bas` typed | `PROC` with parameters of numbers and strings and `LOCAL`s, the program's variables of their names kept; `FN` over lines calling itself, with `LOCAL`s and a `FOR` loop, and one on one line with `IF` and `ELSE`; `FN`s in expressions with numbers and strings pending; a `PROC` calling itself, `ENDPROC` in an `IF`, and a `GOSUB` in a `PROC`; strings that frames keep over sweeps of a small heap; the errors of `ENDPROC`, `=`, and `LOCAL`, of the calls, and of a `FN` with no `=`, after which `CONT` cannot go on; `ENDPROC` and `=` in a subroutine; and a `FN` 30 and 31 deep. |
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `mach` | The ROM, with `--step-time` and `test/mach.bas` typed | `TI`; `FOREGROUND` and `BACKGROUND` by number and by red, green, and blue, read back from the screen's words; `CURSOR` to a place, its limits, `ON`, `OFF`, and the styles; `RCURSOR`; their errors and `LIST`; and `SLEEP`, timed with `TI`, broken by CTRL-C and gone on with `CONT`. |
-| `trap` | The ROM alone, with `test/trap.bas` typed | `ER`, `EL`, and `ERR$` before any error; each error that a program can come to, trapped once, with its number, its line, and its message, and `RESUME NEXT` after it: after `THEN`, a block `IF`, and a `DO`, in a `FOR` loop, which goes on, in a subroutine, whose `GOSUB` to no line is dropped, in a `FN` over lines, after which its caller goes on with its parameter set again, and in a `PROC`; `RESUME` after a fix, `RESUME N`, `ERR$` of 0 to 112, an error in the handler, `TRAP` alone, `RENUMBER` and `LIST` of the lines, a handler that goes on with `GOTO` and a `TRAP`, and CTRL-C, which a `TRAP` does not take. |
+| `trap` | The ROM alone, with `test/trap.bas` typed | `ER`, `EL`, and `ERR$` before any error; each error that a program can come to, trapped once, with its number, its line, and its message, and `RESUME NEXT` after it: after `THEN`, a block `IF`, and a `DO`, in a `FOR` loop, which goes on, in a subroutine, whose `GOSUB` to no line is dropped, in a `FN` over lines, after which its caller goes on with its parameter set again, and in a `PROC`; `RESUME` after a fix, `RESUME N`, `ERR$` of 0 to 113, an error in the handler, `TRAP` alone, `RENUMBER` and `LIST` of the lines; `DS` and `DS$` before any failure, the failures with no card and no IP address, of a server and an offset that are not, and of a slot that is not, trapped, with the dump of the program's tokens, with the 0 after each string, which `BSAVE` leaves as they were, a failure with no `TRAP`, and `LOAD` of a program's text, which a `TRAP` does not take; a handler that goes on with `GOTO` and a `TRAP`, and CTRL-C, which a `TRAP` does not take. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
-| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, and a program that runs the next. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
+| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, a program that runs the next, and the failures of issue #158: `BSAVE` to a slot with no card, and `LOAD` and `DELETE` of a file that is not there, trapped, a failure with no `TRAP`, and `LOAD` of a program's text that is not there, which a `TRAP` does not take. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
 | `time` | The ROM, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, month 0, day 0, letters, wrong separators, and 2106, and the clock left alone after them; the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, 2105-12-31, the last day of a leap year, and blanks in the quotes; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
 
 `time` runs with `--step-time`, so that the clock starts at 0, not
@@ -787,22 +833,22 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2244 | 1444 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1857 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1920 | 46 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1874 | 294 |
-| `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1194 | 150 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2267 | 1464 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1859 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1924 | 46 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1769 | 294 |
+| `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1071 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1591 | 11 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1592 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1205 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
-| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$` | 281 | 4 |
+| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 667 | 20 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15409 | 2177 |
+| In all | | 15597 | 2213 |
 <!-- /romsize basic -->

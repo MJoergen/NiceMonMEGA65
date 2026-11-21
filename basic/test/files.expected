@@ -161,6 +161,35 @@ LIST
 30 PRINT "done"
 40 END
 READY.
+NEW
+READY.
+10 TRAP 100
+20 BSAVE "W", 0x8000, 2, 1
+30 LOAD "NOPE.BIN", 0
+40 DELETE "NOPE.BIN"
+50 END
+100 PRINT ER, EL, DS, ERR$(ER): PRINT DS$: RESUME NEXT
+RUN
+5       20      1       Device not present
+SD error 1 in slot 1, no card
+4       30      21      File not found
+File error 21, no such file
+4       40      21      File not found
+File error 21, no such file
+READY.
+10 LOAD "NOPE.BIN"
+RUN
+File error 21, no such file in 10
+READY.
+10 TRAP 100: LOAD "NOPE": PRINT "NOT HERE"
+RUN
+File error 21, no such file
+READY.
+LIST 10
+10 TRAP 100: LOAD "NOPE": PRINT "NOT HERE"
+READY.
+NEW
+READY.
 DIR
 Directory of NICE in slot 0
 HELLO.BIN                      14436
@@ -178,16 +207,16 @@ READY.
 HALT
 Halted
 Screen:
-|SAVE "BRK"
-|Break
+|File error 21, no such file in 10
 |READY.
-|LOAD "BRK"
+|10 TRAP 100: LOAD "NOPE": PRINT "NOT HERE"
+|RUN
+|File error 21, no such file
 |READY.
-|LIST
-|10 REM written on a pc
-|20 FOR I = 1 TO 3: PRINT I;: NEXT
-|30 PRINT "done"
-|40 END
+|LIST 10
+|10 TRAP 100: LOAD "NOPE": PRINT "NOT HERE"
+|READY.
+|NEW
 |READY.
 |DIR
 |Directory of NICE in slot 0

@@ -32,11 +32,11 @@ E_TERROR        .EQU    -64             ; and an ERROR of the server
 ; DHCP: net_dhcp, entry 23, and the address, the mask, the gateway, and
 ; the DNS server of net_config, entry 21, and the DHCP server and the
 ; NTP server, if it gave one, of net_servers, entry 35, at V_NET, shown,
-; or that no server answered.
+; or the error raised with io_fail (basic_trap.nasm).
 st_dhcp
                 CALL    NET_DHCP
                 TST     R1
-        ?N      JMP     :+
+        ?N      JMP     io_fail
                 MOVE    R1, V_NET
                 CALL    NET_CONFIG
                 MOVE    R1, V_NET+4
@@ -60,9 +60,6 @@ st_dhcp
                 MOVE[M] R2, @V_NET+5
         ?!Z     CALL    show_ip
                 RET
-:
-                MOVE    R1, S_NODHCP
-                JMP     puts_b_crlf     ; which returns to the caller
 
 ; NTP ["SERVER"] [, "+HH:MM" | "-HH:MM"]: R1 SERVER, or 0 without it or
 ; for an empty one, and R2 the offset, or 0 without it. The clock of the
@@ -99,7 +96,7 @@ st_ntp
 ntp_server
                 MOVE    R1, MON_E_NOIP
                 TST     @E_IP
-        ?Z      JMP     ntp_fail
+        ?Z      JMP     io_fail
                 MOVE    R1, V_NET
                 CALL    NET_SERVERS
                 MOVE[M] R9, @V_NET+1
@@ -113,7 +110,7 @@ ntp_server
                 MOVE    R2, V_NTPIP
                 CALL    DNS_LOOKUP
                 TST     R1
-        ?!Z     JMP     ntp_fail
+        ?!Z     JMP     io_fail
                 MOVE    R9, @V_NTPIP
 ; The query, from the UDP endpoint, which udp_open, entry 16, opens on
 ; a port of its own
@@ -134,7 +131,7 @@ ntp_query
                 CLR     R1
                 CALL    UDP_OPEN
                 TST     R1
-        ?N      JMP     ntp_fail
+        ?N      JMP     io_fail
                 MOVE    R7, NTP_TRIES
 ntp_send
                 MOVE    R1, R9
@@ -166,7 +163,7 @@ ntp_off
                 MOVE    R7, R1
                 CALL    UDP_CLOSE
                 MOVE[M] R1, R7
-        ?!Z     JMP     ntp_fail
+        ?!Z     JMP     io_fail
                 MOVE    R1, V_NTPA+40   ; the transmit timestamp
                 CALL    get32
                 MOVE    R7, R1
@@ -177,38 +174,10 @@ ntp_off
                 JMP     clock_ntp       ; which returns to the caller, or goes to ntp_bad_time
 ntp_bad_time
                 MOVE    R1, E_NTPBAD    ; a time that the clock does not take
-; An error: its line, and for a kiss-o'-death the server's code, the 4
-; characters of the reference ID, with ? for one that does not print
-ntp_fail
-                MOVE    R7, R1
-                MOVE    R2, NTP_ERRORS
-:
-                MOVE    R1, @R2++
-                MOVE    R3, @R2++
-                CMP     R1, R7
-        ?!Z     JMP     :-              ; the list ends with E_NTPKOD
-                MOVE    R1, R3
-                CALL    puts_b
-                CMP     R7, E_NTPKOD
-        ?!Z     JMP     ntp_end
-                MOVE    R1, V_NTPA+12   ; the reference ID
-                CALL    get32
-                MOVE    R7, R1
-                MOVE    R8, 4
-:
-                ROL     R7, R7, 8
-                AND     R1, R7, 0xFF
-                SUB     R2, R1, 0x20
-                CMP     R2, 0x5F
-        ?!C     MOVE    R1, 0x3F        ; ?
-                CALL    MON_PUTC
-                SUB[M]  R8, R8, 1
-        ?!Z     JMP     :-
-ntp_end
-                JMP     _io_crlf        ; which returns to the caller
+                JMP     io_fail
 ntp_bad
-                MOVE    R1, S_BADNTP
-                JMP     puts_b_crlf     ; which returns to the caller
+                MOVE    R1, E_NTPOFF
+                JMP     io_fail
 
 ; ntp_parse: the datagram of R1 bytes at V_NTPA, from the source at
 ; V_TSRC, if it is the answer of the server R9: from its port 123, with
@@ -309,8 +278,6 @@ st_tftp
                 MOVE    @V_TLIST, R3
                 ONE     @V_TOP          ; an RRQ
                 CALL    tftp_req
-                TST     R1
-        ?!Z     RET                     ; the error, shown
                 MOVE    @V_TBLK, 1
                 CALL    bin_init
 tftp_try
@@ -409,8 +376,8 @@ tftp_error
 ; TFTP server of the string R1, IP[:PORT], with PORT 69 by default, made
 ; in octet mode, of V_TLEN bytes, in V_TPKT for an RRQ and in V_TBUF for
 ; a WRQ, which receives into V_TPKT, and the endpoint opened, with no TID
-; yet. R1 0, or not 0 when the string is no server or the endpoint does
-; not open, with the error shown. Uses R1-R8.
+; yet. A string that is no server, E_TBAD, and an endpoint that does not
+; open are raised with io_fail. Uses R1-R8.
 tftp_req
                 CLR     @V_LSTATS       ; no word loaded yet,
                 CLR     @V_LSTATS+5     ; and no line read, for load_part
@@ -470,65 +437,24 @@ tftp_ip
         ?N      JMP     tftp_end
                 NOT     @V_OPEN, R0     ; for files_end, at an error of a line
                 CLR     @V_TTID
-                CLR     R1
                 RET
 tftp_bad
-                MOVE    R1, S_BADTFTP
-tftp_say
-                CALL    puts_b_crlf
-                ONE     R1
-                RET
+                MOVE    R1, E_TBAD
+                JMP     io_fail
 
 ; tftp_end: the end of a transfer that failed with the error R1:
 ; E_TNOANS, no answer; E_TERROR, an ERROR of V_TEND bytes, in V_TBUF
-; for an RRQ and in V_TPKT for a WRQ, shown with its code and its
-; message, up to a 0 or its end, without control codes; or an error of
-; udp_open or udp_send, no IP address or no route. The endpoint closed,
-; the summary of a load's lines first, with load_part, and the error
-; shown. R1 not 0. Uses R1-R8.
+; for an RRQ and in V_TPKT for a WRQ; or an error of udp_open or
+; udp_send, no IP address or no route. The endpoint closed, the summary
+; of a load's lines first, with load_part, and the error raised with
+; io_fail, whose text has the ERROR's code and its message.
 tftp_end
                 PUSH    R1
                 CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 POP     R1
                 CALL    load_part
-                CMP     R1, E_TERROR
-        ?Z      JMP     :+
-                MOVE    R2, R1
-                MOVE    R1, S_NOTFTP
-                CMP     R2, E_TNOANS
-        ?Z      JMP     tftp_say
-                MOVE    R1, S_NOIP
-                CMP     R2, MON_E_NOIP
-        ?!Z     MOVE    R1, S_NOROUTE
-                JMP     tftp_say
-:
-                MOVE    R7, V_TBUF      ; the ERROR
-                CMP     @V_TOP, 1
-        ?!Z     MOVE    R7, V_TPKT
-                ADD     R8, R7, @V_TEND
-                MOVE    R1, S_TFTPERR
-                CALL    puts_b
-                SHL     R1, @2[R7], 8
-                OR      R1, R1, @3[R7]
-                CALL    _io_putdec
-                MOVE    R1, S_UCOMMA
-                CALL    puts_b
-                ADD     R7, R7, 4
-:
-                CMP     R7, R8
-        ?!C     JMP     :+
-                MOVE[M] R1, @R7++
-        ?Z      JMP     :+
-                SUB     R2, R1, 0x20
-                CMP     R2, 0x5F
-        ?!C     JMP     :-              ; a control code
-                CALL    MON_PUTC
-                JMP     :-
-:
-                CALL    _io_crlf
-                ONE     R1
-                RET
+                JMP     io_fail
 
 ; The write of SAVE "NAME", "IP" and BSAVE "NAME", A, N, "IP" (issue
 ; #155), which out_file of basic_cmd.nasm drives: tput_open sends the
@@ -544,8 +470,8 @@ tftp_end
 ; ends a write that the break key stopped with tput_abort.
 
 ; tput_open: R1 the name, and R2 the string of the server, IP[:PORT].
-; The WRQ sent with tftp_req, and its ACK 0 waited for. R1 0, with
-; V_OPEN -2, or not 0, with the error shown. Keeps R9-R12.
+; The WRQ sent with tftp_req, and its ACK 0 waited for, with V_OPEN -2
+; after, or the error raised with tftp_end. Keeps R9-R12.
 tput_open
                 PUSH    R7
                 PUSH    R8
@@ -553,17 +479,13 @@ tput_open
                 MOVE    R1, R2
                 MOVE    @V_TOP, 2       ; a WRQ
                 CALL    tftp_req
-                TST     R1
-        ?!Z     JMP     :+              ; the error, shown
                 CLR     @V_TBLK         ; the ACK of block 0
                 CALL    tput_xfer
                 TST     R1
-        ?!Z     CALL    tftp_end        ; which leaves R1 not 0
-                TST     R1
-        ?Z      MOVE    @V_OPEN, 0xFFFFFFFE
+        ?!Z     JMP     tftp_end
+                MOVE    @V_OPEN, 0xFFFFFFFE
                 MOVE    @V_TBLK, 1
                 CLR     @V_TEND
-:
                 POP     R8
                 POP     R7
                 RET
@@ -677,8 +599,8 @@ tput_bytes
                 RET
 
 ; tput_close: the end of a write: the last block sent, unless an error
-; came before, and the endpoint closed. R1 0, or not 0 with the error
-; shown, V_SERR's or the last block's.
+; came before, and the endpoint closed. R1 0, or the error raised with
+; tftp_end, V_SERR's or the last block's.
 tput_close
                 MOVE[M] R1, @V_SERR
         ?Z      CALL    tput_block
@@ -753,8 +675,11 @@ S_NTPBAD
                 .DAT    0
 S_NTPKOD
                 .ASCII_B 'The time server refused: '
-; The errors of time ntp, and their texts, which E_NTPKOD ends
-NTP_ERRORS
+; The failures of the network, and their texts, which io_fail's
+; io_text shows (basic_trap.nasm), and a 0
+IO_TEXTS
                 .DAT    MON_E_NOIP, S_NOIP, MON_E_NOROUTE, S_NOROUTE, MON_E_NODNS, S_NODNS
                 .DAT    MON_E_DNSTIME, S_DNSTIME, MON_E_DNSNAME, S_DNSNAME, MON_E_DNSFAIL, S_DNSFAIL
-                .DAT    E_NTPTIME, S_NONTP, E_NTPBAD, S_NTPBAD, E_NTPKOD, S_NTPKOD
+                .DAT    MON_E_NODHCP, S_NODHCP, E_NTPTIME, S_NONTP, E_NTPBAD, S_NTPBAD
+                .DAT    E_NTPKOD, S_NTPKOD, E_TNOANS, S_NOTFTP, E_TERROR, S_TFTPERR
+                .DAT    E_TBAD, S_BADTFTP, E_NTPOFF, S_BADNTP, 0

@@ -23,8 +23,8 @@
 ;            bit 23 for one that divides, and its FPU command in 15..0
 ;   K_PUNCT  ( ) , ; and :, the character in bits 7..0
 ;   K_FN     a function: its FPU command, 0 for PEEK, 0x800000 for RND,
-;            0x400000 for TI, 0x200000 and 0x200001 for ER and EL, and
-;            CONST 3 for PI; TI, ER, EL, and PI take no argument
+;            0x400000 for TI, 0x200000 to 0x200002 for ER, EL, and DS, and
+;            CONST 3 for PI; TI, ER, EL, DS, and PI take no argument
 ;   K_NOT    NOT, with its FPU command
 ;   K_KW     a statement: its index in KEYWORDS in bits 15..8, and the
 ;            byte after its keyword, its program of ops, in bits 7..0
@@ -40,7 +40,7 @@
 ;   K_SARR   an array of strings, as K_ARR
 ;   K_SFN    a function that gives a string, its index in SFNS
 ;            (basic_str.nasm) in bits 7..0: CHR$, STR$, HEX$, LEFT$, MID$,
-;            RIGHT$, TIME$, and ERR$
+;            RIGHT$, TIME$, ERR$, and DS$
 ;   K_SNUM   a function of strings that gives a number, its index in
 ;            SNUMS: LEN, ASC, VAL, and INSTR
 ;   K_DATA   the text of DATA, as K_STR has it, up to the end of the line
@@ -198,7 +198,7 @@ KW_TOK
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP, T_WHILE, T_UNTIL
                 .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
                 .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
-                .DAT    T_TI, T_OFF, T_ER, T_EL, T_ERRS
+                .DAT    T_TI, T_OFF, T_ER, T_EL, T_ERRS, T_DS, T_DSS
 KW_TOK_END
 
 ; The characters of one-character tokens, each with its token

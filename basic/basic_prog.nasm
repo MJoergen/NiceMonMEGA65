@@ -723,6 +723,8 @@ lt_go
         ?!Z     CMP     R1, T_TI
         ?!Z     CMP     R1, T_ER
         ?!Z     CMP     R1, T_EL
+        ?!Z     CMP     R1, T_DS
+        ?!Z     CMP     R1, T_DSS
         ?!Z     CMP     R1, T_TIMES
         ?Z      JMP     :+
                 SHR     R1, R1, 24
@@ -1286,7 +1288,7 @@ put_msg
                 TST     R1
         ?!Z     CALL    _io_crlf
                 POP     R1
-                CALL    puts_b
+                CALL    msg_text        ; basic_trap.nasm
                 MOVE[M] R1, @V_CUR
         ?Z      JMP     _io_crlf
                 MOVE    R1, S_IN

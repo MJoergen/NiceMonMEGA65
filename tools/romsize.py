@@ -58,7 +58,7 @@ ROM_PARTS = {
                       "`READ`, and `TIME$`",
     "basic_struct.nasm": "The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF`",
     "basic_mach.nasm": "The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR`",
-    "basic_trap.nasm": "The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`",
+    "basic_trap.nasm": "The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network, and its entries",

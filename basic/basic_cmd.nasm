@@ -528,14 +528,14 @@ st_dir
         ?N      JMP     :+
                 CALL    FS_MOUNT
                 TST     R1
-        ?N      JMP     fs_fail
+        ?N      JMP     io_fail
 :
                 MOVE    R1, V_ENT
                 CLR     @R1             ; the folder's name, empty
                 MOVE    R2, 2
                 CALL    FS_OPEN
                 TST     R1
-        ?N      JMP     fs_fail
+        ?N      JMP     io_fail
                 MOVE    R8, R1
                 CLR     R9
                 CLR     R10
@@ -594,14 +594,14 @@ dir_end
                 CALL    _io_putdec
                 JMP     _io_crlf        ; which returns to the caller
 
-; fs_close_fail: the handle R8 closed, and the error R1 shown with
-; fs_fail
+; fs_close_fail: the handle R8 closed, and the error R1 raised with
+; io_fail (basic_trap.nasm)
 fs_close_fail
                 MOVE    R7, R1
                 MOVE    R1, R8
                 CALL    FS_CLOSE
                 MOVE    R1, R7
-                JMP     fs_fail
+                JMP     io_fail
 
 ; decimal: R1 in decimal, unsigned, right-aligned in 12 columns. Uses R1-R6.
 decimal
@@ -639,7 +639,7 @@ st_load
                 CLR     R2              ; to read
                 CALL    FS_OPEN
                 TST     R1
-        ?N      JMP     fs_fail
+        ?N      JMP     io_fail
                 MOVE    R8, R1          ; the handle
                 ADD     @V_OPEN, R1, 1  ; for files_end, at an error of a line
                 CALL    bin_init
@@ -670,7 +670,7 @@ load_byte
                 TST     R1
         ?!N     JMP     load_summary
                 CALL    load_part
-                JMP     fs_fail
+                JMP     io_fail
 
 ; BSAVE "NAME", ADDR, N [, "IP"]: R1 the name, R2 ADDR, R3 N, and R4 the
 ; string of the TFTP server, or 0. The N words from ADDR written with
@@ -686,8 +686,6 @@ st_save
                 MOVE    R2, R4
                 MOVE    R12, save_lines
                 CALL    out_file
-                TST     R1
-        ?!Z     RET                     ; the error, shown
                 MOVE    R1, S_SAVED
                 CALL    puts_b
                 MOVE    R1, R10
@@ -814,23 +812,20 @@ text_lines
 ; fs_open, entry 10, makes or truncates, or with R2 to the server, with
 ; tput_open and tput_close of basic_net.nasm (issue #155). V_FBUF goes to
 ; the file with flush, when it is full, and at the end. The first error
-; of a write is kept in V_SERR, and shown at the end, after the close; a
-; write that does not fit on the card is error 30. R1 0 when all was
-; written, else not 0, with the error shown. The routine keeps R9 and R10
-; for the caller, as out_file does.
+; of a write is kept in V_SERR, and raised at the end, after the close,
+; with io_fail; a write that does not fit on the card is error 30. The
+; routine keeps R9 and R10 for the caller, as out_file does.
 out_file
                 TST     R2
         ?!Z     JMP     :+
                 MOVE    R2, 1           ; to write
                 CALL    FS_OPEN
                 TST     R1
-        ?N      JMP     out_fail
+        ?N      JMP     io_fail
                 ADD     @V_OPEN, R1, 1
                 JMP     :++
 :
                 CALL    tput_open
-                TST     R1
-        ?!Z     RET                     ; the error, shown
 :
                 CLR     @V_SERR
                 MOVE    @V_SPOS, V_FBUF
@@ -845,11 +840,7 @@ out_file
                 MOVE[M] R2, @V_SERR
         ?!Z     MOVE    R1, R2          ; the error of a write, before the close's
                 TST     R1
-        ?!N     CLR     R1
-        ?!N     RET
-out_fail
-                CALL    fs_fail
-                ONE     R1
+        ?N      JMP     io_fail
                 RET
 
 ; flush: the bytes in V_FBUF up to V_SPOS written to the file of SAVE,
@@ -957,64 +948,11 @@ st_delete
                 MOVE    R7, R1          ; the name
                 CALL    FS_DELETE
                 TST     R1
-        ?N      JMP     fs_fail
+        ?N      JMP     io_fail
                 MOVE    R1, S_DELETED
                 CALL    puts_b
                 MOVE    R1, R7
                 JMP     puts_crlf       ; which returns to the caller
-
-; An error of the controller, R1 its negative: the number, the slot, and
-; the meaning, with the last sector after error 7
-sd_fail
-                SUB     R8, R0, R1      ; the error
-                MOVE    R1, S_SDERR
-                CALL    puts_b
-                MOVE    R1, R8
-                CALL    _io_putdec
-                MOVE    R1, S_INSLOT
-                CALL    puts_b
-                MOVE    R1, R7
-                CALL    _io_putdec
-                MOVE    R1, S_UCOMMA
-                CALL    puts_b
-                SUB     R1, R8, 1
-                CMP     R1, SD_ERRS
-        ?!C     JMP     :+              ; an error without a meaning here
-                ADD     R1, R1, SD_ERRORS
-                MOVE    R1, @R1
-                CALL    puts_b
-                CMP     R8, 7
-        ?!Z     JMP     :+
-                MOVE    R1, @SD_LAST
-                CALL    _io_puthex
-:
-                JMP     _io_crlf        ; which returns to the caller
-
-; fs_fail: an error of monitor_fat.nasm, R1 its negative: one of the SD controller's
-; as sd_fail shows it, with the selected slot, or a file error, its number and
-; its meaning
-fs_fail
-                CMP     R1, 0xFFFFFFF8  ; -8
-        ?C      JMP     :+              ; below -8
-                MOVE    R7, @SD_SELECT
-                JMP     sd_fail
-:
-                SUB     R8, R0, R1      ; the error
-                MOVE    R1, S_FSERR
-                CALL    puts_b
-                MOVE    R1, R8
-                CALL    _io_putdec
-                SUB     R1, R8, FS_ERR0
-                CMP     R1, FS_ERRS
-        ?!C     JMP     :+              ; an error without a meaning here
-                ADD     R1, R1, FS_ERRORS
-                MOVE    R7, @R1
-                MOVE    R1, S_UCOMMA
-                CALL    puts_b
-                MOVE    R1, R7
-                CALL    puts_b
-:
-                JMP     _io_crlf        ; which returns to the caller
 
 ; load_row: row R7 blank in the current color, which scr_color, entry 8,
 ; gives, and the cursor at its column 0, with scr_moveto, entry 6. Uses

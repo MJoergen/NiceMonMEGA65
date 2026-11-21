@@ -62,6 +62,10 @@ server's ACK 0, from the TID 3456, comes in each but wnone and wref:
 - wbrk: SAVE of 4 lines and a CTRL-C typed after it, which LIST takes
   at its first line, so the SAVE ends with Break, and an ERROR 0, Break,
   goes to the TID, so that the server drops the file.
+The run trap has a port of its own too, and the input TRAP, a program
+whose TRAP takes the failure of its LOAD (issue #158): an ERROR 1, File
+not found, with a message of 116 characters, of which DS$ keeps the
+first 87, File not found in ER, and 64, the TFTP error, in DS.
 The run args has the input ARGS, with no frames: a DIR with no IP
 address after a LOAD of a word below HIMEM, which keeps the program
 typed after it, the servers that are not, the lines that are no
@@ -95,6 +99,10 @@ BAS = b'ip "10.0.0.9"\rload "prog", "10.0.0.2"\rlist\rrun\rhalt\r'
 BASBAD = b'ip "10.0.0.9"\rload "bad", "10.0.0.2"\rlist\rhalt\r'
 BAS_TEXT = b'10 print "from tftp"\r\n20 end\r\n'
 BASBAD_TEXT = b'10 print "before"\nx\n20 print "after"\n'
+TRAP = (b'ip "10.0.0.9"\r10 trap 100\r20 load "nope.bin", "10.0.0.2"\r30 end\r'
+        b'100 print er, el, ds, err$(er)\r110 print ds$\r120 print len(ds$)\r'
+        b'run\rhalt\r')
+TRAP_TEXT = b"File not found: " + b"x" * 100
 ARGS = (b'load\r9000 1\r\r10 print "kept"\rdir "10.0.0.2"\rlist\r'
         b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
         b'load "a.bin", "10.0.0.256"\rload "a.bin", "10.0.0.2x"\r'
@@ -311,6 +319,14 @@ def main() -> None:
             port_of[name] = at
             eth_in = "\n".join(["1:" + arp_reply(), "2:" + data(at, 1, payload[:500]), ""])
             runs.append((name, *run(emu, monitor, inp, eth_in, tmp, name)))
+        _, probe = run(emu, monitor, TRAP, "1:" + arp_reply() + "\n", tmp, "trap0")
+        sent = [f for f in probe if f[12:14] == b"\x08\x00"]
+        check("tftp trap: an RRQ sent", len(sent) > 0)
+        if not sent:
+            sys.exit(1)
+        port_of["trap"] = struct.unpack(">H", sent[0][PORT_AT:PORT_AT + 2])[0]
+        trap_in = "\n".join(["1:" + arp_reply(), "2:" + error(port_of["trap"], 1, TRAP_TEXT), ""])
+        runs.append(("trap", *run(emu, monitor, TRAP, trap_in, tmp, "trap")))
         for name, inp in WRITES:
             _, probe = run(emu, monitor, inp, "1:" + arp_reply() + "\n", tmp, name + "0")
             sent = [f for f in probe if f[12:14] == b"\x08\x00"]

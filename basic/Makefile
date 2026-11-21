@@ -130,15 +130,13 @@ CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\
 # ip "" is no IP address (S5). A name in a number's place, x, is an
 # Undefined variable. Strings: an empty one, a name glued to load, a
 # server without a comma, or with no closing quote, and the arguments
-# that are too few or too many for each statement. The dumps of the
-# tokens after four statements, each with a colon and the dump after it
-# on its line, show the 0 after each string, and the .BIN that save adds
-# to a name without a dot, which leaves the colon and the dump after it.
+# that are too few or too many for each statement, and four that fail
+# with no card or no IP address, whose tokens test/trap.bas dumps.
 # ip "1.2.3.4, with no closing quote, writes the IP address, which the
 # dump of 0xFFFFFFB0 shows. Last, 9 ver is no statement but line 9 of a
 # program, which list shows.
 ZEROS72  = $(shell printf '%072d' 32768)
-BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 2147483647\rsys 2147483648\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3x\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rbsave "x", 0x, 1\rbsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rbsave "x", 1, 2, "1.2.3.4"\rbsave "x", 1, 2, "y" z\rbsave "x", 1, 2, "y",\rsave "abc\rbsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\rbsave "abc",1,2: dump 0xFFFFECB0, 16\rsave "x", "1.2.3.4": dump 0xFFFFECB0, 16\rbsave "a.b", 1, 2: dump 0xFFFFECB0, 16\rdir "1.2.3.4", "*": dump 0xFFFFECB0, 16\rip "1.2.3.4\r9 ver\rlist\rhalt\r
+BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 2147483647\rsys 2147483648\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3x\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rbsave "x", 0x, 1\rbsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rbsave "x", 1, 2, "1.2.3.4"\rbsave "x", 1, 2, "y" z\rbsave "x", 1, 2, "y",\rsave "abc\rbsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\rbsave "abc",1,2\rsave "x", "1.2.3.4"\rbsave "a.b", 1, 2\rdir "1.2.3.4", "*"\rip "1.2.3.4\r9 ver\rlist\rhalt\r
 # expr: the numbers of stage 2 (issue #113): the operators and their
 # order, the word operators, the comparisons, the functions, the
 # constants in hex, with a point, and with an exponent, and PRINT's
@@ -206,7 +204,13 @@ FUNCS = ? SIN(0), COS(0), TAN(0), ATAN(1) * 4, PI\r? ASIN(1), ACOS(-1), LOG(EXP(
 # and of an empty program, RUN "HELLO.BIN", which calls it at 0x8000,
 # RUN with a number or a word after its name, a program that runs the
 # next, SAVE to TFTP, and a CTRL-C that breaks a SAVE, whose file is
-# closed, and empty, which LOAD then passes over. DIR lists the files.
+# closed, and empty, which LOAD then passes over. The failures of
+# issue #158: a program whose TRAP takes BSAVE to slot 1, which has no
+# card, Device not present, and LOAD, with slot 0 mounted again, and
+# DELETE of a file that is not there, File not found, and whose handler
+# prints ER, EL, DS, ERR$(ER), and DS$; LOAD of a file that is not there with no TRAP, which stops the
+# program; and LOAD of a program's text that is not there, which a TRAP
+# does not take, and which keeps the program. DIR lists the files.
 # keys: INPUT, GET, the break key, and the keys typed ahead (issue
 # #114). INPUT of two numbers, with too few, which ask for the rest with
 # ??, too many, which are Extra ignored, a line that is no number, two
@@ -395,11 +399,21 @@ MACH_TAIL = \003CONT\rNEW\r10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000,
 # frame goes; an error in a FOR loop, which goes on; one in a FN over
 # lines, after which the statement after the call runs, its parameter
 # set again; and one in a PROC, which goes on in it. RESUME after the
-# handler fixed the cause, RESUME N, ERR$ of 0 to 112, an error in the
+# handler fixed the cause, RESUME N, ERR$ of 0 to 113, an error in the
 # handler, which stops the program, and TRAP alone, after which an error
 # stops it too. RENUMBER and LIST of TRAP's and RESUME's lines, ER, EL,
-# and ERR$. A handler that goes on with GOTO and traps again with TRAP;
-# and the break key, which a TRAP does not take, and CONT after it.
+# and ERR$. The failures of issue #158, with no card and no IP address:
+# DS and DS$ before any, then a program whose TRAP takes a BSAVE and a
+# SAVE with no card, a SAVE and a DIR to a TFTP server with no IP
+# address, a server that is not, an offset of NTP that is not, and a slot
+# that is not, and whose handler prints ER, EL, DS, ERR$(ER), and DS$;
+# the dump of its lines, which shows the 0 after each string, and that
+# the .BIN that BSAVE adds to a name without a dot leaves the tokens
+# after it; a failure with no TRAP, which stops the program with DS$ and
+# the line; and LOAD of a program's text, which a TRAP does not take,
+# and which keeps the program. A handler that goes on with GOTO and
+# traps again with TRAP; and the break key, which a TRAP does not take,
+# and CONT after it.
 TRAP_TAIL = \003? ER, EL\rCONT\r\003HALT\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does

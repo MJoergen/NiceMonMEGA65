@@ -47,6 +47,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `sdcard.py`, `sdnbd.py`, `flash.py`, and `tftpd.py`, and their old
   options, stay until V3.1, and not until V2.5, as the notes of V2.4.1
   said ([#159](https://github.com/MJoergen/NiceMonMEGA65/issues/159)).
+- A statement of the card or the network that fails, such as `LOAD`
+  of a file that is not there, now stops the program, where the
+  program went on after its message. A `TRAP` takes it, with `ER` 4,
+  5, 112, or 113, and `DS` and `DS$` tell what failed
+  ([#158](https://github.com/MJoergen/NiceMonMEGA65/issues/158)). A
+  line typed prints the same message as before, but stops there, so
+  the statements after it on the line do not run.
 
 **Fixed.**
 

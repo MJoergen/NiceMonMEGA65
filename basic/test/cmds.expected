@@ -75,6 +75,7 @@ RCURSOR C, R        C and R the column and the row of the cursor
 TRAP N              on an error, go on at line N; TRAP alone, stop at errors
 RESUME [NEXT | N]   after TRAP: the statement again, the one after it, or line N
 ER, EL, ERR$(N)     the last error's number and line, and the text of error N
+DS, DS$             the last file or network failure: its number and text
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 READY.

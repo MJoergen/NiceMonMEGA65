@@ -829,8 +829,24 @@ Stage 9 (#120) is written, in `basic/basic_trap.nasm` (decided on
   the handler too, for the handlers of the C64 that go on with `GOTO`.
 - The break key is no error, unlike BASIC 7.0's `TRAP`, so a program
   can always be stopped.
-- The errors of the files and the network are messages, after which
-  the statement and the program go on, so a `TRAP` does not see them.
+- The failures of the card, the files, and the network are errors
+  too (#158, decided on 2026-11-21). Without a `TRAP` they stop the
+  program, where they were messages after which it went on. `ER` is
+  one of four: BASIC 65's 4, `File not found`, and 5, `Device not
+  present`, where they fit, and 112, `File error`, and 113, `Network
+  error`, for the rest. The detail is in BASIC 65's disk status: `DS`
+  is the monitor's number of the error, which is unique across the SD
+  card's, the files', and the network's, with BASIC's own from 60 on,
+  and `DS$` its full line, which is also the message when the error
+  is not trapped. The line is built once, at the failure, with `putc`
+  into the buffer of `LOAD`, and kept packed in BASIC's last 22 words
+  of RAM, 87 characters at most, as the buffers that it comes from,
+  such as a TFTP server's message, are used again.
+- `LOAD` and `RUN` of a program's text set the line that runs to none
+  before they open the file, so a `TRAP` does not take their failures:
+  only the statements that keep the program running are trapped. A
+  `LOAD` of a `.bin` file that wrote a word below `HIMEM` before it
+  failed runs `NEW`, which drops the `TRAP`, so it stops the program.
 
 The messages of stage 2 are `Syntax error`, `Illegal quantity`,
 `Division by zero`, `Overflow`, `Formula too complex`, `Undefined
@@ -1212,7 +1228,9 @@ Each has an issue, under #54.
    2026-11-20).
 9. **Errors**, #120. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`.
    Written in V2.5, in `basic/basic_trap.nasm`, with the language of
-   [Errors](#errors), in 398 words (measured 2026-11-21).
+   [Errors](#errors), in 398 words (measured 2026-11-21). The failures
+   of the files and the network as errors, with `DS` and `DS$`, #158,
+   followed in V2.5, for 188 words more (measured 2026-11-21).
 10. **The machine**, #121. `TI`, `SLEEP`, the colors, and the cursor.
     Written in V2.5, in `basic/basic_mach.nasm`, with the language of
     [The machine](#the-machine), in 438 words (measured 2026-11-21).

@@ -150,8 +150,9 @@ bas_start
                 CALL    new_prog        ; no program, and no variables
                 CLR     @V_RHEAD        ; no keys typed ahead
                 CLR     @V_EPOS         ; no line to show again
-                CLR     @V_ER           ; no error yet, ER 0 and EL -1
+                CLR     @V_ER           ; no error yet, ER 0 and EL -1,
                 MOVE    @V_EL, 0xFFFFFFFF
+                CLR     @V_DS           ; and no failure, DS 0
                 CLR     @V_RTAIL
                 MOVE    @V_POLL, POLL_EVERY
                 MOVE    @V_NEXT, PROGRAM
@@ -547,7 +548,7 @@ load_go
 :
                 CALL    name_slot
         ?!N     JMP     st_load
-                JMP     fs_fail
+                JMP     io_fail
 
 ; slot_mount: the card in the slot R1 mounted with fs_mount, entry 9, as
 ; DIR SLOT does: R1 0, or the error. A negative slot, which fs_mount
@@ -590,7 +591,7 @@ bas_save
         ?Z      JMP     st_text         ; R2 the server, or 0
                 CALL    name_slot       ; R2 0 when it mounts
         ?!N     JMP     st_text
-                JMP     fs_fail
+                JMP     io_fail
 
 ; name_slot: the card in the slot R2 mounted with slot_mount, with R1,
 ; the name, kept: N and R1 the error when it fails. Uses R1-R12.
@@ -625,7 +626,7 @@ bas_bsave
                 POP     R2
                 CLR     R4              ; to the card, which keeps the flags too
         ?!N     JMP     st_save
-                JMP     fs_fail
+                JMP     io_fail
 
 ; DELETE "NAME" [, SLOT]: st_delete, with the card in SLOT mounted
 ; first. It shares SAVE's ops, so a string after the comma is a Syntax
@@ -639,7 +640,7 @@ bas_delete
 :
                 CALL    name_slot
         ?!N     JMP     st_delete
-                JMP     fs_fail
+                JMP     io_fail
 
 ; HELP: the lines of the statements
 st_help         MOVE    R1, HELP
@@ -736,7 +737,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    40              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"DS"DS$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -763,7 +764,7 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
                 .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
                 .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_SLEEP, H_FG, H_BG, H_CUR, H_CURP, H_RCUR
-                .DAT    H_TRAP, H_RESUME, H_ER
+                .DAT    H_TRAP, H_RESUME, H_ER, H_DS
                 .DAT    H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
@@ -862,6 +863,7 @@ H_RESUME
                 .ASCII_B 'RESUME [NEXT | N]   after TRAP: the statement again, the one after it, or line N'
                 .DAT    0
 H_ER            .ASCII_B "ER, EL, ERR$(N)     the last error's number and line, and the text of error N"
+H_DS            .ASCII_B "DS, DS$             the last file or network failure: its number and text"
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0
