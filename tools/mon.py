@@ -20,6 +20,7 @@ Usage: tools/nicemon.py mon (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
 Only the Python standard library is used, so this runs on Linux and macOS.
 """
 
+import argparse
 import sys
 
 from boardlink import Link, add_arguments, open_link
@@ -36,10 +37,17 @@ def load(link: Link, path: str) -> int:
     return len(words)
 
 
-def main(argv: list[str]) -> None:
-    """nicemon.py mon: nicedbg parses argv itself (issue #156)."""
-    nicedbg.main(argv, add_link_arguments=add_arguments, open_link=open_link,
-                 load=load, check_file=read_bin)
+DESCRIPTION = __doc__.splitlines()[0]
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """Adds nicedbg's options to parser, with the board's links."""
+    nicedbg.add_options(parser, add_arguments)
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Runs nicedbg on the board's links, with the checks of its memory."""
+    nicedbg.run(args, open_link=open_link, load=load, check_file=read_bin)
 
 
 if __name__ == "__main__":
