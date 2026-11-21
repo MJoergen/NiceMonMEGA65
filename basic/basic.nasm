@@ -1,11 +1,12 @@
 ; BASIC in the ROM (issue #54, doc/BASIC.md), an image of its own at
 ; BASIC_BASE, 0x3000, assembled apart from the monitor's (issue #152).
 ; It calls the monitor through the entries of the dispatch table alone,
-; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
-; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
-; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, basic_dis.nasm,
-; basic_edit.nasm, and basic_str.nasm, and the monitor's common.nasm,
-; monlib.nasm, and mon.nasm, of which BASIC has copies of its own.
+; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile
+; here joins the sources of ../rom.mk, BAS_SOURCES: this file first, then
+; basic_expr.nasm, basic_prog.nasm, basic_cmd.nasm, basic_net.nasm,
+; basic_time.nasm, basic_dis.nasm, basic_edit.nasm, basic_str.nasm, and
+; basic_struct.nasm, and the monitor's common.nasm, monlib.nasm, and
+; mon.nasm, of which BASIC has copies of its own.
 ;
 ; This file has the main loop, the scanner of a statement's items, and
 ; BASIC's keywords, messages, and help, packed with .ASCII_B and read
@@ -19,6 +20,10 @@
 ; Stage 4 (issue #60) has the programs' texts on a card and from a TFTP
 ; server: SAVE "NAME", LOAD "NAME", and RUN "NAME", in basic_cmd.nasm.
 ; Stage 5 (issue #116) has the strings, DATA, and READ, in basic_str.nasm.
+; Stage 6 (issue #117) has the functions, in basic_expr.nasm, stage 7
+; (issue #118) the screen editor, in basic_edit.nasm, and stage 8 (issue
+; #119) the structure, ON, DEF FN, DEF PROC, LOCAL, DO and LOOP, and the
+; block IF, in basic_struct.nasm.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
@@ -749,14 +754,14 @@ H_LOAD          .ASCII_B 'LOAD "NAME" [, S]   load the program NAME.BAS, or NAME
 H_TFTP          .ASCII_B 'LOAD "NAME", "IP"   load it from the TFTP server at IP'
 H_SAVET         .ASCII_B 'SAVE "NAME" [, S]   save the program as the text NAME.BAS'
 H_SAVE          .ASCII_B 'BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME'
-H_TFTPS         .ASCII_B 'SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)'
+H_TFTPS         .ASCII_B 'SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)'
 H_TFTPB         .ASCII_B 'BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP'
 H_DEL           .ASCII_B 'DELETE "NAME" [, S] delete the file NAME of the SD card'
 H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
                 .DAT    0
 H_DIR           .ASCII_B 'DIR [S]             list the files of the card in slot S, or of the one mounted'
 H_SLOT          .ASCII_B '  S, a slot, mounts its card first, for the statements after it too'
-H_TFTPL         .ASCII_B 'DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT'
+H_TFTPL         .ASCII_B 'DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT'
 H_D             .ASCII_B 'DUMP [A] [, N]      show N words from A, in hex, or the next ones'
 H_U             .ASCII_B 'DIS [A] [, N]       disassemble N instructions from A, or the next ones'
 H_I             .ASCII_B 'IP ["A.B.C.D"]      show the IP address, or set it, such as "192.168.1.65"'

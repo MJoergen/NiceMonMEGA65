@@ -851,7 +851,7 @@ READY.
 dir "10.0.0.2", "a", "b"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 load "a.bin", "10.0.0.256"
 Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
@@ -874,7 +874,7 @@ READY.
 dir "10.0.0.2" "*"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 load "a.txt", "10.0.0.2"
 No IP address; IP or DHCP sets one

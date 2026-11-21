@@ -293,7 +293,7 @@ put32
 ; octet mode through the UDP endpoint, which tftp_req opens on a port
 ; that udp_open picks, and closes at the end, and its lines written as
 ; LOAD "NAME.BIN" writes them, with bin_char, and shown as LOAD shows
-; them, or for a program's text stored by bas_eol (issue #60); or for a listing the lines that tools/tftpd.py answers a
+; them, or for a program's text stored by bas_eol (issue #60); or for a listing the lines that nicemon.py tftpd answers a
 ; pattern, with * or ?, with, which are shown instead. The RRQ goes to
 ; PORT, 69 by default, and the server's first DATA gives its TID; the
 ; packets of other hosts and TIDs are passed over. Each DATA of the block

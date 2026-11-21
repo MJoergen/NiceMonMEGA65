@@ -35,12 +35,12 @@ READY.
 save
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 save "x",
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 save "x", 0x8000
 File error 27, no such slot

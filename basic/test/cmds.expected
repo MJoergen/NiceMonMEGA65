@@ -8,12 +8,12 @@ LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 LOAD "NAME", "IP"   load it from the TFTP server at IP
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
 BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
 DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
   S, a slot, mounts its card first, for the statements after it too
 DUMP [A] [, N]      show N words from A, in hex, or the next ones
 DIS [A] [, N]       disassemble N instructions from A, or the next ones

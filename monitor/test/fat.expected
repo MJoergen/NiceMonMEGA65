@@ -109,7 +109,7 @@ READY.
 dir 1 2
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 0x123456789
 Illegal quantity
@@ -136,7 +136,7 @@ Screen:
 |dir 1 2
 |Syntax error
 |DIR [S]             list the files of the card in slot S, or of the one mounted
-|DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+|DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 |READY.
 |dir 0x123456789
 |Illegal quantity

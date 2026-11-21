@@ -43,7 +43,7 @@ READY.
 save x
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 delete x
 Syntax error
@@ -243,17 +243,17 @@ READY.
 save "x", "y" z
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 save "x" "y"
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 save "x",
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 save "x", 1
 SD error 1 in slot 1, no card
@@ -269,7 +269,7 @@ READY.
 save "x", "y", 99999999999
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
-SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 bsave "x", 1, 2, "1.2.3.4"
 No IP address; IP or DHCP sets one
@@ -307,12 +307,12 @@ READY.
 dir 0x
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 0x"1.2.3.4"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 99999999999"1.2.3.4"
 Illegal quantity
@@ -329,17 +329,17 @@ READY.
 dir "1.2.3.4",
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 1,
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 1 "x"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
-DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 5
 File error 27, no such slot

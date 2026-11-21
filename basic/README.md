@@ -652,7 +652,7 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2027 | 1256 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2028 | 1257 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1831 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1910 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1874 | 294 |
@@ -667,5 +667,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 14572 | 1985 |
+| In all | | 14573 | 1986 |
 <!-- /romsize basic -->

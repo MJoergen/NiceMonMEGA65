@@ -115,11 +115,11 @@ romsize` writes it (`tools/romsize.py`).
 | `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
 | `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
 | `colors.nasm` | The names of the colors, which take no words | 0 | 0 |
-| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 567 | 567 |
+| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 564 | 564 |
 | `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
-| In all | | 5017 | 2385 |
+| In all | | 5014 | 2382 |
 
-The code is 2295 words, and the texts and tables 2722. They are at `0x8000`–`0x9398`, in 4956 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
+The code is 2295 words, and the texts and tables 2719. They are at `0x8000`–`0x9395`, in 4953 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
 <!-- /romsize demo -->
 
 The demo changes only with a tag of nice_cpu, but its version and
