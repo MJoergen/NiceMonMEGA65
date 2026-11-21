@@ -32,8 +32,9 @@ what the stages need of the monitor.
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
 the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
-2026-11-16, the four after them, which are of 2026-11-18, and the
-last, which is of 2026-11-20.
+2026-11-16, the four after them, which are of 2026-11-18, the
+one after them, which is of 2026-11-20, and the last, which is of
+2026-11-21.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -99,6 +100,16 @@ settle the three open questions of #54.
   left. The ECMA-55 suite, whose programs need `DATA` and strings,
   waited for stage 5, which has them, and `make ecma55` runs it
   ([Tests](#tests)).
+- **A name with `%` holds a whole number**, `A%` and `A%(`, for every
+  variable and not for arrays alone
+  ([#161](https://github.com/MJoergen/NiceMonMEGA65/issues/161)),
+  where stage 2 had no `A%`. An element of an array of `%` is one
+  word, a signed 32-bit integer, so the array is half as large. A
+  value stored in a `%` name is rounded toward zero, as `POKE` rounds
+  its value, and one outside -2^31 to 2^31 - 1 is an
+  `Illegal quantity`. The arithmetic stays on doubles, so `%` is a way
+  of storing a number and not a second kind of number
+  ([Numbers](#numbers)).
 
 ## What it runs on
 
@@ -271,9 +282,27 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   and `>>`, the comparisons, `NOT`, `AND`, and last `OR` and `XOR`.
   That is V2's order, with each new operator beside its like.
 - A variable is two words, the double. Nothing says what it holds, as
-  it holds one kind. There is no `A%`, and a `%` in a name is an
-  error, so that it can come with `DIM` if arrays of whole numbers
-  need it ([Open questions](#open-questions)). `A$` is a string.
+  it holds one kind. `A$` is a string.
+- A name with `%`, `A%`, holds a whole number, and `A%(` is an array
+  of them (#161). `A`, `A%`, `A$`, and their arrays are different
+  names. A value stored in one is rounded toward zero and must fit a
+  signed 32-bit integer, -2^31 to 2^31 - 1, or it is an
+  `Illegal quantity`. That is the rule of `POKE`, of a subscript, and
+  of the operators on words, the FPU's `FPU_X_W` with the test of the
+  class's bit 21, `x_word` in `basic_expr.nasm`, so `A% = -1.5` gives
+  -1, and `A%(I) = X` stores the word that `POKE A, X` writes. It
+  rounds toward zero, not down as `INT` does, as no rule of its own is
+  needed then. A `%` variable is two words, as any other, which hold
+  its whole number as a double, so it is read as any other. An element
+  of a `%` array is one word, which the FPU reads through `FPU_X_W`
+  with no rounding, so an array of flags or of words is half as large,
+  which counts in the Nexys4DDR's 26K words. The arithmetic stays on
+  doubles: `%` is how a number is stored, not a second kind of number,
+  and no operator has a second path. A 32-bit float, through
+  `FPU_X_S`, costs the same, but holds whole numbers only up to 2^24,
+  so an address or a word from `PEEK` would lose bits, and `PRINT`'s
+  15 digits would show its rounding: 0.1 prints as
+  `0.100000001490116`.
 - `ABS`, `SGN`, `INT`, and `SQR` are the FPU's arithmetic, and `INT`
   rounds down. `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `LOG`,
   `LOG2`, `LOG10`, `EXP`, and `^` are its functions, each one
@@ -682,7 +711,8 @@ entries alone (#152). Its workspace is the program's RAM:
   `DIM`, as a variable never assigned has, and `0x100` in its length,
   which marks the name as an array's. Its data, after the table, is
   its two sizes, the second 0 for one dimension, and its doubles, row
-  by row. A new variable moves the data up, with no change to an
+  by row, or its words for an array of `%`, whose name has a bit of
+  its own in its length, as `ARRAY` marks an array's. A new variable moves the data up, with no change to an
   offset. So `CLR` drops the arrays by setting a pointer and the
   entries' high words.
 - The program's end is a pointer in BASIC's own RAM, and an empty
@@ -1494,9 +1524,9 @@ that is open when it is done.
    back.~~ Settled on 2026-11-18: the token of a constant keeps its
    digits beside the double ([Lines and tokens](#lines-and-tokens)), as
    stage 2 tokenizes ([Decisions](#decisions)).
-7. **`A%`**, #161: not in stage 2, where `%` in a name is an error. It may
-   come with `DIM`, as one word of storage for a whole number, pushed
-   and read through the FPU's view of a word. An array of flags is
-   then half as large, which counts in the Nexys4DDR's 26K words.
+7. ~~**`A%`**, #161.~~ Settled on 2026-11-21: for every variable,
+   an element of a `%` array one word, a signed 32-bit integer, and a
+   value rounded toward zero, with `Illegal quantity` outside the
+   range ([Numbers](#numbers)).
 8. ~~**When the stages start.**~~ Settled: the FPU was there in
    nice_cpu `V2.2` before stage 2 started.
