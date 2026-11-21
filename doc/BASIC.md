@@ -872,7 +872,12 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   - A character at column 0 of a row clears the row's bit, unless
     the cursor came there by the wrap: a row that a program writes
     again from its start, after `scr_moveto` or a CR, is a line of
-    its own.
+    its own. `scr_moveto` and the end of a program forget the wrap,
+    so the same holds where the wrap left the cursor and it was moved
+    there again, or the program's status goes (found in review,
+    2026-11-21). BASIC calls `scr_moveto` to where the cursor is
+    before `READY.`, so that `READY.` after a `PRINT` with `;` that
+    filled its row is no part of the line printed.
   - The end of a program that moved the cursor through its registers,
     and so wrote the screen itself, clears the word, in `mon_restore`.
     One that used the monitor's cursor keeps it, so that a line that

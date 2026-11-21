@@ -193,7 +193,9 @@ HAL18 = sys 0x8000\r
 # with the bit of the line's second row, row 5. sys 0x8020 runs the
 # second, which wraps a line and moves the cursor to row 20 through its
 # registers: the word is 0, and the status and the dump are from row 20.
-LINKS = sys 0x8000\rdump 0xFFFFF004, 1\rsys 0x8020\rdump 0xFFFFF004, 1\rhalt\r
+# sys 0x8040 runs the third, whose 80 characters leave the cursor at the
+# start of the next row, where the status is a line of its own: 0 again.
+LINKS = sys 0x8000\rdump 0xFFFFF004, 1\rsys 0x8020\rdump 0xFFFFF004, 1\rsys 0x8040\rdump 0xFFFFF004, 1\rhalt\r
 # reset: sys 0, the cold start, which shows the banner again and leaves
 # the RAM from 0x8000 alone, so that sys 0x8000 then runs hello.
 RESET = sys 0\rsys 0x8000\rhalt\r
@@ -322,7 +324,7 @@ DUMP_hal16    = -d 0x9100:16 -d 0x9180:9 -d 0x9190:7 -d 0x9198:2 -d 0x9200:2
 # For hal17 its results, and the two lines that fs_complete completed
 DUMP_hal17    = -d 0x9100:13 -d 0x9180:18 -d 0x91A0:18
 # For hal18 its results
-DUMP_hal18    = -d 0x9100:17
+DUMP_hal18    = -d 0x9100:18
 DUMP_fat      = -d 0xFFFFE810:5
 # For fpu the number of test/fpu.nasm's runs, the FPU's status and the
 # screen's mode word at the start of each run, and both at the halt

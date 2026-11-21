@@ -138,7 +138,7 @@ V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SC
 V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
 V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
 V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
-V_WRAP          .EQU    0xFFFFF00B      ; the row that a wrap left the cursor in, until a character goes to a column 0, or 0
+V_WRAP          .EQU    0xFFFFF00B      ; the row that a wrap left the cursor in, until a character goes to a column 0, scr_moveto moves the cursor, or a program ends, or 0
 V_I             .EQU    0xFFFFF068      ; for the clock, the monitor's block of common.nasm's conversions: the fields of a date and a time to set, and a 7th word,
 V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
@@ -392,7 +392,10 @@ mon_exit
 ; past 79 is 79, and a row past 24 is 24. A program that left the cursor
 ; elsewhere than mon_putc and scr_moveto have it wrote the screen itself,
 ; so the rows that go on from the row above, V_LINKS, are no longer known,
-; and are cleared (scr_links). R1 = 0. Uses R1-R6.
+; and are cleared (scr_links). A wrap that left the cursor at a row's
+; start is forgotten, V_WRAP, so that what is put there next, the status
+; or READY., starts a line of its own, and is not more of the program's
+; last line. R1 = 0. Uses R1-R6.
 mon_restore
                 CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
                 CLR     @TIMER
@@ -412,6 +415,7 @@ mon_restore
         ?!Z     CLR     @V_LINKS
                 MOVE    @V_COL, R1
                 MOVE    @V_ROW, R2
+                CLR     @V_WRAP
                 CLR     R1
                 RET
 
@@ -510,7 +514,9 @@ scr_back
 ; clears it at a LF, and when a character goes to the row's column 0 and
 ; the cursor did not come there by that wrap, as after scr_moveto or a
 ; CR, and shifts the word when the screen scrolls; scr_cls clears it, and
-; so does mon_restore after a program that moved the cursor itself. R1
+; so does mon_restore after a program that moved the cursor itself.
+; scr_moveto and the end of a program forget the wrap, also when the
+; cursor is still where the wrap left it. R1
 ; the new word, or -1 to keep it; bit 0 and the bits from 25 are dropped.
 ; R1 = the old word. Uses R2.
 scr_links
@@ -599,7 +605,9 @@ putc_wrap
 ; of its own, its bit of V_LINKS cleared, unless the cursor is where a
 ; wrap left it, in the row of V_WRAP, which goes on from the row above:
 ; so a row that a program writes again from its start, after scr_moveto
-; or a CR, is no longer part of the line above it. Uses R2 and R3.
+; or a CR, is no longer part of the line above it. scr_moveto and
+; mon_restore clear V_WRAP, as the cursor is then no longer where the
+; wrap left it, or the line of the wrap is at its end. Uses R2 and R3.
 putc_line
                 MOVE    R2, @V_ROW
                 CMP     R2, @V_WRAP
@@ -714,7 +722,9 @@ scr_cls         CLR     @SCR_OFFS
                 JMP     putc_cur
 
 ; scr_moveto: entry 6. The cursor to column R1 and row R2. A column past
-; 79 is 79, and a row past 24 is 24.
+; 79 is 79, and a row past 24 is 24. A character put at column 0 after it
+; starts a line of its own (putc_line), also where a wrap left the cursor
+; before, as V_WRAP is cleared.
 scr_moveto
                 CMP     R1, 80
         ?!C     MOVE    R1, 79
@@ -722,6 +732,7 @@ scr_moveto
         ?!C     MOVE    R2, 24
                 MOVE    @V_COL, R1
                 MOVE    @V_ROW, R2
+                CLR     @V_WRAP
                 JMP     putc_cur
 
 ; scr_getxy: entry 7. R1 = the cursor's column, R2 = its row.

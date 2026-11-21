@@ -28,8 +28,11 @@
 ; 14  after scr_moveto to column 0 of row 5 and a character: 0
 ; 15  after 79 more, which wrap to row 6, and one there: 0x40
 ; 16  after scr_moveto to column 0 of row 6 again, and a character: 0
+; 17  after 80 characters from column 0 of row 8, which wrap to row 9,
+;     scr_moveto to column 0 of row 9, where the wrap left the cursor,
+;     and a character: 0, as scr_moveto forgets the wrap
 ;
-; It halts with R1 the number of results, 17.
+; It halts with R1 the number of results, 18.
 
                 .ORG    0x8000
 H18_RESULTS     .EQU    0x9100
@@ -104,6 +107,18 @@ h18_main
                 CALL    h18_links
                 CLR     R1
                 MOVE    R2, 6
+                CALL    _mon_scr_moveto
+                ONE     R8
+                CALL    h18_chars
+                CALL    h18_links
+; A wrap, and scr_moveto to where it left the cursor
+                CLR     R1
+                MOVE    R2, 8
+                CALL    _mon_scr_moveto
+                MOVE    R8, 80
+                CALL    h18_chars
+                CLR     R1
+                MOVE    R2, 9
                 CALL    _mon_scr_moveto
                 ONE     R8
                 CALL    h18_chars

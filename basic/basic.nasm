@@ -152,7 +152,10 @@ bas_start
 
 ; main: READY., on a row of its own, the row after it blank, whatever
 ; was left there (ed_fresh), and the lines, each tokenized and run with a
-; fresh SP
+; fresh SP. A PRINT with ; that filled its row left the cursor at the
+; next row's start, which goes on from it (scr_links): scr_moveto to
+; where the cursor is forgets that wrap, so READY. is no part of the
+; line that was printed.
 main            CLR     @V_AUTO         ; READY. ends AUTO
 main_auto
                 MOVE    SP, STACK
@@ -170,6 +173,8 @@ main_auto
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
+                CALL    SCR_GETXY       ; where a wrap left the cursor, READY. or
+                CALL    SCR_MOVETO      ; AUTO's number starts a line of its own
                 TST     @V_AUTO
         ?!Z     JMP     main_line       ; AUTO, with no READY.
                 MOVE    R1, S_READY

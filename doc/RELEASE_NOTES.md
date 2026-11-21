@@ -86,6 +86,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `Syntax error` that the line did not explain. BASIC blanks the rest
   of the row after `READY.`, `INPUT`'s prompt, and `AUTO`'s number
   ([basic/README.md](../basic/README.md)).
+- After output that filled a row to its last column, what came next
+  at the start of the row below, `READY.` or the status of `SYS`, was
+  part of that line for the editor, and so was a row that a program
+  wrote from its start after `scr_moveto` to where the wrap left the
+  cursor. `scr_moveto` and the end of a program now end the line
+  ([monitor/README.md](../monitor/README.md#the-dispatch-table)).
 
 **Tests.**
 
