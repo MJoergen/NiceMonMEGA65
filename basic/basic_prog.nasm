@@ -717,6 +717,7 @@ lt_go
                 CMP     R1, T_RPAR
         ?!Z     CMP     R1, T_HIMEM
         ?!Z     CMP     R1, T_PI
+        ?!Z     CMP     R1, T_TI
         ?!Z     CMP     R1, T_TIMES
         ?Z      JMP     :+
                 SHR     R1, R1, 24

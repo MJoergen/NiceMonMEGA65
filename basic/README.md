@@ -4,6 +4,7 @@
 - [Numbers](#numbers)
 - [Programs](#programs)
 - [Strings](#strings)
+- [The screen and the time](#the-screen-and-the-time)
 - [The disassembler](#the-disassembler)
 - [Loading without a host](#loading-without-a-host)
 - [Building](#building)
@@ -227,7 +228,7 @@ exact.
   or a procedure's, and no variable (Programs below). A `$` after a
   name makes a string's name (Strings below), and a `%` is a `Syntax
   error`, as whole numbers come later. An
-  assignment, `INPUT`, and `GET` make the variable in a line typed,
+  assignment, `INPUT`, `GET`, and `RCURSOR` make the variable in a line typed,
   and a line of a program makes each of its names. A variable that
   none of them set is an `Undefined variable`. A variable is its
   double and its name, 4 to 7 words, after the program's lines (Programs
@@ -369,6 +370,53 @@ that are not, once, and the rest is `Out of memory`. So a program
 never runs out of room for strings while its strings in use fit.
 `CLR`, `RUN`, `NEW`, and `HIMEM` drop the strings, and an edit keeps
 them, as it keeps the variables.
+
+## The screen and the time
+
+These statements change the colors and the cursor, and wait. Their
+names are those of BASIC 65, the MEGA65's own BASIC.
+
+| Statement | What it does |
+|---|---|
+| `FOREGROUND N` | Sets the color of the characters that are printed from now on, `N` one of the 16 colors below. |
+| `FOREGROUND R, G, B` | The same, with the color given as its red, green, and blue, each 0 to 15, so that any of 4096 colors is possible: `FOREGROUND 15, 8, 0` is orange. |
+| `BACKGROUND N`, `BACKGROUND R, G, B` | Sets the background of the characters that are printed from now on, as `FOREGROUND` does. |
+| `CURSOR ON`, `CURSOR OFF` | Shows the cursor, or hides it. |
+| `CURSOR C, R [, S]` | Moves the cursor to column `C` and row `R`, both from 0, so that the next `PRINT` prints there. `CURSOR ON, C, R` and `CURSOR OFF, C, R` show or hide it too. A column past 79 is 79, and a row past 24 is 24. `S` is the cursor's style: 0 solid, 1 blinking, and 2 and 3 the same, but small. |
+| `RCURSOR C, R` | Sets the variables `C` and `R` to the cursor's column and row. |
+| `SLEEP S` | Waits `S` seconds, such as `SLEEP 0.5`. CTRL-C stops it, and `CONT` goes on after it. |
+
+A color's number, or the number past 15 of a part, or a negative
+column or row, is an `Illegal quantity`. The colors stay after a
+program ends, and `CLS` clears the screen in them. `READY.` shows the
+cursor again, blinking, as a program may have hidden it.
+
+The 16 colors are those of BASIC 65, with their red, green, and blue:
+
+| N | Color | R, G, B | N | Color | R, G, B |
+|---:|---|---|---:|---|---|
+| 0 | black | 0, 0, 0 | 8 | orange | 15, 6, 0 |
+| 1 | white | 15, 15, 15 | 9 | brown | 10, 4, 0 |
+| 2 | red | 15, 0, 0 | 10 | light red | 15, 7, 7 |
+| 3 | cyan | 0, 15, 15 | 11 | dark gray | 5, 5, 5 |
+| 4 | purple | 15, 0, 15 | 12 | gray | 8, 8, 8 |
+| 5 | green | 0, 15, 0 | 13 | light green | 9, 15, 9 |
+| 6 | blue | 0, 0, 15 | 14 | light blue | 9, 9, 15 |
+| 7 | yellow | 15, 15, 0 | 15 | light gray | 11, 11, 11 |
+
+`TI` is the time since the board started, in microseconds, a number
+in an expression with no parentheses, as `PI` is. It is real time on
+the board and in `niceemu`, and it cannot be set. So a program times
+itself with it:
+
+```
+10 T = TI
+20 FOR I = 1 TO 1000: NEXT
+30 PRINT (TI - T) / 1000; " ms"
+```
+
+`TI` and `OFF` are keywords, so they are no names of variables.
+`TIME$` is the time of day (Strings above).
 
 ## The disassembler
 
@@ -619,6 +667,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `struct` | The ROM alone, with `test/struct.bas` typed | `DEF FN` with no, one, and two parameters, of a string, calling others and defined after its call, with its parameters kept; `ON ... GOTO` and `ON ... GOSUB` with each line, 0, past the list, a fraction, and after `THEN`; their errors and those of a `DEF`, `CLR` and an edit before a call, `LIST`, and `RENUMBER` of `ON`'s lists; `DO` and `LOOP` with `WHILE` and `UNTIL` at either end, on one line and over lines, nested, with `FOR` inside, `EXIT`, a `GOTO` back to a `DO`, and a `RETURN` out of one; block `IF`s nested, with and without `ELSE`, a number like `THEN`'s token before one, and their errors, `LIST`, and `RENUMBER`. |
 | `proc` | The ROM alone, with `test/proc.bas` typed | `PROC` with parameters of numbers and strings and `LOCAL`s, the program's variables of their names kept; `FN` over lines calling itself, with `LOCAL`s and a `FOR` loop, and one on one line with `IF` and `ELSE`; `FN`s in expressions with numbers and strings pending; a `PROC` calling itself, `ENDPROC` in an `IF`, and a `GOSUB` in a `PROC`; strings that frames keep over sweeps of a small heap; the errors of `ENDPROC`, `=`, and `LOCAL`, of the calls, and of a `FN` with no `=`, after which `CONT` cannot go on; `ENDPROC` and `=` in a subroutine; and a `FN` 30 and 31 deep. |
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
+| `mach` | The ROM, with `--step-time` and `test/mach.bas` typed | `TI`; `FOREGROUND` and `BACKGROUND` by number and by red, green, and blue, read back from the screen's words; `CURSOR` to a place, its limits, `ON`, `OFF`, and the styles; `RCURSOR`; their errors and `LIST`; and `SLEEP`, timed with `TI`, broken by CTRL-C and gone on with `CONT`. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
@@ -656,9 +705,9 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2028 | 1257 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1831 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1910 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2163 | 1377 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1842 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1912 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1874 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1194 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
@@ -666,10 +715,11 @@ table, and `make romsize` writes it again.
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1590 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1193 | 45 |
+| `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 14573 | 1986 |
+| In all | | 15011 | 2106 |
 <!-- /romsize basic -->

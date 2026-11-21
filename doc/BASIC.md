@@ -539,6 +539,48 @@ PROC`, with `LOCAL`, `DO` and `LOOP`, and the block `IF`.
   ENDIF`. An `IF ... THEN` with nothing after it did nothing before;
   now it starts a block. In a direct line it runs nothing after.
 
+### The machine
+
+Stage 10 (#121) is written, in `basic/basic_mach.nasm` (decided on
+2026-11-21), with the names of BASIC 65 where they fit. It needs
+nothing new of the monitor: it uses the entries `scr_color`,
+`scr_moveto`, and `scr_getxy`, and the registers of the hardware, as
+BASIC uses the FPU's.
+
+- **`TI`** is the microsecond counter of nice_cpu's DEVICES.md §3, all
+  64 bits of it, as a double, read low word first. It cannot be set.
+  It is real time on a board and in `niceemu`, and counts a microsecond
+  a step with `--step-time`, so a test sees the same each time.
+- **`SLEEP S`** waits `S` seconds, a fraction too, as BASIC 65's. It
+  polls the console as a program's statements do: CTRL-C breaks it,
+  `CONT` goes on after it, and the other keys go into the ring of the
+  keys typed ahead. `con_key` keeps the network going meanwhile. Each
+  round writes the microseconds left, up to 10000, to `TIME_SKIP`,
+  which `niceemu --step-time` skips at once and a board ignores, so a
+  test of `SLEEP` takes no real time.
+- **`FOREGROUND N`** and **`BACKGROUND N`** take BASIC 65's 16
+  colors, the C65's palette at its start, and **`FOREGROUND R, G,
+  B`** any of the 4096 that a screen word has. Three numbers keep the
+  16 apart from the small values of red, green, and blue. There is no
+  `PALETTE`, as a screen word holds its color, so a new palette would
+  change only the characters printed after it, and no `BORDER`, as
+  the display has no border.
+- **`CURSOR [ON | OFF] [, C, R [, S]]`** and **`RCURSOR C, R`** are
+  BASIC 65's. The place goes through `scr_moveto`, which stops it at
+  the last column and row, so it follows #157's 28 rows. `ON`, `OFF`,
+  and the style write bits 6 to 4 of `0xFFFFFF80`: a style of 0 is
+  solid and 1 blinking, as BASIC 65's, and 2 and 3 are the same,
+  small. `READY.` shows the cursor again, blinking, as `mon_exit` does
+  after a program. `RCURSOR` makes its variables in a line typed, as
+  `INPUT` does.
+- **The display offset** has no statement. `scr_back` uses it for the
+  scrollback, and `scr_cls` turns it off, so a statement would fight
+  the editor. `POKE 0xFFFFFF85` reaches it, and the virtual screens of
+  stage 11 are the place for one.
+- **`TI` and `OFF`** are new keywords, so a saved program with a
+  variable of either name gets a `Syntax error` (open question 5).
+  `ON` is the statement's keyword, read again after `CURSOR`.
+
 ### What changed in the list of #54
 
 The review of 2026-11-11 changed the list of #54 in these places:
@@ -1141,8 +1183,10 @@ Each has an issue, under #54.
    `PROC`, `FN` over lines, and `LOCAL` in 699 more (measured
    2026-11-20).
 9. **Errors**, #120. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`.
-10. **The machine**, #121. `TI`, `SLEEP`, the colors, the cursor, and
-    the display offset.
+10. **The machine**, #121. `TI`, `SLEEP`, the colors, and the cursor.
+    Written in V2.5, in `basic/basic_mach.nasm`, with the language of
+    [The machine](#the-machine), in 438 words (measured 2026-11-21).
+    The display offset has no statement.
 11. Later, in no order: statements for the network, after #111;
     virtual screens, #163, `FIND` and `CHANGE`, #162; and graphics,
     sprites, and sound, with their hardware.
@@ -1261,7 +1305,7 @@ in C that the note had before 2026-11-16:
 | 7. The editor and its statements, measured | 1071 | 6969 |
 | 8. Structure, measured | 1626 | 8595 |
 | 9. Errors | 400 | 8995 |
-| 10. The machine | 700 | 9695 |
+| 10. The machine, measured | 438 | 9433 |
 
 Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
 the old line input that it replaced, and the monitor's 50 of
@@ -1280,6 +1324,8 @@ words more, to 14169, of which about 90 are the keywords', the help's,
 and the messages' text, and leave 6311 free (measured 2026-11-20).
 With `SAVE` and `BSAVE` to a TFTP server (#155) and the fixes of
 `V2.4.1`, the image is 14573 words, and 5907 are free (measured
+2026-11-21). Stage 10 is 438 words more, to 15011, of which 120 are the
+keywords' and the help's text, and leaves 5469 free (measured
 2026-11-21).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
@@ -1369,7 +1415,8 @@ that is open when it is done.
   forget a wrap, which the monitor of `V2.4` does not.
 - **The stages 9 and 10**, #120 and #121, go to `V2.5` (decided on
   2026-11-21). Stage 9 comes after stage 8, as `RESUME` keeps the
-  frames that stage 8 adds.
+  frames that stage 8 adds. Stage 10 is written first, and changes
+  the monitor in nothing.
 - **A stage that changes the monitor waits for a release with a
   bitstream.** Stage 7, the editor, is the first.
 - **#111 and BASIC share the ROM.** #111 is in V2.1, and

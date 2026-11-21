@@ -57,6 +57,7 @@ ROM_PARTS = {
     "basic_str.nasm": "The strings: the heap, its sweep, the functions of strings, `DATA`, "
                       "`READ`, and `TIME$`",
     "basic_struct.nasm": "The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF`",
+    "basic_mach.nasm": "The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network, and its entries",

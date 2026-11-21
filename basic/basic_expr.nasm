@@ -23,12 +23,13 @@
 ;            bit 23 for one that divides, and its FPU command in 15..0
 ;   K_PUNCT  ( ) , ; and :, the character in bits 7..0
 ;   K_FN     a function: its FPU command, 0 for PEEK, 0x800000 for RND,
-;            and CONST 3 for PI, which takes no argument
+;            0x400000 for TI, and CONST 3 for PI; TI and PI take no
+;            argument
 ;   K_NOT    NOT, with its FPU command
 ;   K_KW     a statement: its index in KEYWORDS in bits 15..8, and the
 ;            byte after its keyword, its program of ops, in bits 7..0
 ;   K_PRT    TAB and SPC, which only PRINT takes
-;   K_SEP    THEN, ELSE, TO, and STEP
+;   K_SEP    THEN, ELSE, TO, STEP, WHILE, UNTIL, and OFF
 ;   K_LINE   a line number after GOTO, GOSUB, RUN, THEN, or ELSE, in
 ;            bits 23..0, and the address of its line in the word after,
 ;            0 until a jump finds it (basic_prog.nasm)
@@ -63,9 +64,9 @@
 ; (basic_prog.nasm). A name with ( after it is an array's. The variables go from V_PEND, the end of the
 ; program, to V_VEND. The tokenizer makes a variable for each name of a
 ; line to store (basic_prog.nasm), and in a direct line for a name after
-; GET, INPUT, or READ, or a comma of INPUT or READ, and with = after it at the start of
-; a statement, or after LET, FOR, THEN, or ELSE, and an array's name in
-; a direct line after DIM, or a comma of DIM. Any other name without a variable is a K_VAR of NO_VAR, an
+; GET, INPUT, READ, or RCURSOR, or a comma of INPUT, READ, or RCURSOR,
+; and with = after it at the start of a statement, or after LET, FOR,
+; THEN, or ELSE, and an array's name in a direct line after DIM, or a comma of DIM. Any other name without a variable is a K_VAR of NO_VAR, an
 ; Undefined variable when it runs, so that a line that only reads a
 ; name, or has a typo, does not write over a program at PROGRAM. The walk
 ; of the table stops at V_VEND and at a length of 0 or above 16, where
@@ -196,6 +197,7 @@ KW_TOK
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP, T_WHILE, T_UNTIL
                 .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
                 .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
+                .DAT    T_TI, T_OFF
 KW_TOK_END
 
 ; The characters of one-character tokens, each with its token
@@ -431,16 +433,18 @@ tok_var
         ?Z      OR      R10, R10, FUNC
 tv_store
                 MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
-                MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT, or
-                AND     R3, R2, 0xFFFFFF00  ; READ, or with = after it, at the
+                MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT,
+                AND     R3, R2, 0xFFFFFF00  ; READ, or RCURSOR, or with = after it, at the
                 CMP     R3, K_KW*K+I_INPUT*0x100  ; start of a statement
         ?!Z     CMP     R3, K_KW*K+I_GET*0x100
         ?!Z     CMP     R3, K_KW*K+I_READ*0x100
+        ?!Z     CMP     R3, K_KW*K+I_RCURSOR*0x100
         ?Z      ONE     R11
-                CMP     R2, T_COMMA     ; and after a comma of INPUT or READ
-        ?!Z     JMP     :+
+                CMP     R2, T_COMMA     ; and after a comma of INPUT, READ, or
+        ?!Z     JMP     :+              ; RCURSOR
                 CMP     @V_KW, I_INPUT+1
         ?!Z     CMP     @V_KW, I_READ+1
+        ?!Z     CMP     @V_KW, I_RCURSOR+1
         ?Z      ONE     R11
 :
                 ADD     R1, R5, R7
@@ -961,6 +965,8 @@ p_fn
                 CMP     R1, T_PI
         ?Z      MOVE    @FPU_CMD, FPU_PI
         ?Z      RET
+                CMP     R1, T_TI
+        ?Z      JMP     p_ti            ; basic_mach.nasm
                 PUSH    R1
                 CALL    paren
                 POP     R1

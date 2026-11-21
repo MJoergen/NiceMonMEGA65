@@ -368,6 +368,24 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # a number; a FN with no =, after which CONT cannot go on; ENDPROC in a
 # GOSUB of a PROC, and = in a PROC; a PROC and a GOSUB in a FN, and = in
 # its GOSUB; and a FN that calls itself 30 deep, and 31.
+# mach: the machine of stage 10 (issue #121), test/mach.bas typed line
+# by line, with --step-time, so that TI counts a microsecond a step. TI,
+# which grows; FOREGROUND and BACKGROUND by BASIC 65's numbers and by red,
+# green, and blue, which PEEK reads in the screen's word of a character;
+# CURSOR to a column of the row, past the last column and the last row,
+# which stop there; and the state of the cursor that CURSOR ON and OFF and
+# a style write, which READY. shows and blinks again. RCURSOR, which makes
+# its variables in a direct line, to an array's elements too. Then the
+# errors: CURSOR with no place, a negative column and row, a style past
+# 3, ON without its comma, and no row; colors past 15, below 0, two
+# numbers, a string, and none; RCURSOR with one variable and a string's;
+# SLEEP below 0, with none, and two; and OFF and TI, which are no
+# variables. LIST of the tokens. A program of SLEEP 100, which the CTRL-C
+# of MACH_TAIL breaks, and CONT goes on after it. Last a program of
+# SLEEPs, timed with TI, of 0, -0, and fractions, whose run takes the
+# line after it into the ring of the keys typed ahead, so that it is
+# short; it shows the cursor, which the program hid, again.
+MACH_TAIL = \003CONT\rNEW\r10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000, B - A < 251000\r20 A = TI: SLEEP 0: SLEEP -0: B = TI: PRINT B - A < 1000\r30 A = TI: SLEEP 1.5: B = TI: PRINT B - A >= 1.5E6, B - A < 1501000\r40 CURSOR OFF: SLEEP 0.01: PRINT PEEK(-128)\rRUN\r? PEEK(-128)\rHALT\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -440,7 +458,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -465,6 +483,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/str.bas > $(BUILD)/str.txt
 	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
 	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
+	@{ tr '\n' '\r' < test/mach.bas; printf '$(MACH_TAIL)'; } > $(BUILD)/mach.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
@@ -474,14 +493,14 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
 	    funcs|prog|keys|edit|long|lines|arr|struct|proc) prog=; dump=;; \
-	    str) prog=; dump=; opts=--step-time;; \
+	    str|mach) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
