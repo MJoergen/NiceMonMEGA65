@@ -113,7 +113,7 @@ def old_options(name: str, argv: Sequence[str]) -> list[str]:
         new, takes = renamed[old]
         form = "--listen [ADDR:]PORT" if new == "--listen" else new
         print(f"{script}: warning: {old} is {form} of {PROG} {name}; "
-              f"V2.5 removes {script} and {old}", file=sys.stderr)
+              f"V3.1 removes {script} and {old}", file=sys.stderr)
         if takes and not eq and i + 1 < len(argv):
             value = argv[i + 1]
             i += 1

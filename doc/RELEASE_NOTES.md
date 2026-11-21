@@ -43,6 +43,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The debugger's page shows 25 rows of memory, where it showed 22, and
   Page Up and Page Down move its window 200 words. The strip is rows 28
   to 31.
+- The old names of the host tools, `load.py`, `run.py`, `mon.py`,
+  `sdcard.py`, `sdnbd.py`, `flash.py`, and `tftpd.py`, and their old
+  options, stay until V3.1, and not until V2.5, as the notes of V2.4.1
+  said ([#159](https://github.com/MJoergen/NiceMonMEGA65/issues/159)).
+
+**Fixed.**
+
+- `nicemon.py mon --help` has the same form as the other subcommands'
+  help, with `mon` in its usage line
+  ([nice_cpu#202](https://github.com/MJoergen/nice_cpu/issues/202)).
 
 ## V2.4.1 (2026-11-21)
 

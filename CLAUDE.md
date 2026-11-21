@@ -167,7 +167,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   users run, with the subcommands `load`, `run`, `mon`, `sd`, `nbd`,
   `flash`, and `tftpd`, each a module below that it imports when it
   runs (#156; the old names, `load.py` and the others, call it until
-  V2.5), `cli.py` (the messages on stderr and the exit codes that the
+  V3.1), `cli.py` (the messages on stderr and the exit codes that the
   subcommands share), `boardlink.py` (the link: nice_cpu's
   `debugger/nicelink.py`, on the UART or over TCP to `niceemu --link`,
   with the board's Ethernet port and `make cosim`; the tools import it
