@@ -96,7 +96,7 @@ option that `nbd` and `tftpd` share.
 
 The old names, `tools/load.py`, `run.py`, `mon.py`, `sdcard.py`,
 `sdnbd.py`, `flash.py`, and `tftpd.py`, still run the matching
-subcommand until V2.5 removes them
+subcommand until V3.1 removes them
 ([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)). They
 take the options that V2.4.1 renamed by their old names too, with a
 warning that names the new one.

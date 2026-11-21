@@ -43,6 +43,17 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The debugger's page shows 25 rows of memory, where it showed 22, and
   Page Up and Page Down move its window 200 words. The strip is rows 28
   to 31.
+- The old names of the host tools, `load.py`, `run.py`, `mon.py`,
+  `sdcard.py`, `sdnbd.py`, `flash.py`, and `tftpd.py`, still run and
+  call `tools/nicemon.py` (V2.4.1 below). They take the old options
+  too, with a warning that names the new one. V3.1 removes them
+  ([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)).
+
+**Fixed.**
+
+- `nicemon.py mon --help` has the same form as the other subcommands'
+  help, with `mon` in its usage line
+  ([nice_cpu#202](https://github.com/MJoergen/nice_cpu/issues/202)).
 
 ## V2.4.1 (unreleased)
 
@@ -68,10 +79,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   | `tftpd.py --timeout` | `nicemon.py tftpd --retry-wait` |
 
   `make flash SLOT=N` and `make tftpd TFTP_PORT=P` are as they were.
-- The old names, `load.py`, `run.py`, `mon.py`, `sdcard.py`,
-  `sdnbd.py`, `flash.py`, and `tftpd.py`, still run and call
-  `nicemon.py`. They take the old options too, with a warning that
-  names the new one. V2.5 removes them.
 - The subcommands print their errors, warnings, and progress on
   stderr, after `nicemon.py SUBCOMMAND: `, so stdout carries only the
   console and the data: `load`'s progress, `sd`'s `put`, `del`,
