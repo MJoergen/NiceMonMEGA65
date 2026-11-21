@@ -1144,7 +1144,7 @@ Each has an issue, under #54.
 10. **The machine**, #121. `TI`, `SLEEP`, the colors, the cursor, and
     the display offset.
 11. Later, in no order: statements for the network, after #111;
-    virtual screens, `FIND`, and `CHANGE`; and graphics,
+    virtual screens, #163, `FIND` and `CHANGE`, #162; and graphics,
     sprites, and sound, with their hardware.
 
 ## What the stages need of the monitor
@@ -1389,14 +1389,14 @@ that is open when it is done.
 4. ~~**`PROC` and `FN`**.~~ Settled on 2026-11-20: as BBC BASIC
    writes them, `DEF PROCname` and `PROCname`, `DEF FNname` and
    `FNname`, so a variable's name cannot start with `PROC` or `FN`.
-5. **Reserved names.** A keyword of a later stage, `SPRITE` or
+5. **Reserved names**, #160. A keyword of a later stage, `SPRITE` or
    `SOUND`, breaks a saved program that has a variable of that name.
-   The names could be refused as variables from stage 3 on.
+   The names could be refused as variables before they come.
 6. ~~**The digits of a constant**, so that `LIST` gives the program
    back.~~ Settled on 2026-11-18: the token of a constant keeps its
    digits beside the double ([Lines and tokens](#lines-and-tokens)), as
    stage 2 tokenizes ([Decisions](#decisions)).
-7. **`A%`**: not in stage 2, where `%` in a name is an error. It may
+7. **`A%`**, #161: not in stage 2, where `%` in a name is an error. It may
    come with `DIM`, as one word of storage for a whole number, pushed
    and read through the FPU's view of a word. An array of flags is
    then half as large, which counts in the Nexys4DDR's 26K words.
