@@ -21,6 +21,21 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.5 (unreleased)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.5`. Its emulator's screen has 80×28 characters,
+  or 160×112 pixels in the chunky mode, where the board's has 80×25
+  and 160×100 until
+  [#157](https://github.com/MJoergen/NiceMonMEGA65/issues/157)
+  ([nice_cpu#203](https://github.com/MJoergen/nice_cpu/issues/203),
+  [EMULATOR.md](EMULATOR.md)). `nice_screen_clear` of nice_cpu's
+  runtime blanks 2240 words, and on the board the 240 after the
+  screen's 2000 are part of the monitor's scrollback, which no row
+  shows, so a C program that calls it blanks three of the
+  scrollback's rows.
+
 ## V2.4.1 (unreleased)
 
 **Upgrade notes.**

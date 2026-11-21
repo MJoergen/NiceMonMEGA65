@@ -29,6 +29,14 @@ ASM      = $(ROM_ASM)
 FMT      = $(PYTHON) $(NICE_CPU)/assembler/nicefmt.py
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
+# niceemu prints a screen of 28 rows (nice_cpu#203), and the board has
+# 25 until #157; the rows after them are the ROM's room for scrolling.
+# SCREEN25 keeps rows 0 to 24 and drops their trailing blank rows, as
+# niceemu drops those of its 28.
+SCREEN25 = awk '/^Screen:/ {n = 0; b = 0} \
+  !/^\|/ {b = 0} \
+  /^\|/ {if (++n > 25) next; if ($$0 == "|") {b++; next}} \
+  {while (b > 0) {print "|"; b--}; print}'
 RUNTIME  = $(NICE_CPU)/runtime
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 BUILD    = build
@@ -470,7 +478,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	  cat $$rom $$prog > $(BUILD)/$$t.full.bin; \
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
-	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
+	  { $(SCREEN25) $(BUILD)/$$t.raw | sed -e '/^Halted (HALT)/,/^R12 /d'; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
