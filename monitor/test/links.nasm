@@ -1,6 +1,6 @@
 ; The test of what mon_restore does with the rows that go on from the row
 ; above, the word of scr_links (README.md, "The dispatch table"), after a
-; program that SYS ran: two programs, which the Makefile joins with the
+; program that SYS ran: three programs, which the Makefile joins with the
 ; stubs of mon.nasm, as test/hal18.nasm. The first two print 81
 ; characters, which wrap, so that the second row goes on from the first,
 ; and return. The first, at 0x8000, leaves the cursor where mon_putc put

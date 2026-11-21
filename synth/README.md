@@ -110,8 +110,8 @@ tools tell them apart. It needs `coretool`, the Python script `src/tools/coretoo
 [mega65-tools](https://github.com/MEGA65/mega65-tools), on the `PATH` or
 in `CORETOOL`.
 
-`make flash COR=synth/r6/build/NiceMonMEGA65-r6.cor SLOT=1` writes the
-core file into slot 1 over the JTAG cable instead, with no key held at
+`make flash PORT=/dev/ttyUSB1 COR=synth/r6/build/NiceMonMEGA65-r6.cor
+SLOT=1` writes the core file into slot 1 over the JTAG cable instead, with no key held at
 power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core,
 or 1 to 3 on an R3 with a flash of 32 MiB, an S25FL256S.
 It checks the FPGA first, as `make hwtest` does, and stops unless the

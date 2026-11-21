@@ -102,8 +102,8 @@ help:
 	@echo "                  write the core file COR into slot SLOT, 1 to 7, of the"
 	@echo "                  MEGA65's flash over JTAG, with no key held at power on,"
 	@echo "                  and start it"
-	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
-	@echo "                  mon.py's check of the memory, without a board"
+	@echo "  make linktest   compare tools/nicemon.py run on niceemu --link with niceemu,"
+	@echo "                  and check mon's check of the memory, without a board"
 	@echo "  make sdtest     check tools/nicemon.py sd and tools/nicemon.py nbd on niceemu --link"
 	@echo "                  with images of a card, without a board"
 	@echo "  make ecma55     run the ECMA-55 conformance suite on BASIC in niceemu, and"
@@ -122,7 +122,7 @@ help:
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"
-	@echo "  make cosimtest  compare run.py on the simulated system with niceemu,"
+	@echo "  make cosimtest  compare tools/nicemon.py run on the simulated system with niceemu,"
 	@echo "                  without a board (hours)"
 	@echo "  FLOW=default|timing  with a board's target picks Vivado's directives"
 	@echo "                  (synth/Makefile.inc)"
@@ -268,7 +268,7 @@ mon:
 
 # The files of the board's SD card over the link (tools/nicemon.py sd)
 sdcard:
-	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', or CMD='del NAME'"; exit 1)
+	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', CMD='del NAME', CMD=mkdir, or CMD='--slot N format'"; exit 1)
 	$(PYTHON) tools/nicemon.py sd $(LINK) $(ARGS) $(CMD)
 
 # The board's SD card as a block device of the host, for nbd-client and a
@@ -299,7 +299,7 @@ hwtest: examples $(EMU)
 linktest: $(EMU)
 	$(PYTHON) tools/linktest.py
 
-# sdcard.py and sdnbd.py on niceemu --link with images of a card, which needs no board
+# nicemon.py sd and nbd on niceemu --link with images of a card, which needs no board
 sdtest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/sdtest.py
 

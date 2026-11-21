@@ -2,7 +2,7 @@
 
 What the ROM has for itself, behind the dispatch table of
 [README.md](README.md): the routines with no entries, which only the
-ROM's statements call, FAT32, the scrollback, the ROM's words, and the
+monitor itself calls, FAT32, the scrollback, the ROM's words, and the
 build and the tests. A program does not call these routines, as they
 have no entries and their addresses change with every build; it calls
 the entries, or drives the registers itself.
@@ -341,21 +341,23 @@ order:
 
 1. `monitor.nasm`, `monitor_sd.nasm`, `monitor_fat.nasm`,
    `monitor_eth.nasm`, `monitor_tcp.nasm`, `monitor_clock.nasm`,
-   `common.nasm`, `monlib.nasm`, and `mon.nasm`.
-2. `build/version.nasm`, which defines `VERSION`, the text of the
+   `monitor_basic.nasm`, `common.nasm`, `monlib.nasm`, and `mon.nasm`.
+2. `build/folder.nasm`, the card's folder (README.md, "Files"), as an
+   8.3 name.
+3. `build/version.nasm`, which defines `VERSION`, the text of the
    banner and of DHCP's request: `git describe` of the tree, or the
    `VERSION=` of the command line.
-3. `build/folder.nasm`, the card's folder (README.md, "Files"), as an
-   8.3 name.
 
 BASIC's, in this order:
 
 1. `../basic/basic.nasm`, which starts with the two vectors at
-   `0x3000`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`, and
-   `basic_dis.nasm`, then `common.nasm`, `monlib.nasm`, and `mon.nasm`.
-2. `../basic/build/version.nasm`.
-3. `../basic/build/basic_folder.nasm`, the texts with the folder's name,
+   `0x3000`, `basic_expr.nasm`, `basic_prog.nasm`, `basic_cmd.nasm`,
+   `basic_net.nasm`, `basic_time.nasm`, `basic_dis.nasm`,
+   `basic_edit.nasm`, `basic_str.nasm`, and `basic_struct.nasm`, then
+   `common.nasm`, `monlib.nasm`, and `mon.nasm`.
+2. `../basic/build/basic_folder.nasm`, the texts with the folder's name,
    of `DIR` and of error 29.
+3. `../basic/build/version.nasm`.
 
 The generated files are written only when they change, so that the
 ROM, and a bitstream with it, is not built again for nothing. The build
@@ -483,7 +485,7 @@ compared with `test/NAME.expected`:
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
 | `hal17` | `test/hal17.nasm`, with `ab` typed after `SYS`, and `super.img` | The entries of table 1.7, through `mon.nasm`'s stubs: `mon_build`'s text, `con_key` with a wait, without, and with no key, `scr_back` back, forward, and past either end after 40 rows, and `fs_complete` on a line, plainly and through the word window, as a C stub calls it. |
 | `hal18` | `test/hal18.nasm` | The entry of table 1.8, `scr_links`, through `mon.nasm`'s stub: the word after `scr_cls`, after a wrap, a CR LF, a wrap and a LF at the last row, which scroll, and a TAB at its last column, the bits that a write drops, and a row written again from its column 0, after `scr_moveto` and after a CR, which is a line of its own, where one written from column 1, or right after a wrap, is not; after a wrap and `scr_moveto` to where it left the cursor, it is one too. |
-| `links` | `test/links.nasm`, two programs that `SYS` runs | The word of `scr_links` after a program, as `DUMP` shows it: kept after one that wraps a line and returns, 0 after one that moves the cursor through its registers, and 0 after one whose wrap left the cursor at the start of the row where the status goes. |
+| `links` | `test/links.nasm`, three programs that `SYS` runs | The word of `scr_links` after a program, as `DUMP` shows it: kept after one that wraps a line and returns, 0 after one that moves the cursor through its registers, and 0 after one whose wrap left the cursor at the start of the row where the status goes. |
 | `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set the timer, and moved the cursor off the screen. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `SAVE`, `LOAD`, `DIR`, and `DELETE`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `DELETE`. |

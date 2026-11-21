@@ -33,7 +33,7 @@ ARP_SLOTS       .EQU    4               ; the entries of the ARP cache
 ARP_AGE         .EQU    60              ; the ticks of arp_tick an entry is kept, about a minute
 ARP_TRIES       .EQU    3               ; the requests that arp_resolve sends
 ARP_WAIT        .EQU    1000000         ; the microseconds it waits for a reply to each
-DHCP_TRIES      .EQU    4               ; the DISCOVERs that i dhcp sends
+DHCP_TRIES      .EQU    4               ; the DISCOVERs that DHCP sends
 DHCP_WAIT       .EQU    2000000         ; the microseconds it waits for each reply
 DHCP_LEN        .EQU    382             ; the bytes of its frames: 14 Ethernet, 20 IP, 8 UDP, and 340 DHCP
 DHCP_WORDS      .EQU    96              ; their words, with the 2 bytes before the frame, all of V_TXF
@@ -147,7 +147,7 @@ dhcp_commit
 ; before, from BG_START up to BG_MAX, plus up to a second that the
 ; microseconds pick (RFC 2131 §4.1). An OFFER with an address gets a
 ; REQUEST, and DHCP_WAIT microseconds for its ACK; without it, or with a
-; NAK, the next DISCOVER goes. The ACK sets the address, as i dhcp does,
+; NAK, the next DISCOVER goes. The ACK sets the address, as DHCP does,
 ; and bg_show shows it. The exchange ends there, or when the station has
 ; an address from elsewhere: i, net_set, net_dhcp, or the link.
 

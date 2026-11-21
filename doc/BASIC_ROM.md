@@ -54,8 +54,9 @@ is left, the R3. V2.4 moves BASIC's part from `0x4000` to `0x3000`
   what they have now.
 - The monitor knows only BASIC's two vectors, `BAS_COLD` at `0x3000`
   and `BAS_WARM` at `0x3002`. BASIC calls the monitor only through the
-  entries of the dispatch table, as a program does: table 1.6, with
-  37 entries. Both share the
+  entries of the dispatch table, as a program does: table 1.8, with
+  42 entries, where it was 1.6, with 37, before this design. Both
+  share the
   layout of the RAM at the top, `STACK`, `BASIC_WORDS`, and `MON_RAM`
   of `monitor/common.nasm`.
 - The cold start, `mon_reset`, ends with `JMP BAS_COLD`. `SYS 0` runs
@@ -96,8 +97,9 @@ is left, the R3. V2.4 moves BASIC's part from `0x4000` to `0x3000`
   with the port, its build needed 277 of the 270 RAMB18 places, as a
   memory that is written takes 32 RAMB36 where a ROM took about 27. So
   its ROM is built without the port, `G_ROM_WRITE` false; the loader
-  finds it locked and runs the bitstream's BASIC, and `load.py --basic`
-  refuses it. Its contents at configuration still come
+  finds it locked and runs the bitstream's BASIC, and
+  `nicemon.py load --basic` refuses it. Its contents at configuration
+  still come
   from `build/rom.bin`. `synth/rompatch.tcl` finds the ROM's block
   RAMs by their names, `mem_even_reg_*` and `mem_odd_reg_*`, with the
   port and without it, and stops when it does not find the layout that
@@ -325,7 +327,8 @@ the monitor's write of a word back to itself changes nothing in
   host's clear zeroes the word with the RAM.
 - **A monitor that runs from RAM** finds the ROM open at every cold
   start: in `niceemu`, and where a tool loads a ROM image at 0 with
-  the ROM hidden, as `load.py --monitor --rom` and `make hwtest` do.
+  the ROM hidden, as `nicemon.py load --monitor --rom` and
+  `make hwtest` do.
   There the loader would replace the BASIC that was just loaded with
   the card's, when no program is at `0x8000`. "keep" is for them: the
   tests' image has it, and the tools set it in
@@ -398,8 +401,8 @@ finds the ROM locked, and runs that image.
 - This is the network load that #153 asks for, with the tools that
   are there now. A load by the board itself, with BOOTP and TFTP, is
   left out ([Not included](#not-included)).
-- `load.py --basic` sets "keep" in the image that it writes, so the
-  monitor runs it also where the ROM is still open.
+- `nicemon.py load --basic` sets "keep" in the image that it writes,
+  so the monitor runs it also where the ROM is still open.
 - The tools hide the ROM before every other load, so a program loaded
   at 0 never reaches the ROM.
 - The link's clear zeroes the RAM, the screen, and the fonts, not the
@@ -451,14 +454,15 @@ finds the ROM locked, and runs that image.
 ## The tools
 
 - `make rom` builds `basic/build/basic.rom` beside `build/rom.bin`.
-- `load.py --basic FILE` loads an image over the link into the ROM,
-  with "keep" set, and starts the core. `make load` passes it on.
-- `load.py --monitor --rom FILE`, `run.py`, and `make hwtest` set
-  "keep" in a ROM image that they load into the RAM. So the card's
+- `nicemon.py load --basic FILE` loads an image over the link into the
+  ROM, with "keep" set, and starts the core. `make load` passes it on.
+- `nicemon.py load --monitor --rom FILE`, `nicemon.py run`, and
+  `make hwtest` set "keep" in a ROM image that they load into the
+  RAM. So the card's
   BASIC does not replace it, the program at `0x8000` stays, and
   `make hwtest` tests the build's BASIC, with the waits that it has.
-- `load.py --monitor` has the end of a program's RAM from the words
-  of the monitor's RAM, `MON_VARS`, and of BASIC's, which it takes
+- `nicemon.py load --monitor` has the end of a program's RAM from the
+  words of the monitor's RAM, `MON_VARS`, and of BASIC's, which it takes
   from the header, of the file of `--rom`, or over the link.
   `make hwtest` shares it.
 - `make hwtest` checks that the ROM's BASIC part takes a link's write,
@@ -468,7 +472,7 @@ finds the ROM locked, and runs that image.
   against the file, and without one that is NOT COVERED. It still
   writes nothing to a card. At its end it loads the BASIC it found, so
   that the board is left as it was.
-- `sdcard.py put` copies `BASIC-V2.3.2.ROM` to a card, as it copies
+- `nicemon.py sd put` copies `BASIC-V2.3.2.ROM` to a card, as it copies
   any file.
 - The README tells the users how to install a new BASIC on a card, and
   what to do with one that hangs.
@@ -510,7 +514,7 @@ would not fit in the 6890 words that were free
 ([BASIC.md](BASIC.md#the-roms-room)).
 
 - BASIC's part has 20480 words, `0x3000`–`0x7FFF`, and the monitor's
-  12288, of which it uses 10648.
+  12288, of which it uses 10682 in V2.4.1.
 - The boundary is the generic `G_ROM_BASIC` of `src/mem.vhd` and
   `src/nicemon.vhd`, a comparison of the ROM's address with a
   constant, where it was address bit 14. So the move needs a
@@ -643,10 +647,10 @@ One is open:
    and checks that the second cold start finds the ROM locked. There a
    load of that image takes about 10 ms at 100 MHz, nearly all of it
    the card's reads, and the copy and the zeroing 3 ms more.
-4. **The tools.** `load.py --basic`, "keep" in the images that the
+4. **The tools.** `nicemon.py load --basic`, "keep" in the images that the
    tools load, `make hwtest`, the README, and `basic/README.md`.
-   Written: `load.py --basic` and "keep" in a ROM image that `load.py`
-   or `run.py` loads at 0, and the end of a program's RAM from the
+   Written: `nicemon.py load --basic` and "keep" in a ROM image that
+   `nicemon.py load` or `run` loads at 0, and the end of a program's RAM from the
    header; `make linktest` checks "keep" and the refusal of `--basic`
    on `niceemu`. `make hwtest` checks BASIC's part, the load after the
    configuration against the card's file, a test image, and the BASIC

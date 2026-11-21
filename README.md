@@ -27,8 +27,9 @@ A few words come up throughout:
   (`.cor`) holds it. The other documents also call the NICE CPU itself
   "the core"; this one says "the processor".
 - The **monitor** is the program in the ROM that the system starts
-  with. It shows a prompt, and takes commands that load and run
-  programs ([monitor/](monitor/README.md)).
+  with. It runs BASIC, whose `READY.` takes the statements that load
+  and run programs ([basic/](basic/README.md)), and it has the
+  routines that programs call ([monitor/](monitor/README.md)).
 - **[Remote control](doc/DEBUG_LINK.md)** lets a PC load, run, pause,
   step, and inspect programs on the board, over its Ethernet port or its
   serial port. It is nice_cpu's
@@ -72,10 +73,12 @@ There are three ways to use the system:
 
 With nothing connected but a screen, the MEGA65 starts the
 [monitor](monitor/README.md) from the ROM. It shows its version and
-`READY.`, and takes a statement of its BASIC on each line. BASIC is
-young: so far it has the monitor's commands, numbers, variables, and
-programs, which a card keeps, but no strings yet
-([doc/BASIC.md](doc/BASIC.md)).
+`READY.`, and takes a statement of its BASIC on each line. BASIC has
+numbers and strings, arrays, and programs with loops, functions, and
+procedures, which a card keeps, and a screen editor
+([basic/README.md](basic/README.md)). A program cannot catch its
+errors yet, and has no statements for the colors and the cursor
+([doc/BASIC.md](doc/BASIC.md#stages)).
 
 | Statement | What it does |
 |---|---|
@@ -632,8 +635,10 @@ USB HID port (see [synth/](synth/README.md#building)).
 - [doc/](doc/README.md) has the reference documents: how to write
   programs, the address map, remote control, and the differences from
   the emulator.
+- [basic/README.md](basic/README.md) describes BASIC: its statements,
+  its numbers, its strings, and its programs.
 - [monitor/README.md](monitor/README.md) describes the monitor: its
-  commands, and its routines for programs.
+  routines for programs, the files, and the network.
 - [tools/README.md](tools/README.md) describes the tools on the PC.
 - [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) has what changed in each
   release.

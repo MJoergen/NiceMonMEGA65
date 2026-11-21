@@ -152,8 +152,8 @@ Checks, in this order:
       FPU's registers as the link reads them after the halt, and its
       fpudec.nasm, which prints numbers through the decimal commands
     - the monitor of the tests with the demo after it,
-      demo/build/test/monitor_demo.bin, with r for the demo, and its
-      screen
+      demo/build/test/monitor_demo.bin, with SYS 0x8000 for the demo,
+      and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, and bench_win.bin,
       built for the byte windows, all but their cycles
     - the monitor's test program, monitor/test/hello.nasm, with run.py
@@ -161,7 +161,8 @@ Checks, in this order:
       on the two joined, also with 448 rows of d that are still coming
       when the input ends, and under the monitor in the board's ROM, if it
       has one, which must return its status; and BASIC's LOAD, with the
-      600 lines of hello.bin pasted at the UART's full rate, then r
+      600 lines of hello.bin pasted at the UART's full rate, then
+      SYS 0x8000
     - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
       the monitor and without it
     And the demo's self-test, F11, runs with tools/run.py, and its four

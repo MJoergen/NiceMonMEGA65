@@ -2,9 +2,10 @@
 
 The design of the BASIC interpreter in the ROM, issue
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54), and the
-stages of the work. **Stage 1, the shell, is written (#112), and so
-are stage 2, the numbers (#113), and stage 3, the programs (#114);
-the rest is not.**
+stages of the work. **The stages 1 to 8 are written: the shell
+(#112), the numbers (#113), the programs (#114), the files (#60), the
+strings (#116), the functions (#117), the screen editor (#118), and
+the structure (#119). The stages 9 and 10 are not.**
 [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey behind it. #54 lists
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
@@ -96,7 +97,8 @@ settle the three open questions of #54.
   is no `ATN`. `RND` takes its argument as Microsoft's BASIC does, and
   starts from the same word at each cold start. `^` groups to the
   left. The ECMA-55 suite, whose programs need `DATA` and strings,
-  waited for stage 5, which has them, and is still to be run.
+  waited for stage 5, which has them, and `make ecma55` runs it
+  ([Tests](#tests)).
 
 ## What it runs on
 
@@ -165,10 +167,10 @@ These facts bound the design:
 
 ## The main loop
 
-The cold start prints the banner, the free words, and `READY.`, and
-reads a line. Stage 1 prints `HELP lists the statements` where the
-free words are to go, as it has no variables yet. A line that starts with a number is stored, from stage 3
-on. Any other line runs at once. `mon_exit` comes back to `READY.`.
+The cold start prints the banner, `HELP lists the statements`, and
+`READY.`, and reads a line. The free words were to go where that line
+is, and no stage prints them so far. A line that starts with a number
+is stored, from stage 3 on. Any other line runs at once. `mon_exit` comes back to `READY.`.
 
 The monitor's commands become these statements
 ([Decisions](#decisions)). A name is a string in quotes, and
@@ -311,8 +313,8 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
 - A constant is read as at most 16 digits in BCD and an exponent,
   `FROMBCD` and `SCALE10`. Digits after the 16th round the 16th.
 - `LIST` and `SAVE` write a constant so that a program saved and
-  loaded is the same program. How is open
-  ([Open questions](#open-questions)).
+  loaded is the same program: the token of a constant keeps its
+  digits ([Lines and tokens](#lines-and-tokens)).
 - An address from `0x80000000` on is a negative number: `0xFFFF0000`
   prints as -65536. `HEX$` shows the word. `PEEK` gives a signed word
   too, and a number above 2^31 - 1 is no address: `POKE 0xFFFFFF00, 0`
@@ -393,8 +395,9 @@ these do not say otherwise.
 - **An error in a program** prints its message and the line's number,
   `Syntax error in 20`, as in V2, and the frames are dropped.
 - **`HIMEM = n`** does a `CLR`, as the frames are below it. It is
-  `Out of memory` below the end of the arrays and the frames' room,
-  and above the RAM.
+  `Out of memory` below the end of the variables and the frames' room,
+  and above the RAM. The arrays do not count, as the `CLR` frees
+  them.
 
 ### Strings
 
@@ -472,9 +475,10 @@ PROC`, with `LOCAL`, `DO` and `LOOP`, and the block `IF`.
   its value, so that the function has the FPU's whole stack. The
   program's end in a function is `FN without =`, and `END`, `STOP`, or
   the break key there ends the call, after which `CONT` cannot go on.
-  A function calls itself up to 30 deep, as the call of a function over
-  lines may start while 512 words of the processor's stack are taken at
-  most; past it, it is `Formula too complex`.
+  A function calls itself about 30 deep, 30 for the tests' factorial,
+  as the call of a function over lines may start while 512 words of
+  the processor's stack are taken at most; past it, it is `Formula too
+  complex`.
 - **`DEF PROCA(X, Y$)`** defines a procedure, a statement of its own,
   which `PROCA(1, "S")` calls. It runs the statements after the
   parameters up to `ENDPROC`, which goes on after the call. A procedure
@@ -593,7 +597,9 @@ entries alone (#152). Its workspace is the program's RAM:
   0, BASIC takes the MEGA65's size.
 - The variables are 6K words, `MON_VARS` and `BASIC_WORDS`: the
   monitor's 4K and BASIC's 2K, of which its stage 3 uses 1585, and leaves 463
-  (measured 2026-11-18), and stage 4 uses 8 words more, and leaves 455. BASIC's state,
+  (measured 2026-11-18), and stage 4 uses 8 words more, and leaves 455.
+  Since stage 5 the two strings of a statement end it, at
+  `0xFFFFEFE1`, 30 words below its end. BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo
   tested on the Nexys4DDR, up to `0xDFFF`. From nice_cpu's `V2.4` on,
@@ -736,10 +742,12 @@ parameter 7, and a frame with no room is
 `Out of memory`. A `NEXT` with no `FOR` frame is `NEXT without FOR`,
 and a `RETURN` with no `GOSUB` frame is `RETURN without GOSUB`. The
 numbers of an expression are on the FPU's stack
-([The FPU](#the-fpu)). Its other temporaries, the strings, are on the
-stack of the frames, above them, and are gone at the end of the
-statement. So an error drops them all by resetting one pointer and
-clearing the FPU's stack. `PROC` recursion is on the
+([The FPU](#the-fpu)). Its other temporaries, the strings, are on a
+stack of their own in BASIC's RAM, 16 entries of an address and a
+length, and a new string is a block of the heap
+([Strings](#strings)); they are gone at the end of the statement. So
+an error drops them all by resetting their pointers and clearing the
+FPU's stack. `PROC` recursion is on the
 frames, not on the processor's stack, as the loop of statements does
 not recurse. A `FN` over lines does: its call runs a loop of
 statements below its expression on the processor's stack, which `=`
@@ -1210,7 +1218,7 @@ bitstream.
 BASIC's image ([BASIC_ROM.md](BASIC_ROM.md#the-image)). The monitor
 takes SP and the end of a program's RAM from it, 1024 to 8192 words, and the header's
 version of the RAM's layout then covers the monitor's own RAM alone,
-from `0xFFFFF000`. `load.py --monitor` takes BASIC's from the word
+from `0xFFFFF000`. `nicemon.py load --monitor` takes BASIC's from the word
 too, and has the monitor's as `MON_VARS`.
 
 The rest of stage 3 is BASIC's own. `HIMEM` works with `bin_line` as
@@ -1230,8 +1238,9 @@ These were looked at, and not checked as the stages 2 and 3 were:
   entries above too.
 - **The stages 4 to 6 and 8 to 10** show nothing that they need of
   the monitor.
-- **The console's interrupt (#104) and RESTORE's NMI (#110)**, of
-  stage 11, change the FPGA, so they need a bitstream in any case.
+- **The console's interrupt (#104) and RESTORE's NMI (#110)** will
+  not come, as nice_cpu V3.0 has no interrupts
+  ([The break key and keys typed ahead](#the-break-key-and-keys-typed-ahead)).
 
 ## The ROM's room
 
@@ -1250,9 +1259,9 @@ in C that the note had before 2026-11-16:
 | 5. Strings, measured | 1762 | 5785 |
 | 6. Functions, measured | 113 | 5898 |
 | 7. The editor and its statements, measured | 1071 | 6969 |
-| 8. Structure | 1400 | 8369 |
-| 9. Errors | 400 | 8769 |
-| 10. The machine | 700 | 9469 |
+| 8. Structure, measured | 1626 | 8595 |
+| 9. Errors | 400 | 8995 |
+| 10. The machine | 700 | 9695 |
 
 Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
 the old line input that it replaced, and the monitor's 50 of
@@ -1269,6 +1278,9 @@ keywords', the help's, and the messages' text, and leave 7010 free
 (measured 2026-11-20). `PROC`, `FN` over lines, and `LOCAL` are 699
 words more, to 14169, of which about 90 are the keywords', the help's,
 and the messages' text, and leave 6311 free (measured 2026-11-20).
+With `SAVE` and `BSAVE` to a TFTP server (#155) and the fixes of
+`V2.4.1`, the image is 14573 words, and 5907 are free (measured
+2026-11-21).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left
@@ -1348,12 +1360,16 @@ that is open when it is done.
   and the move changes the FPGA, and `V2.4` has a bitstream in any
   case, as it bumps nice_cpu. Stage 6 is small, and the FPU's
   functions that it needs are in nice_cpu's `V2.4`.
-- **The stages 5, 8, 9, and 10**, #116, #119, #120, and #121, go to
-  `V2.4.1` for now (decided on 2026-11-20). None of them changes the
-  monitor, so it can be a release of BASIC alone, on the bitstreams of
-  `V2.4`. Stage 8 comes after stage 5, for an `FN` of a string, and
-  stage 9 after stage 8, as `RESUME` keeps the frames that stage 8
-  adds.
+- **`V2.4.1` has the stages 5 and 8**, #116 and #119 (decided on
+  2026-11-21; on 2026-11-20 the stages 9 and 10 were to come with
+  them). Stage 8 came after stage 5, for an `FN` of a string. Neither
+  needs anything new of the monitor, so `BASIC-V2.4.1.ROM` loads on a
+  core of `V2.4` too. The release has bitstreams of its own all the
+  same, as its monitor changed: `scr_moveto` and the end of a program
+  forget a wrap, which the monitor of `V2.4` does not.
+- **The stages 9 and 10**, #120 and #121, go to `V2.5` (decided on
+  2026-11-21). Stage 9 comes after stage 8, as `RESUME` keeps the
+  frames that stage 8 adds.
 - **A stage that changes the monitor waits for a release with a
   bitstream.** Stage 7, the editor, is the first.
 - **#111 and BASIC share the ROM.** #111 is in V2.1, and

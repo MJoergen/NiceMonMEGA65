@@ -23,8 +23,8 @@ overwritten; a program leaves room for the stack anyway. A word in the
 screen is refused, as the monitor clears the screen when it boots. The
 memory is cleared and the program written with the core held, and the
 core is started, so the monitor boots cold, which leaves the RAM from
-0x8000 alone. Then r and CR are typed on the console, the monitor's
-command that runs the program. A bitstream without a ROM, and niceemu,
+0x8000 alone. Then SYS 0x8000 and CR are typed on the console, BASIC's
+statement that runs the program. A bitstream without a ROM, and niceemu,
 have no monitor: --rom FILE loads FILE at 0 in its place, such as
 build/rom.bin, the monitor and BASIC, with the ROM hidden. The
 variables at the top are the monitor's 4K words and BASIC's RAM below
@@ -269,7 +269,7 @@ def add_monitor_arguments(parser: argparse.ArgumentParser) -> None:
     """--monitor and --rom, which load.py and run.py share."""
     parser.add_argument("--monitor", action="store_true",
                         help="run the program, at 0x8000, under the monitor "
-                        "in the ROM, which boots and gets r and CR")
+                        "in the ROM, which boots and gets SYS 0x8000 and CR")
     parser.add_argument("--rom", metavar="FILE",
                         help="with --monitor, load FILE at 0 in place of the "
                         "ROM, such as build/rom.bin")

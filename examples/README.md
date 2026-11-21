@@ -38,8 +38,8 @@ Nexys4DDR, set it after each reset. Without it, the screen shows
 
 The board needs a network with a DHCP server, the service that hands out
 IP addresses, as most home routers have. When the board has no IP
-address yet, the program asks for one by itself, as the monitor's `i
-dhcp` does.
+address yet, the program asks for one by itself, as BASIC's `DHCP`
+does.
 
 | Key | What it does |
 |---|---|

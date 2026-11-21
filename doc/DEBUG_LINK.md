@@ -177,7 +177,7 @@ that an interrupt routine returns to.
 The link's version is 8, which the board sends as `b08` at reset, and
 which `0xFFFFFFF2` reads. A host written for an older version works
 unchanged. Version 8 adds the NMI request at `0xFFFFFFD7`. The board
-keeps a request there, which a hold drops, but does not yet pass it to
+keeps a request there, which a hold drops, but does not pass it to
 the core, so no NMI comes
 ([#106](https://github.com/MJoergen/NiceMonMEGA65/issues/106)).
 [DEBUG.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#9-versions)

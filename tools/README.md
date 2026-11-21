@@ -56,7 +56,7 @@ tools](#the-other-tools) test the tools and build releases.
 | `tcppeer.py` | A TCP peer of its own on `niceemu`'s frames, with a script for each port, and for each connection it opens to a port where the board listens, for `tcptest.py`. |
 | `weathertest.py` | Checks the weather display, `examples/weather.c`, in `niceemu` against `tcppeer.py`, without a board. |
 | `cosimtest.py` | Checks `nicemon.py run` and the RTL on `make cosim` against plain `niceemu`, without a board. |
-| `romsize.py` | Measures the words of the ROM and of the demo, and writes or checks their tables in `monitor/INTERNALS.md` and `demo/README.md`. |
+| `romsize.py` | Measures the words of the ROM and of the demo, and writes or checks their tables in `monitor/INTERNALS.md`, `basic/README.md`, and `demo/README.md`. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
@@ -515,11 +515,11 @@ not echo what you type, so the number shows only after you press Enter:
 
     Count the primes up to (0 to stop): 1000
     Primes up to 1000: 168
-    34333 instructions in 55761 cycles
+    24280 instructions in 45285 cycles
 
 The third line comes from the performance counters, and the numbers are
-from the board with the pipelined core, where the 55761 cycles at 100 MHz
-take about 0.56 ms.
+from the board with the pipelined core, where the 45285 cycles at 100 MHz
+take about 0.45 ms.
 
 ## nicemon.py sd
 
@@ -531,8 +531,8 @@ monitor's folder `NICE` (see
 
     tools/nicemon.py sd (link) [--slot N] [--hold] [--folder NAME] COMMAND
 
-- `ls` lists the folder as BASIC's `DIR` does, with the long names
-  after the rows.
+- `ls` lists the folder as BASIC's `DIR` does, by the long names, with
+  the 8.3 name after the row of a file that has a long name.
 - `get NAME [DEST]` copies a file to `DEST`, by default its name in the
   current directory, or with `-` to stdout. The name it writes is the
   long name when that is a plain file name, or else the 8.3 name, so a
@@ -567,9 +567,10 @@ make sdcard ETH=192.168.1.65 CMD="--slot 0 format"
 ### The files
 
 `get` and `del` take the 8.3 name or the long name, in either case.
-`put` writes only 8.3 names, as the monitor does: a host file such as
-`my program.bas` needs a `NAME`, such as `PROG.BAS`. The folder of
-`mkdir` must be an 8.3 name with no extension, as `NICE` is.
+`put` writes an 8.3 name, or a long name of up to 255 characters with
+an 8.3 alias, as the monitor does, so a host file such as
+`my program.bas` keeps its name. The folder of `mkdir` must be an 8.3
+name with no extension, as `NICE` is.
 
 A card with no FAT32 file system, or with FAT16 or exFAT, must be
 formatted as FAT32 first, with `format` or on a PC; the tool says so. A
@@ -733,7 +734,7 @@ JTAG cable on the USB device of `--port`, with openFPGALoader, and
 checks the FPGA first, as `hwtest.py` does. It runs on Linux only, and
 the MEGA65 needs pyftdi.
 
-    tools/nicemon.py flash --port DEVICE [--baud N] [--bit FILE | --erase]
+    tools/nicemon.py flash --port DEVICE [--baud N] [--bit FILE] [--erase]
     tools/nicemon.py flash --port DEVICE [--baud N] --cor FILE --flash-slot N
                            [--no-board-check]
 
@@ -844,14 +845,17 @@ and niceemu first, and runs it.
   ([RELEASE.md](../doc/RELEASE.md)).
 - `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,
   `tools/tcptest.py`, `tools/weathertest.py`, and `tools/cosimtest.py`
-  take no options. They need niceemu, and `make linktest`,
+  take no options, but for `tcptest.py`, whose `--clients` and
+  `--timers` run one of its two parts alone. They need niceemu, and `make linktest`,
   `make sdtest`, `make tftptest`, `make tcptest`, `make weathertest`,
   and `make cosimtest`, which runs on `make cosim`, build it first
   ([CONTRIBUTING.md](../CONTRIBUTING.md#the-tools-and-niceemu)).
 - `tools/romsize.py` is run by `make romsize`, which writes the tables
   of the ROM's words anew, and by the tests of the monitor and the
   demo, which check them
-  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
+  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words),
+  [basic/README.md](../basic/README.md#its-words), and
+  [demo/README.md](../demo/README.md#its-words)).
 - `tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE] prog.bin`
   runs the program in niceemu, with the console input of `-i` and at
   most `-n` steps, as niceemu's options, and draws the screen as the

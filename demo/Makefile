@@ -1,16 +1,16 @@
 # Builds nice_cpu's demo (nice_cpu/demo), with the board's text,
 # text.nasm, into build/demo.bin, a program under the monitor at 0x8000,
-# which a user copies to the card's folder NICE and starts with the
-# monitor's load demo.bin and r (issue #129). The release ships it as an
-# asset of its own (tools/release.py).
+# which a user copies to the card's folder NICE and starts with
+# BASIC's LOAD "DEMO.BIN" and SYS 0x8000 (issue #129). The release
+# ships it as an asset of its own (tools/release.py).
 #
 # make          builds build/demo.bin, with VERSION in the demo's title
 #               bar, git describe of the tree by default; the release
 #               gives its tag
 # make test     runs the monitor of the tests and the demo in niceemu,
-#               with r and a few keys, and with F12 and the monitor's v
-#               and h after them, and compares the screens with
-#               test.expected
+#               with SYS 0x8000 and a few keys, and with F12 and
+#               BASIC's VER and HALT after them, and compares the
+#               screens with test.expected
 # make clean    removes build/
 #
 # The demo itself, its source and its tests, are nice_cpu's: a change to

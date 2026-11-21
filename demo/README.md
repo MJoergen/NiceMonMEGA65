@@ -12,7 +12,8 @@ with the text of the boards in `text.nasm`. It is a program at `0x8000`,
 3. F12 returns to BASIC.
 
 `LOAD "DEMO.BIN", "IP"` loads it from a TFTP server instead, and
-`tools/nicemon.py load --monitor demo.bin` from a PC.
+`tools/nicemon.py load --eth 192.168.1.65 --monitor demo.bin` from a
+PC on the board's network.
 
 The demo's source, its documentation, and its tests are in nice_cpu, so a
 change to it reaches the boards only with a tag of nice_cpu
@@ -50,7 +51,7 @@ has what each demo shows and how it works. On the boards:
   host connects over Ethernet
   ([SYSTEM.md](../doc/SYSTEM.md#io-registers)); the keyboard's keys still
   come, but the demo ends as `niceemu` does, rather than read on. The
-  link sends `h`, and `run.py`, `hwtest.py`, and the tests in `niceemu`
+  link sends `h`, and `nicemon.py run`, `hwtest.py`, and the tests in `niceemu`
   end on it. A terminal program that sends a break when it opens the port
   thus stops the demo, and the reset button, or a start from the link,
   starts the monitor again.
@@ -81,7 +82,8 @@ The two run in `niceemu` like any program, from address 0:
     niceemu --screen -i demo/build/test1.txt demo/build/test/monitor_demo.bin
 
 `tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run
-`build/test/monitor_demo.bin` with `r` and a few keys through `run.py`,
+`build/test/monitor_demo.bin` with `SYS 0x8000` and a few keys through
+`nicemon.py run`,
 and compare its registers and screen with `niceemu`'s. `make hwtest`
 and `make linktest` also run F11's self-test, which `make cosimtest`
 leaves out, as the simulation is slow.

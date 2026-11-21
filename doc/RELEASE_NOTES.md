@@ -33,7 +33,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `tools/nicemon.py load --eth IP prog.bin`. The `make` targets keep
   their names.
 - Each option has one meaning in all subcommands, and each idea one
-  name, so these options are renamed:
+  name: `--hold` holds the core, which `load` then leaves held, and
+  `sd` and `nbd` start again from reset at their end. So these options
+  are renamed:
 
   | Old | New |
   |---|---|
@@ -57,9 +59,43 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   1 for an error, 2 for one of the command line, 130 after Ctrl-C, and
   141 when stdout closes early; `run` keeps the program's status
   ([tools/README.md](../tools/README.md)).
+- `DATA`, `READ`, `RESTORE`, `DEF`, `ON`, `DO`, `LOOP`, `EXIT`,
+  `ENDIF`, `ENDPROC`, `LOCAL`, `WHILE`, `UNTIL`, `LEN`, `ASC`, `VAL`,
+  and `INSTR` are keywords, and no names of variables any more.
+- A name that starts with `FN` or `PROC` and goes on, such as `FNORD`
+  or `PROCESS`, is a function's or a procedure's, and no variable:
+  `PROCESS = 2` is an `Undefined procedure`
+  ([basic/README.md](../basic/README.md#numbers)).
+- An `IF X THEN` that ends its line starts a block of lines, up to an
+  `ENDIF`, where it did nothing. Without the `ENDIF` it is a `Missing
+  ENDIF`.
+- A card's `BASIC-V2.4.ROM` fits this core, so the monitor still takes
+  it, with `older than the core's V2.4.1`, in place of the core's own
+  BASIC. The board then runs the BASIC of V2.4, which has no strings.
+  Copy `BASIC-V2.4.1.ROM` beside it, or remove it with
+  `DELETE "BASIC-V2.4.ROM"` ([README.md](../README.md#a-new-basic)).
 
 **New.**
 
+- BASIC has strings
+  ([#116](https://github.com/MJoergen/NiceMonMEGA65/issues/116),
+  [basic/README.md](../basic/README.md#strings)): the variables `A$`
+  and the arrays `A$(I)`, of up to 255 characters, `+`, the
+  comparisons, and the functions `LEN`, `ASC`, `VAL`, `INSTR`, `CHR$`,
+  `STR$`, `HEX$`, `LEFT$`, `MID$`, and `RIGHT$`. `TIME$` is the
+  clock's date and time, and an assignment sets it. `INPUT` and `GET`
+  read strings, and `DATA`, `READ`, and `RESTORE` keep a program's
+  numbers and strings in its lines. A string in a statement is a
+  string expression, as in `LOAD N$ + ".BIN"`. `Type mismatch`,
+  `String too long`, and `Out of data` are new errors.
+- BASIC has structure
+  ([#119](https://github.com/MJoergen/NiceMonMEGA65/issues/119),
+  [basic/README.md](../basic/README.md#programs)): `ON X GOTO` and
+  `ON X GOSUB`; the functions of `DEF FNA(X, Y$) = E`, on one line or
+  over lines up to `= E`; the procedures of `DEF PROCA(X, Y$)`, up to
+  `ENDPROC`, with parameters and `LOCAL` variables, which call
+  themselves; `DO` and `LOOP`, with `WHILE`, `UNTIL`, and `EXIT`; and
+  `IF`, `ELSE`, and `ENDIF` over lines.
 - `nicemon.py --version` prints the tags of the repository and of
   nice_cpu, and `nicemon.py help SUBCOMMAND` a subcommand's help, in
   which the link's options are a group of their own.
@@ -91,10 +127,21 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   part of that line for the editor, and so was a row that a program
   wrote from its start after `scr_moveto` to where the wrap left the
   cursor. `scr_moveto` and the end of a program now end the line
-  ([monitor/README.md](../monitor/README.md#the-dispatch-table)).
+  ([monitor/README.md](../monitor/README.md#the-dispatch-table)). The
+  fix is in the monitor, whose dispatch table is still 1.8, so it
+  comes with the new core: `BASIC-V2.4.1.ROM` on a core of V2.4 runs
+  without it.
 
 **Tests.**
 
+- `make ecma55` runs the ECMA-55 conformance suite, the 208 programs
+  that bas55 2.0 ships, on BASIC in `niceemu`, and compares each
+  program's outcome with `basic/test/ecma55.expected`. It fetches the
+  programs the first time, so CI does not run it
+  ([basic/README.md](../basic/README.md#testing)).
+- `make -C basic test` has the runs `str`, `struct`, and `proc`, of
+  the strings and the structure, and the benchmark `str.bas`, which
+  fills the heap with strings until it is swept.
 - `basic/test/tftp.py` runs the writes against scripted frames, and
   `make tftptest` against `nicemon.py tftpd --write`, with `curl -T`
   as a standard client of the server.
@@ -141,7 +188,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   [basic/README.md](../basic/README.md#numbers)). Each is within 1 ulp
   and gives the same bits on the board as in `niceemu`. `RND(-1)`
   repeats its numbers, and `RND(0)` takes them from the cycle counter.
-- `nicemon.py sd format`, and `make sdcard CMD="--slot N format"`, erase
+- `sdcard.py format`, and `make sdcard CMD="--slot N format"`, erase
   the card in a slot and write a new FAT32 with the folder `NICE`, with
   no PC slot ([#142](https://github.com/MJoergen/NiceMonMEGA65/issues/142)).
   It asks for the slot's number to be typed, and refuses a

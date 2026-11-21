@@ -3,7 +3,7 @@
 This is the design note for storage on the SD cards. The lower half is
 written: the registers and the emulator's images, the controller in SPI
 mode, and the boards' slots and `make hwtest`, in V1.5. The registers
-are now specified by nice_cpu's `doc/SYSTEM.md` §5, and the boards'
+are now specified by nice_cpu's `doc/DEVICES.md` §5, and the boards'
 slots by "The SD card slots" in [SYSTEM.md](SYSTEM.md); where this note
 differs from them, they are right. The ROM's sector routines are
 written too, in V1.7.1, and
@@ -12,9 +12,8 @@ FAT32's reading, with `dir` and `load`, in V1.9, and its writing, with
 `save` and `del`, in V1.9.1. It is `monitor/monitor_fat.nasm`, in NICE
 assembly since issue #149. The host tool `tools/sdcard.py` lists
 the card, and reads, writes, and deletes its files from the host, in
-V1.9.1. BASIC is not written yet. Its end is `SAVE`, `LOAD`, and `DIR`
-in the BASIC interpreter planned for the ROM, and on the way it gives
-the monitor a way to load and save programs. The subtasks are listed at
+V1.9.1. Its end is written too, in V2.3.2: `SAVE`, `LOAD`, and `DIR`
+in the BASIC interpreter of the ROM (#60). The subtasks are listed at
 the end.
 
 ## Contents
@@ -98,7 +97,7 @@ Two limits of the R3, which the R6 does not have:
 1. **The controller in the RTL** does all of the SD protocol: the start-up
    of the card, the bus width, the CRCs, and the timeouts. A program sees a
    512-byte buffer and the commands "read sector N" and "write sector N".
-2. **The registers** are specified in nice_cpu's `doc/SYSTEM.md`, as the
+2. **The registers** are specified in nice_cpu's `doc/DEVICES.md`, as the
    timer and the math unit are, and `niceemu` implements them on an image
    file. So the emulator needs no model of the SD protocol.
 3. **The ROM** has the sector routines and FAT32 with a small file API,
@@ -108,7 +107,7 @@ Two limits of the R3, which the R6 does not have:
 
 ## The registers
 
-Specified in nice_cpu's `doc/SYSTEM.md` §5, which is the authoritative
+Specified in nice_cpu's `doc/DEVICES.md` §5, which is the authoritative
 text; this
 section keeps the design with its reasons. They take 16 of the words that
 nice_cpu reserves for I/O.
@@ -322,8 +321,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   cores on the MEGA65, each with a root folder of its own. A card without
   it is refused, with no fallback to the root, and the ROM never creates
   it, so writing happens only in a folder that the user made, on a PC
-  or with `sdcard.py mkdir` over the link (#140), or that
-  `sdcard.py format` made with the file system (#142).
+  or with `nicemon.py sd mkdir` over the link (#140), or that
+  `nicemon.py sd format` made with the file system (#142).
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is
@@ -341,7 +340,7 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   freed. The hint is read with nothing written, so a write to a full
   card leaves FSInfo alone. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
-  and `fsck.fat` reports as uninitialized. `fat_close` puts the date and
+  and `fsck.fat` reports as uninitialized. `fs_close` puts the date and
   the time of the clock of the time of day into the entry of a file
   written, and a new entry gets them as its creation too, from
   `monitor_clock.nasm` (#109). The clock keeps local time, as FAT's dates do. While it is not
@@ -352,7 +351,7 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
   check, also one whose volume is larger than its partition or the card,
-  or has a 16-bit total of sectors. Only the host's `sdcard.py format`
+  or has a 16-bit total of sectors. Only the host's `nicemon.py sd format`
   writes the MBR and the boot sector (#142): it needs the slot named,
   a typed confirmation, `--force` for a card that is not blank, and
   `--system` for one with the MEGA65's system partition, of type
@@ -476,12 +475,12 @@ has the details.
   card, BASIC's `DIR` must list the folder `NICE` as the host
   reads it from the sectors. It never writes, as the card is the
   user's. A slot with no card is NOT COVERED.
-- **The host tool**: `make sdtest` runs `tools/sdcard.py` on `niceemu
+- **The host tool**: `make sdtest` runs `tools/nicemon.py sd` on `niceemu
   --link` with images made by `mkfs.fat`, `sfdisk`, and `mcopy`, on a held
   core and on a running one that has the card in use. After its writes,
   `fsck.fat -n` checks the images, and `mdir` and `mtype` what is on
   them, and the monitor of the tests lists and loads what it put. It
-  also runs `tools/sdnbd.py`, the card as a block device over NBD, with
+  also runs `tools/nicemon.py nbd`, the card as a block device over NBD, with
   a client of its own.
 
 ## Not included
@@ -532,4 +531,4 @@ ROM is developed in niceemu and needs no board.
 | FAT32 writing, `save`, and `del` | Done in V1.9.1 |
 | `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
 | `tools/sdnbd.py`, the whole card as a block device of a Linux host over NBD, for a mount, while the core is held | Done |
-| BASIC's `SAVE`, `LOAD`, and `DIR` | Not yet |
+| BASIC's `SAVE`, `LOAD`, and `DIR` | Done in V2.3.2 |

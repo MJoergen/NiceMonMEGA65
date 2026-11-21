@@ -194,7 +194,15 @@ them alone, so a program can do all that BASIC does (#152):
 - The IP settings, `net_config`, `net_set`, `net_dhcp`, and `net_poll`,
   the names of hosts, `dns_lookup`, and up to four TCP connections,
   `tcp_open` to `tcp_listen`, as a client or a server.
-- The return to the monitor, and its version.
+- The line that BASIC reads, `con_getline`, with TAB's completion of
+  a file's name, `fs_complete`, a key of the console, `con_key`, the
+  scrollback, `scr_back`, and the rows of the screen that go on from
+  the row above, `scr_links`.
+- A line of a `.bin` file, `bin_line`, the clock, `clock_set`, and
+  the servers that DHCP gave, `net_servers`.
+- The return to the monitor, `mon_exit`, the state after a program
+  that another ran, `mon_restore`, and the versions, `mon_version` and
+  `mon_build`.
 
 They are there whenever the ROM is visible, as it is for a program that
 the monitor runs. They are not there for a program at 0, as `nicemon.py load`
@@ -206,8 +214,8 @@ which a program does not call
 **The libraries.** These are assembly files and C libraries that a
 program joins when it is built. They are in its image, and only in a
 program that joins them: there is no linker, so a program that joins a
-file has all of it. `monitor/monlib.nasm` has the routines that the
-monitor's commands use too, `_io_puts`, `_io_puthex`, `_io_gets`, and
+file has all of it. `monitor/monlib.nasm` has the routines that
+BASIC's statements use too, `_io_puts`, `_io_puthex`, `_io_gets`, and
 others ([monitor/README.md](../monitor/README.md#the-shared-routines));
 they print through `mon_putc`, so they need the ROM. nice_cpu's runtime
 (`lib.nasm`, `muldiv_mpu.nasm`) and its C library need no ROM, and run
@@ -418,7 +426,8 @@ between them.
 In C, the entries of the network take C's own pointers. A program
 includes `mon.h`, and is built with the stubs of `mon_c.nasm` too:
 
-    nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm         --asm monitor/mon_c.nasm -I monitor -o get.bin get.c
+    nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm \
+        --asm monitor/mon_c.nasm -I monitor -o get.bin get.c
 
 The file and UDP entries take NICE word addresses, one character or
 byte per word, and not C pointers. `mon_words`, a stub of `mon_c.nasm`,
@@ -541,7 +550,7 @@ itself, and a program under the monitor may do so too:
 ## The monitor's error codes
 
 The entries of the files and the network return a negative number for an
-error. The monitor's file commands print the number with its text, as
+error. BASIC's file statements print the number with its text, as
 `File error 29, no folder NICE on the card`, or as
 `SD error 1 in slot 0, no card` for an error of the SD controller. The
 SD controller's errors are those of `SD_ERROR` ([nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card)), negated:

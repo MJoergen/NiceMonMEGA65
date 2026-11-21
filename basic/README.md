@@ -3,6 +3,7 @@
 - [The statements](#the-statements)
 - [Numbers](#numbers)
 - [Programs](#programs)
+- [Strings](#strings)
 - [The disassembler](#the-disassembler)
 - [Loading without a host](#loading-without-a-host)
 - [Building](#building)
@@ -221,9 +222,11 @@ exact.
 - **A variable** has a name of up to 16 letters and digits, the first
   a letter, every one significant, in either case, so `Total` and
   `TOTAL` are one variable. A keyword is no name, but a name may start
-  with one, as `TOTAL` starts with `TO`. A `$` after a name makes a
-  string's name (Strings below), and a `%` is a `Syntax error`, as
-  whole numbers come later. An
+  with one, as `TOTAL` starts with `TO`. A name that starts with `FN`
+  or `PROC` and goes on, such as `FNORD` or `PROCESS`, is a function's
+  or a procedure's, and no variable (Programs below). A `$` after a
+  name makes a string's name (Strings below), and a `%` is a `Syntax
+  error`, as whole numbers come later. An
   assignment, `INPUT`, and `GET` make the variable in a line typed,
   and a line of a program makes each of its names. A variable that
   none of them set is an `Undefined variable`. A variable is its
@@ -246,7 +249,8 @@ large for a double, such as `EXP(710)`; `Illegal quantity`, a number
 that a function does not take, such as `SQR(-1)`, `LOG(-1)`,
 `ASIN(2)`, `SIN(1E7)`, or a word operator's operand that does not
 fit; and `Formula too complex`, more than 16 values that wait for
-the FPU, or parentheses and signs nested too deep for the stack. A
+the FPU, more than 16 strings that wait, or parentheses and signs
+nested too deep for the stack. A
 program never sees an infinity or a NaN.
 
 ## Programs
@@ -268,7 +272,7 @@ keeps the variables, but `CONT` cannot go on after it.
 | `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. CTRL-C stops it. |
 | `NEW` | Deletes the program and its variables and arrays. |
 | `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (Files above). |
-| `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, and `ELSE` with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
+| `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, `ELSE`, and `RESTORE`, and those of `ON`'s lists, with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
 | `AUTO [N] [, S]` | Types the number of each line before it: `N` first, then that of the line stored last plus `S`, 10 and 10 when not given. A line with nothing after its number ends `AUTO` and deletes no line, and so does CTRL-C, an empty line, a statement typed with no number, and an error. |
 | `CLR` | Clears the variables, drops the arrays, and ends the loops and subroutines. |
 | `GOTO N` | Goes on at line `N`. |
@@ -285,8 +289,8 @@ keeps the variables, but `CONT` cannot go on after it.
 | `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
 | `ON X GOTO N, M`, `ON X GOSUB N, M` | Goes to the line of the X-th number, as `GOTO` and `GOSUB` do: `ON 2 GOTO 100, 200` goes to 200. `X` is rounded toward zero. An `X` of 0 or past the list goes on after the statement, and below 0 it is an `Illegal quantity`. A `GOSUB` comes back after the statement. |
 | `DEF FNA(X, Y$) = E` | Defines the function `FNA` of the parameters `X` and `Y$`, with the value of the expression `E`, which `FNA(1, "S")` gives, `E` with `X` 1 and `Y$` `"S"`. `DEF FNP = 3.14` has no parameters, and `FNP` calls it. `DEF FNA$(X) = ...` gives a string. The parameters are variables of numbers or strings, which have their own values again after the call, and the other variables are the program's. A name that starts with `FN` is a function's, and a call finds its `DEF` anywhere in the program; with none it is an `Undefined function`, with another count of arguments a `Syntax error`, and with an argument of the other kind a `Type mismatch`. A `DEF` that runs does nothing, as `REM`. |
-| `DEF FNA(X)`, `= E` | A function over lines: with no `=` after its parameters, a call runs the statements after them up to a statement `= E`, whose `E` is its value, as `IF N < 2 THEN = 1`. A function calls itself up to 30 deep, past which it is `Formula too complex`. The program's end in one is `FN without =`, and `=` with no function running is `= without FN`. |
-| `DEF PROCA(X, Y$)`, `ENDPROC` | Defines the procedure `PROCA`, a statement, which `PROCA(1, "S")` calls: it runs the statements after the parameters up to `ENDPROC`, which goes on after the call. Its parameters are as a function's, and it calls itself as deep as the frames have room, 73 deep with one parameter. With no `DEF` it is an `Undefined procedure`, and `ENDPROC` with no procedure running is `ENDPROC without PROC`. |
+| `DEF FNA(X)`, `= E` | A function over lines: with no `=` after its parameters, a call runs the statements after them up to a statement `= E`, whose `E` is its value, as `IF N < 2 THEN = 1`. A function calls itself about 30 deep, as its calls have 512 words of the processor's stack, past which it is `Formula too complex`. A `DEF` that runs does nothing, so a program that reaches one runs on into the function's lines: they go after the program's `END`. The program's end in one is `FN without =`, and `=` with no function running is `= without FN`. |
+| `DEF PROCA(X, Y$)`, `ENDPROC` | Defines the procedure `PROCA`, a statement, which `PROCA(1, "S")` calls: it runs the statements after the parameters up to `ENDPROC`, which goes on after the call. Its parameters are as a function's, and it calls itself as deep as the frames have room, 73 deep with one parameter. A procedure's lines go after the program's `END` too, as a `DEF` that runs does nothing. With no `DEF` it is an `Undefined procedure`, and `ENDPROC` with no procedure running is `ENDPROC without PROC`. |
 | `LOCAL X, Y$` | In a procedure or a function, keeps the values of `X` and `Y$`, and sets them to 0 and an empty string, until the `ENDPROC` or `=`. It comes before the loops of the procedure, whose `NEXT` or `LOOP` it would hide. With no procedure or function running it is `LOCAL without PROC`. |
 | `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `A` is from the end of the variables plus 512 words up to the default, as below; outside them it is `Out of memory`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
 
@@ -369,7 +373,7 @@ them, as it keeps the variables.
 ## The disassembler
 
 `DIS` shows each instruction as nice_cpu's `assembler/nicedis.py` and
-`mon.py` do, so the three disassemblers agree, but for the
+`nicemon.py mon` do, so the three disassemblers agree, but for the
 pseudo-instructions below, which only `DIS` shows:
 
     DIS 0x8000, 5
@@ -416,7 +420,7 @@ pseudo-instructions below, which only `DIS` shows:
   and `SUB[CM] R0, R1, R2` stay as they are, and so do `MOVE[M]` and
   `SUB[M]` with a dest that is not R0. A field that the `MOVE` does not
   use and that is not R0 makes a `.DAT`, as before. `niceasm` assembles
-  each back to the same word. nicedis.py and `mon.py`, and the
+  each back to the same word. nicedis.py and `nicemon.py mon`, and the
   debugger's decode of row 27, show the plain instructions.
 - An instruction of 4 words, with constants in all three fields, has a
   text longer than the 34 columns left, and goes on in the next row of
@@ -465,7 +469,7 @@ and TCP holds the host back meanwhile. A byte is lost, with the link's
 `o`, only when the program reads nothing for 50 ms. On the R6, 20600
 lines pasted at full speed over TCP, in LF lines and in CR LF lines,
 and through `nc`, were all written, with no byte lost, in about 0.7 s.
-`load.py --eth 192.168.1.65 --monitor prog.bin` ([Remote control](../monitor/README.md#remote-control))
+`tools/nicemon.py load --eth 192.168.1.65 --monitor prog.bin` ([Remote control](../monitor/README.md#remote-control))
 is faster, as it writes the words into the memory.
 
 ## Building
@@ -475,9 +479,9 @@ is faster, as it writes the words into the memory.
 `build/rom.bin` ([rom.mk](../rom.mk)). Both write the image as a file
 for a card too, `build/basic.rom`
 ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md), #153). The image is the cat of
-`basic.nasm`, `basic_expr.nasm`, `basic_cmd.nasm`, `basic_net.nasm`,
-`basic_time.nasm`,
-and `basic_dis.nasm`, BASIC's copies of the monitor's `common.nasm`,
+`basic.nasm`, `basic_expr.nasm`, `basic_prog.nasm`, `basic_cmd.nasm`,
+`basic_net.nasm`, `basic_time.nasm`, `basic_dis.nasm`,
+`basic_edit.nasm`, `basic_str.nasm`, and `basic_struct.nasm`, BASIC's copies of the monitor's `common.nasm`,
 `monlib.nasm`, and `mon.nasm`, the version, and the texts with the
 card's folder. `basic.nasm`'s header says what each file has, and
 "Its words" below has the words of each.

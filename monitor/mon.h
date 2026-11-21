@@ -128,7 +128,7 @@ int mon_fs_delete(unsigned name);
 int mon_udp_open(unsigned port);
 
 // n bytes, up to 1472, from bits 7..0 of the words from buf, sent as a
-// datagram to a port of an IP address, through the gateway of i dhcp when
+// datagram to a port of an IP address, through the gateway of DHCP when
 // the address is in another network. 0, or an error.
 int mon_udp_send(unsigned ip, unsigned port, unsigned buf, unsigned n);
 
@@ -141,7 +141,7 @@ int mon_udp_recv(unsigned buf, unsigned n, unsigned src);
 // The endpoint closed, and the port for Ethernet frames disabled. 0.
 int mon_udp_close(void);
 
-// The IP address from the network's DHCP server, as i dhcp gets it,
+// The IP address from the network's DHCP server, as BASIC's DHCP gets it,
 // with the mask, the gateway, and the DNS server, printing nothing. With
 // an address set, it asks for that one. Waits up to 16 seconds. 0, or an
 // error. Entry 23 (issue #111).
@@ -306,8 +306,10 @@ MON_ENTRY(fs_complete) unsigned *mon_fs_complete(unsigned *line, unsigned *curso
 // column, clears it at a LF and when the row is written again from its
 // column 0, and shifts the word when the screen scrolls; scr_cls clears
 // it, and so does the end of a program that moved the cursor through
-// its registers. links the new word, or -1 to keep it. The old word.
-// Entry 41.
+// its registers. Since V2.4.1, in a table that is still 1.8,
+// mon_scr_moveto and the end of a program forget a wrap, so that what
+// goes to column 0 next starts a line of its own. links the new word,
+// or -1 to keep it. The old word. Entry 41.
 unsigned mon_scr_links(unsigned links);
 
 // The NICE word address of a C array of words, for the entries above

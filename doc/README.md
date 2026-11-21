@@ -29,13 +29,16 @@ Design notes, which record how a part came to be as it is:
   stages 1 to 10 are written.
 - [SDCARD.md](SDCARD.md) is the design of the storage on the SD cards,
   from the registers to BASIC's `SAVE` and `LOAD`. The controller, the
-  slots, and the ROM's reading and writing of FAT32 cards are written;
-  BASIC is not yet.
+  slots, the ROM's reading and writing of FAT32 cards, and BASIC's
+  statements for the files are written.
 - [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey of the BASIC dialects
-  behind the interpreter planned for the ROM.
+  behind the interpreter in the ROM.
 - [BASIC.md](BASIC.md) is the design note of that interpreter, with its
-  decisions, the room in the ROM, and its stages. None of it is written
-  yet.
+  decisions, the room in the ROM, and its stages, of which 1 to 8 are
+  written.
+- [BASIC_ROM.md](BASIC_ROM.md) is the design of BASIC's image from a
+  card's `BASIC*.ROM`, which replaces BASIC's part of the ROM at the
+  first cold start.
 
 For those who change this repository:
 

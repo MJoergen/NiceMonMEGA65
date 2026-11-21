@@ -151,8 +151,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
 | [SDCARD.md](doc/SDCARD.md) | The design of the storage on the SD cards, from the controller to the files and BASIC, with its issues. |
-| [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter planned for the ROM. |
-| [BASIC.md](doc/BASIC.md) | The design note of the BASIC interpreter planned for the ROM: its decisions, its internals, the room in the ROM, and its stages. |
+| [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter in the ROM. |
+| [BASIC.md](doc/BASIC.md) | The design note of the BASIC interpreter in the ROM: its decisions, its internals, the room in the ROM, and its stages, of which 1 to 8 are written. |
+| [BASIC_ROM.md](doc/BASIC_ROM.md) | The design of BASIC's image from a card's `BASIC*.ROM`, which replaces BASIC's part of the ROM at the first cold start. |
 | [CODING_STYLE.md](doc/CODING_STYLE.md) | The style of the VHDL, which `make lint` checks as far as vsg can. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
@@ -1290,7 +1291,7 @@ kernel, and prints the instructions and cycles of each, its result, and
 whether that is the expected one. It reads no input, so `tools/nicemon.py run`
 runs it:
 
-    tools/nicemon.py run examples/build/bench.bin
+    tools/nicemon.py run --eth 192.168.1.65 examples/build/bench.bin
 
 The instructions are the same as on the emulator, and the same at nice_cpu
 V1.0 and V1.1. The cycles were measured on the R6 with the pipelined core

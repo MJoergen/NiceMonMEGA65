@@ -78,7 +78,7 @@ header is the authoritative address map.
     make flash COR=f.cor SLOT=1 # write a slot (1-7, --flash-slot) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision
     make linktest         # nicemon.py run --tcp on niceemu --link against plain niceemu, and mon's memory check, no board
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/nicemon.py tftpd for BASIC's LOAD and DIR, with listings for DIR "IP", "*.BIN"; ARGS=--write for SAVE and BSAVE (#155)
-    make tftptest         # nicemon.py tftpd, and the monitor's tftp in niceemu --eth-udp against it, no board
+    make tftptest         # nicemon.py tftpd, and BASIC's TFTP in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
     make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/tcppeer.py, no board
     make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir, --slot N format (ETH= or PORT=)
@@ -86,7 +86,7 @@ header is the authoritative address map.
     make sdtest           # nicemon.py sd and nbd on niceemu --link with images that mtools made, no board
     make ecma55           # the ECMA-55 suite (bas55 2.0's programs, fetched once) on BASIC in niceemu, against basic/test/ecma55.expected
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
-    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (two to four hours on each core in CI)
+    make cosimtest        # nicemon.py run --cosim on make cosim against plain niceemu, no board (two to four hours on each core in CI)
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_ps2`, `tb_text`, `tb_board_io`, `synth-nicemon`, ...). `make -C sim
@@ -185,8 +185,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   peer on niceemu's frames, #111), `weathertest.py` (the weather
   display against it, #128),
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
-  `monitor/INTERNALS.md` and the demo's in `demo/README.md`, which the
-  tests of the monitor and the demo check), `screenshot.py`
+  `monitor/INTERNALS.md` and `basic/README.md` and the demo's in
+  `demo/README.md`, which the tests of the monitor and the demo
+  check), `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator, with the weather display of #128,
   `weather.c`, for the monitor, a release asset of its own as
@@ -278,7 +279,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   50 ms for room in the full FIFO before it is lost. Version 7 starts
   the registers at `FFFFFFD0`, and has `G_WATCHES` watchpoints, 4 on
   every board, at `FFFFFFD4`–`DB`: the core pauses after a step that hit
-  one, and the link sends `w`.
+  one, and the link sends `w`. Version 8 has the NMI request at
+  `FFFFFFD7`, which the board keeps and does not pass to the core.
 - The tools take `--eth HOST[:PORT]` for the board's link over TCP on
   its Ethernet port, 4510 by default, once 0xFFFFFFB0 gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and
