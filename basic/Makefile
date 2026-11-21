@@ -29,6 +29,14 @@ NICE_CPU = ../nice_cpu
 ASM      = $(ROM_ASM)
 FMT      = $(PYTHON) $(NICE_CPU)/assembler/nicefmt.py
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
+# niceemu prints a screen of 28 rows (nice_cpu#203), and the board has
+# 25 until #157; the rows after them are the ROM's room for scrolling.
+# SCREEN25 keeps rows 0 to 24 and drops their trailing blank rows, as
+# niceemu drops those of its 28.
+SCREEN25 = awk '/^Screen:/ {n = 0; b = 0} \
+  !/^\|/ {b = 0} \
+  /^\|/ {if (++n > 25) next; if ($$0 == "|") {b++; next}} \
+  {while (b > 0) {print "|"; b--}; print}'
 TOOLS    = $(ROM_TOOLS)
 BUILD    = build
 ROM_TEST = $(ROOT)/build/rom_test.bin
@@ -531,9 +539,8 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	  cat $(ROM_TEST) $$prog > $(BUILD)/$$t.full.bin; \
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$t.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
-	  { sed -e '/^Halted (HALT)/,/^R12 /d' \
-	      -e '/Stopped at the step limit/,/^R12 /{/Stopped/!d;s/Stopped at the step limit.*/Stopped at the step limit/;}' \
-	      $(BUILD)/$$t.raw; \
+	  { $(SCREEN25) $(BUILD)/$$t.raw | sed -e '/^Halted (HALT)/,/^R12 /d' \
+	      -e '/Stopped at the step limit/,/^R12 /{/Stopped/!d;s/Stopped at the step limit.*/Stopped at the step limit/;}'; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = time ]; then \
