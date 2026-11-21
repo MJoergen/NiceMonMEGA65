@@ -39,6 +39,9 @@ load my^C
 halt
 Halted
 Screen:
+|Line without a number
+|mandelbr line 0
+|READY.
 |load pad2
 |PAD20.TXT
 |PAD21.TXT

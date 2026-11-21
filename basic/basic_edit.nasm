@@ -8,8 +8,8 @@
 ; the screen's words of the rows follow each other. Its variables,
 ; V_ECOL, V_ESR, V_ESC, V_EMOV, and V_EKEY, are in basic.nasm.
 
-PAGE            .EQU    24              ; the rows of Page Up and Page Down, as the monitor's
-SCR_LAST        .EQU    0xFFFF0780      ; the screen's row 24, the last
+PAGE            .EQU    ROWS-1          ; the rows of Page Up and Page Down, as the monitor's
+SCR_LAST        .EQU    SCREEN+SCR_WORDS-80  ; the screen's last row
 
 ; getline: the line of BASIC at V_LINE, up to EDIT_MAX characters and a
 ; 0, from the screen, with the keys typed ahead first. RETURN takes the
@@ -304,12 +304,12 @@ gl_down
                 CALL    gl_leave
                 CALL    SCR_GETXY
                 ADD     R2, R2, 1
-                CMP     R2, 25
+                CMP     R2, ROWS
         ?C      JMP     gl_at
                 PUSH    R1
                 CALL    ed_scroll
                 POP     R1
-                MOVE    R2, 24
+                MOVE    R2, ROWS-1
                 JMP     gl_at
 gl_right
                 CALL    gl_leave
@@ -317,7 +317,7 @@ gl_right
                 ADD     R1, R1, 1
                 CMP     R1, 80
         ?C      JMP     gl_at
-                CMP     R2, 24
+                CMP     R2, ROWS-1
         ?Z      JMP     gl_key          ; at the bottom right
                 CLR     R1
                 ADD     R2, R2, 1
@@ -444,7 +444,7 @@ ed_ext
                 MOVE    R4, R2
 :
                 ADD     R1, R4, 1       ; down while the next goes on from it
-                CMP     R1, 25
+                CMP     R1, ROWS
         ?Z      JMP     :+
                 SHR     R1, R6, R1
                 AND[M]  R0, R1, 1
@@ -516,7 +516,7 @@ ed_copy
 ; scr_links, and the new row is blank. R3 and R4 = the line's rows. Uses
 ; R1 and R2.
 ed_grow
-                CMP     R4, 24
+                CMP     R4, ROWS-1
         ?!Z     JMP     :+
                 CALL    ed_scroll
                 SUB     R3, R3, 1
@@ -574,7 +574,7 @@ ed_scroll
                 PUSH    R3
                 PUSH    R4
                 CLR     R1
-                MOVE    R2, 24
+                MOVE    R2, ROWS-1
                 CALL    SCR_MOVETO
                 MOVE    R1, MON_OUT_SCREEN
                 CALL    MON_OUT

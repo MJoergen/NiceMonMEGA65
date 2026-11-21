@@ -1,4 +1,4 @@
--- The text display: shows the screen of the NiceMon system, 80x25
+-- The text display: shows the screen of the NiceMon system, 80x28
 -- characters, on a video output in the video mode G_MODE (see video_pkg.vhd),
 -- with a cursor and a display offset for scrolling, as the VGA of QNICE-FPGA
 -- has.
@@ -6,7 +6,7 @@
 -- THEORY OF OPERATION
 -- The screen is the 2^G_SCR_ADDR_BITS words at 0xFFFF0000 (src/nicemon.vhd),
 -- 32768 on the MEGA65 boards and 8192 on the Nexys4DDR, of which the first
--- 2000 are the emulator's 80x25
+-- 2240 are the emulator's 80x28
 -- characters, row by row. Each word is a character in bits 7..0 and its
 -- color above (nice_cpu's runtime/ABI.md, nice_screen_put). This module keeps
 -- a copy of the screen in a memory of its own (scr_ram.vhd), with a write
@@ -14,7 +14,7 @@
 -- (scr_*_i), and a read port in the VGA clock domain. So the copy is a
 -- crossing of the clock domains, and the block RAM makes it.
 --
--- The display shows the 2000 words from the display offset, offs_i, so a
+-- The display shows the 2240 words from the display offset, offs_i, so a
 -- program scrolls by adding 80 to the offset and writing the next row after
 -- the words shown. The offset wraps at the end of the screen. The cursor is
 -- at column cur_x_i and row cur_y_i of the display, and cur_mode_i says how
@@ -30,18 +30,18 @@
 -- the clocks need not be timed.
 --
 -- In the chunky mode of nice_cpu's doc/DEVICES.md §1.10, which chunky_i
--- selects, the program's 25 rows show 160x100 pixels instead, one word of
+-- selects, the program's 28 rows show 160x112 pixels instead, one word of
 -- the screen each, row by row, from the display offset as the text does.
 -- A pixel is 8x8 pixels of the display, and its color is the background
 -- of its word, bits 31..20; the font and the cursor are not shown. The
 -- debugger's page and strip are drawn over it as over the text.
 --
 -- The overlay is the on-board debugger's (src/dbg/dbg.vhd, doc/DEBUGGER.md):
--- 29 rows of 80 words, in a memory of its own, 2^12 words written by the
+-- 32 rows of 80 words, in a memory of its own, 2^12 words written by the
 -- debugger (ovl_*_i) in the system clock domain, and read in the VGA clock
--- domain, as the copy of the screen is. Its rows 0 to 24 are the page, which
--- replaces the program's 25 rows while page_i is '1', and hides the cursor;
--- its rows 25 to 28 are the strip, which is shown under them while strip_i
+-- domain, as the copy of the screen is. Its rows 0 to 27 are the page, which
+-- replaces the program's 28 rows while page_i is '1', and hides the cursor;
+-- its rows 28 to 31 are the strip, which is shown under them while strip_i
 -- is '1', and is black otherwise. A word of the overlay is at row * 80 +
 -- column, with no display offset. strip_i and page_i cross to the VGA clock
 -- through synchronizers of their own: they change rarely, and a frame half
@@ -55,11 +55,10 @@
 -- always drawn from the ROM, so that the debugger stays readable whatever a
 -- program did to its font. The bus reads and writes both fonts through
 -- fnt_*_i and fnt_rdata_o, in the system clock domain, as font.vhd says.
--- So the 29 rows are 1280x928 pixels, in the
--- middle of the visible area, which is black around them. The program's 25
--- rows are at their top, in every state of the debugger, so that nothing
--- moves when the strip appears. The color of a word is
--- two colors of 12 bits, red, green, and blue with 4 bits each: the
+-- So the 32 rows are 1280x1024 pixels, the whole visible area. The
+-- program's 28 rows are at their top, in every state of the debugger, so
+-- that nothing moves when the strip appears. The color of a word is two
+-- colors of 12 bits, red, green, and blue with 4 bits each: the
 -- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
 -- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
 -- is full intensity and 0x0 is none. Unlike in NICE's original IDE of 2004,
@@ -143,8 +142,8 @@ end entity text;
 architecture synthesis of text is
 
    constant C_COLS        : natural := 80;
-   constant C_ROWS        : natural := 25;  -- The program's
-   constant C_ALL_ROWS    : natural := 29;  -- With the debugger's strip
+   constant C_ROWS        : natural := 28;  -- The program's
+   constant C_ALL_ROWS    : natural := 32;  -- With the debugger's strip
    constant C_CHAR_WIDTH  : natural := 16;
    constant C_CHAR_HEIGHT : natural := 32;
    -- The lines of the character that the small cursor covers
@@ -252,8 +251,8 @@ begin
       report "The text does not fit in the visible area"
       severity failure;
 
-   assert G_SCR_ADDR_BITS >= 11 and G_SCR_ADDR_BITS <= 15
-      report "text: the screen must hold its 2000 words, and at most 32768"
+   assert G_SCR_ADDR_BITS >= 12 and G_SCR_ADDR_BITS <= 15
+      report "text: the screen must hold its 2240 words, and at most 32768"
       severity failure;
 
 
@@ -451,19 +450,19 @@ begin
          addr_v := ('0' & row_v & "000000") + ("000" & row_v & "0000") + ("00000" & col_v);
          -- The chunky mode's pixels are 8x8, so the pixel's row is y / 8
          -- and its column x / 8, and pixel row * 160 = row * 128 + row * 32.
-         -- In the program's rows pix_v is below 16000.
+         -- In the program's rows pix_v is below 17920.
          prow_v := y_v(9 downto 3);
          pcol_v := x_v(10 downto 3);
          pix_v  := (prow_v & "0000000") + ("00" & prow_v & "00000") + ("0000000" & pcol_v);
          chk_v  := chunky_vga and prog_v and not page_s(1);
-         -- In the program's rows addr_v is below 2000, so 11 bits of it are
-         -- the address in the screen. A screen too small for the chunky
-         -- mode never selects it (scr_regs.vhd), so the bits of pix_v
-         -- above it do not matter.
+         -- In the program's rows addr_v is below 2240, and in all of them
+         -- below 2560, so its 12 bits are the address in the screen. A
+         -- screen too small for the chunky mode never selects it
+         -- (scr_regs.vhd), so the bits of pix_v above it do not matter.
          if chk_v = '1' then
             addr_1 <= offs_vga + pix_v(G_SCR_ADDR_BITS - 1 downto 0);
          else
-            addr_1 <= offs_vga + addr_v(10 downto 0);
+            addr_1 <= offs_vga + addr_v;
          end if;
          ovl_addr_1 <= addr_v;
          ovl_1      <= not prog_v or page_s(1);

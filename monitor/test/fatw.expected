@@ -99,6 +99,9 @@ READY.
 halt
 Halted
 Screen:
+|Directory of NICE in slot 1
+|HELLO.BIN                      14436
+|Files: 1, directories: 0
 |READY.
 |bsave "full.bin", 0x8000, 256
 |File error 30, the card or the folder is full

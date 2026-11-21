@@ -38,6 +38,7 @@ MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 PROGRAM = os.path.join(REPO, "examples", "build", "weather.bin")
 ANSWERS = os.path.join(REPO, "examples", "test")
 SCREEN = 0xFFFF0000
+ROWS = 28  # the screen's, as nice.h's NICE_SCREEN_ROWS
 # The steps of a case: about 3 seconds of the host, far more than a fetch
 # from the peer takes, and less than the 60 s before a fetch again.
 STEPS = 100_000_000
@@ -118,7 +119,7 @@ class Run:
         inp = os.path.join(tmp, "input")
         with open(inp, "w") as f:
             f.write(keys)
-        cmd = [NICEEMU, "-i", inp, "-n", str(steps), "-d", f"{SCREEN:#x}:2000",
+        cmd = [NICEEMU, "-i", inp, "-n", str(steps), "-d", f"{SCREEN:#x}:{80 * ROWS}",
                "--sd0", card(tmp, cfg), "--eth-udp", f"127.0.0.1:{self.peer.emu_port}",
                "--eth-peer", f"127.0.0.1:{self.peer.port}", image]
         try:
@@ -133,9 +134,9 @@ class Run:
             a = int(m[1], 16)
             for k, w in enumerate(m[2].split()):
                 words[a + k] = int(w, 16)
-        self.words = [words.get(SCREEN + i, 0) for i in range(2000)]
+        self.words = [words.get(SCREEN + i, 0) for i in range(80 * ROWS)]
         self.rows = ["".join(char(w) for w in self.words[80 * r:80 * r + 80]).rstrip()
-                     for r in range(25)]
+                     for r in range(ROWS)]
 
     def row(self, r: int) -> str:
         return self.rows[r].strip()
@@ -173,7 +174,7 @@ def answer(name: str) -> bytes:
 CFG = "# the peer of the test\nplace Copenhagen\nserver 10.0.0.2\nunits m\n"
 KEYS = 'IP "10.0.0.9"\rSYS 0x8000\r'
 ROW_CLOCK, ROW_DATE, ROW_PLACE, ROW_COND, ROW_VALUES = 3, 8, 11, 13, 15
-ROW_STATUS, ROW_ERROR, ROW_CFG, ROW_KEYS = 18, 19, 21, 24
+ROW_STATUS, ROW_ERROR, ROW_CFG, ROW_KEYS = 18, 19, 21, ROWS - 1
 C_ERR = 0x000F66
 
 

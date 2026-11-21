@@ -154,7 +154,7 @@ Screen:
 |halt
 |Halted
 exit 0
-== another layout of the monitor's RAM
+== another layout of the monitor's RAM, the 25 rows of layout 1
 BASIC-5.ROM on card 0: for another monitor
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements

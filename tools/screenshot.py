@@ -2,9 +2,9 @@
 """Draw a program's screen in niceemu as a PNG picture.
 
 The program runs in niceemu until it halts, with --step-time, so that
-its microseconds are the same each time, and the 80x25 words of the
+its microseconds are the same each time, and the 80x28 words of the
 screen at 0xFFFF0000 and the cursor's registers at 0xFFFFFF80-82 are drawn
-as the text display (src/video/text.vhd) shows them: 1280x800 pixels, each
+as the text display (src/video/text.vhd) shows them: 1280x896 pixels, each
 character in 16x32 pixels, and the colors of 4 bits, each component n as
 the byte n * 0x11. The glyphs are those of the font that the font base at
 0xFFFFFF86 selects, the font RAM at 0xFFFE0000 or the character ROM at
@@ -14,7 +14,7 @@ shown is drawn on, in the inverted colors, as large as its character or,
 when small, its bottom 4 lines.
 
 With --debugger, the strip of the on-board debugger (doc/DEBUGGER.md) is
-drawn under the screen, 4 rows more, as MEGA+HELP shows it at the stop:
+drawn under the screen, 4 rows more, 1280x1024 in all, as MEGA+HELP shows it at the stop:
 R0-R15; the state, PAUSED at the step limit of -n, as after F3, or HALTED
 with its reason; the PC, the instruction word there, and the flags of
 R14; the instruction decoded, as nicedis writes it; and the keys. The
@@ -66,7 +66,7 @@ sys.path.insert(0, f"{REPO}/nice_cpu/assembler")
 import nicedis  # noqa: E402
 
 COLS = 80
-ROWS = 25
+ROWS = 28
 W    = 16
 H    = 32
 
@@ -139,7 +139,7 @@ def run(args: argparse.Namespace, dumps: tuple[str, ...] | list[str] = ()
 
 
 def screen_rows(mem: dict[int, int]) -> list[list[int]]:
-    """The 25 rows of the screen, each the 80 words of its characters."""
+    """The 28 rows of the screen, each the 80 words of its characters."""
     return [[mem[0xFFFF0000 + row * COLS + col] for col in range(COLS)]
             for row in range(ROWS)]
 

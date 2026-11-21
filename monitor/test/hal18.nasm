@@ -10,15 +10,15 @@
 ;  2  after 100 characters from row 0, which wrap to row 1: 2
 ;  3  after CR LF, to row 2, whose bit stays clear: 2
 ;  4  after 81 characters from row 2, which wrap to row 3: 0xA
-;  5  scr_links(0x1000023), which drops bit 0: the old word, 0xA
-;  6  after 81 characters from row 24, column 0, where scr_moveto put
-;     the cursor, which scroll the word and wrap to row 24: 0x1000010,
-;     row 24's bit cleared by the first, row 1's dropped, row 5's moved
-;     up, and row 24's set by the wrap
-;  7  after a LF at row 24, which scrolls: 0x800008, row 24's cleared
-;  8  after a TAB at column 79 of row 24, which wraps and scrolls:
-;     0x1400004
-;  9  scr_links(0xFE000001), all bits it drops: 0x1400004
+;  5  scr_links(0x8000023), which drops bit 0: the old word, 0xA
+;  6  after 81 characters from row 27, the last, column 0, where
+;     scr_moveto put the cursor, which scroll the word and wrap to row
+;     27: 0x8000010, row 27's bit cleared by the first, row 1's dropped,
+;     row 5's moved up, and row 27's set by the wrap
+;  7  after a LF at row 27, which scrolls: 0x4000008, row 27's cleared
+;  8  after a TAB at column 79 of row 27, which wraps and scrolls:
+;     0xA000004
+;  9  scr_links(0xF0000001), all bits it drops: 0xA000004
 ; 10  scr_links(-1): 0
 ; 11  scr_links(0x10), scr_cls, scr_links(-1): 0
 ; 12  scr_links(0x28), and a character at column 1 of row 3, after
@@ -55,12 +55,12 @@ h18_main
                 MOVE    R8, 81
                 CALL    h18_chars
                 CALL    h18_links
-                MOVE    R1, 0x1000023
+                MOVE    R1, 0x8000023
                 CALL    _mon_scr_links
                 MOVE    @R7++, R1
-; Row 24: a wrap, a LF, and a TAB at the last column
+; Row 27: a wrap, a LF, and a TAB at the last column
                 CLR     R1
-                MOVE    R2, 24
+                MOVE    R2, 27
                 CALL    _mon_scr_moveto
                 MOVE    R8, 81
                 CALL    h18_chars
@@ -69,12 +69,12 @@ h18_main
                 CALL    _mon_putc
                 CALL    h18_links
                 MOVE    R1, 79
-                MOVE    R2, 24
+                MOVE    R2, 27
                 CALL    _mon_scr_moveto
                 MOVE    R1, 0x09
                 CALL    _mon_putc
                 CALL    h18_links
-                MOVE    R1, 0xFE000001
+                MOVE    R1, 0xF0000001
                 CALL    _mon_scr_links
                 MOVE    @R7++, R1
                 CALL    h18_links

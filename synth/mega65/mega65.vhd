@@ -6,7 +6,7 @@
 -- The keyboard's power LED is green, and its drive LED is green while the
 -- core runs, like the user LED.
 --
--- The screen is shown as 80x25 characters (src/video/text.vhd) at 1280x1024
+-- The screen is shown as 80x28 characters (src/video/text.vhd) at 1280x1024
 -- @ 60 Hz, on the VGA connector and on the HDMI connector. The video, the
 -- video DAC, and the HDMI output are as in MandelbrotMEGA65's mega65.vhd:
 -- * The VGA output goes through a video DAC with 8 bits per color. The DAC

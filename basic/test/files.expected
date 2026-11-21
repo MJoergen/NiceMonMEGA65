@@ -178,6 +178,9 @@ READY.
 HALT
 Halted
 Screen:
+|SAVE "BRK"
+|Break
+|READY.
 |LOAD "BRK"
 |READY.
 |LIST

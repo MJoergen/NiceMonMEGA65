@@ -1,6 +1,6 @@
 -- The screen's registers (src/scr_regs.vhd), with their properties, for
 -- SymbiYosys. Every input is free, so the solver writes and reads any word,
--- and clears the registers, at any time. The screen has 2^14 words, the
+-- and clears the registers, at any time. The screen has 2^15 words, the
 -- fewest with the chunky mode; the other properties do not depend on the
 -- size.
 --
@@ -34,7 +34,7 @@ begin
 
    i_scr_regs : entity work.scr_regs
       generic map (
-         G_SCR_ADDR_BITS => 14,
+         G_SCR_ADDR_BITS => 15,
          G_FORMAL        => true
       )
       port map (

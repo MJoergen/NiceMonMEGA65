@@ -95,6 +95,9 @@ READY.
 halt
 Halted
 Screen:
+|load "ACROSS A CLUSTER.BIN"
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 |READY.
 |load "bad sum.bin"
 |File error 21, no such file

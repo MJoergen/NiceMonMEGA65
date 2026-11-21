@@ -3,10 +3,10 @@
 -- THEORY OF OPERATION
 -- p_write fills the screen through the write port, in the system clock
 -- domain: a line of text in white on black, a line in the color of
--- print.nasm (nice_cpu/assembler/test/print.nasm), the 256 codes in many colors, and the 48 words after the 2000
+-- print.nasm (nice_cpu/assembler/test/print.nasm), the 256 codes in many colors, and the 48 words after the 2240
 -- of the screen, which must not show at a display offset of 0. It also
--- fills the debugger's overlay: the page, rows 0 to 24, with the 256 codes
--- in other colors, the strip, rows 25 to 28, with text, and the words after
+-- fills the debugger's overlay: the page, rows 0 to 27, with the 256 codes
+-- in other colors, the strip, rows 28 to 31, with text, and the words after
 -- them, which must not show. It keeps a model of the screen and of the
 -- overlay. It writes the font RAM through the bus's port, Spleen with the
 -- 64 blank codes 0x00-0x1F and 0x80-0x9F drawn as boxes, which it keeps in
@@ -17,7 +17,7 @@
 -- the writes. p_check selects the font RAM, and checks that whole frame in the VGA clock
 -- domain: the number of visible pixels in each line and of visible lines,
 -- the widths of the sync pulses, and the color of every visible pixel, as
--- the models and the fonts give it: the program's 25 rows from line 48, in
+-- the models and the fonts give it: the program's 28 rows from line 0, in
 -- the font RAM, and the strip under them, in the ROM (font_pkg.vhd). With
 -- G_PPM_FILE it also writes the frame as a PPM picture. Then, in the
 -- vertical blanking after that frame, it hides the strip, sets the display
@@ -29,9 +29,9 @@
 -- show the page, in the ROM, with no cursor. Last it hides the page and
 -- selects the chunky mode of nice_cpu's DEVICES.md §1.10, with the display
 -- offset at 20000, so that the pixels wrap at the end of the screen, and
--- checks the whole fourth frame: 160x100 pixels of 8x8, each the
+-- checks the whole fourth frame: 160x112 pixels of 8x8, each the
 -- background of its word, no cursor, and the strip under them. p_write
--- fills the words from 2048 to the end of the screen for it. It stops
+-- fills the words from 2288 to the end of the screen for it. It stops
 -- there, for each frame takes about half a minute to simulate.
 
 library ieee;
@@ -112,8 +112,8 @@ architecture simulation of tb_text is
                      shown  : boolean;
                      paged  : boolean;
                      chunk  : boolean) return std_logic_vector is
-      -- The program's 25 rows and the strip's 4, centered
-      constant C_Y0  : natural := (C_MODE.v_visible - 29 * 32) / 2;
+      -- The program's 28 rows and the strip's 4, which fill the lines
+      constant C_Y0  : natural := (C_MODE.v_visible - 32 * 32) / 2;
       constant C_X0  : natural := (C_MODE.h_visible - 1280) / 2;
       variable row   : natural;
       variable col   : natural;
@@ -123,15 +123,15 @@ architecture simulation of tb_text is
       variable bg    : std_logic_vector(11 downto 0);
       variable c     : std_logic_vector(11 downto 0);
    begin
-      if x < C_X0 or x >= C_X0 + 1280 or y < C_Y0 or y >= C_Y0 + 29 * 32 then
+      if x < C_X0 or x >= C_X0 + 1280 or y < C_Y0 or y >= C_Y0 + 32 * 32 then
          return X"000000";
       end if;
       row   := (y - C_Y0) / 32;
       col   := (x - C_X0) / 16;
-      if row >= 25 and not shown then
+      if row >= 28 and not shown then
          return X"000000";
       end if;
-      if row >= 25 or paged then
+      if row >= 28 or paged then
          word := ovl(row * 80 + col);
       elsif chunk then
          -- A pixel of 8x8, the background of its word, and no cursor
@@ -143,14 +143,14 @@ architecture simulation of tb_text is
          word := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
       end if;
       -- The overlay is always in the ROM
-      if ram and row < 25 and not paged then
+      if ram and row < 28 and not paged then
          glyph := fnt(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
       else
          glyph := C_FONT(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
       end if;
       fg    := word(19 downto 8);
       bg    := word(31 downto 20);
-      if cursor and row = cy and col = cx and row < 25 and not paged then
+      if cursor and row = cy and col = cx and row < 28 and not paged then
          c  := fg;
          fg := bg;
          bg := c;
@@ -293,39 +293,39 @@ begin
       check_fnt(16#41# * 32 + 9, C_FONT(16#41# * 32 + 9));
       check_fnt(16#80# * 32, X"FFFF");
       check_fnt(16#9F# * 32 + 12, X"9F9F");
-      print(0, "NiceMon on the MEGA65: 80x25 characters, white on black.", X"000FFF");
+      print(0, "NiceMon on the MEGA65: 80x28 characters, white on black.", X"000FFF");
       print(80, "Blue on orange, as in print.nasm", X"F8000F");
       -- The last column of a row, and the last word of the screen
       print(80 + 79, "!", X"000E00");
-      print(1999, "#", X"031C00");
+      print(2239, "#", X"031C00");
       -- The 256 codes, from row 4, in colors from the code and the row
       for i in 0 to 20 * 80 - 1 loop
          color_v := to_slv((i * 40503) mod 2 ** 24, 24);
          put(4 * 80 + i, color_v & to_slv(i mod 256, 8));
       end loop;
       -- Words beyond the screen
-      for i in 2000 to 2047 loop
+      for i in 2240 to 2287 loop
          put(i, X"FFFFFF41");
       end loop;
       -- The rest, for the chunky mode, in colors from the address, with
       -- a character and a foreground that it must not show
-      for i in 2048 to 2 ** C_SCR_BITS - 1 loop
+      for i in 2288 to 2 ** C_SCR_BITS - 1 loop
          put(i, to_slv((i * 40503) mod 2 ** 12, 12) & X"FFF41");
       end loop;
       -- The page of the overlay: the 256 codes in other colors
-      for i in 0 to 1999 loop
+      for i in 0 to 2239 loop
          color_v := to_slv((i * 7919 + 12345) mod 2 ** 24, 24);
          put_ovl(i, color_v & to_slv((255 - i) mod 256, 8));
       end loop;
       -- The strip: its first and last columns, and the codes in its last row
-      print_ovl(25 * 80, " R0-7   00000000 00000001", X"004FFF");
-      print_ovl(26 * 80 + 79, "|", X"004FFF");
-      print_ovl(27 * 80, " PAUSED   00001234", X"004FF0");
+      print_ovl(28 * 80, " R0-7   00000000 00000001", X"004FFF");
+      print_ovl(29 * 80 + 79, "|", X"004FFF");
+      print_ovl(30 * 80, " PAUSED   00001234", X"004FF0");
       for i in 0 to 79 loop
-         put_ovl(28 * 80 + i, X"00FFFF" & to_slv(i + 32, 8));
+         put_ovl(31 * 80 + i, X"00FFFF" & to_slv(i + 32, 8));
       end loop;
       -- Words beyond the strip
-      for i in 29 * 80 to 29 * 80 + 47 loop
+      for i in 32 * 80 to 32 * 80 + 47 loop
          put_ovl(i, X"FFFFFF42");
       end loop;
       written <= true;
@@ -459,8 +459,8 @@ begin
       check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false, false, false);
 
       -- The page over the program's rows, which hides the cursor, in the
-      -- ROM while the font RAM is selected. The first four rows of text
-      -- start 48 lines down.
+      -- ROM while the font RAM is selected: the first four rows of text,
+      -- from line 0.
       wait until rising_edge(clk);
       strip   <= '1';
       page    <= '1';
@@ -468,11 +468,11 @@ begin
       ctl_we  <= '1';
       wait until rising_edge(clk);
       ctl_we <= '0';
-      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, true, false, false);
+      check_frame(4 * 32, 80, true, 5, 3, true, true, true, false, false);
 
       -- The chunky mode, with the cursor still on, which it hides, and the
-      -- strip under the pixels. That frame starts 48 lines before the
-      -- third one would end, so the registers wait for its end first.
+      -- strip under the pixels. The third frame was checked only to its
+      -- fifth row, so the registers wait for its end first.
       wait until rising_edge(vga_clk) and vs = C_MODE.sync_active;
       wait until rising_edge(clk);
       page   <= '0';

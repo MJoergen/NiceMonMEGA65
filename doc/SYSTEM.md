@@ -40,7 +40,7 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 | `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
 | `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
-| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
+| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×28 screen and room for scrolling. The 2240 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM: the top words of the RAM, as it repeats, from `0xFFFF2000` on the Nexys4DDR. The stacks and the monitor's variables are here (see [Stack, heap, and variables](#stack-heap-and-variables)). |
 | `0xFFFFFF00`–`0xFFFFFFFF` | The I/O page: nice_cpu's devices, the board's registers, and the link's debug registers (see [I/O registers](#io-registers)). |
 
@@ -239,10 +239,10 @@ modules, and behave as the emulator's:
 ## The screen
 
 The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
-connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of characters
-of 16×32 pixels. Under them are the 4 rows of the on-board debugger's
-strip ([DEBUGGER.md](DEBUGGER.md)), black unless it is shown, and the 29
-rows are in the middle of the picture, 48 black lines from its top.
+connector, at 1280×1024 and 60 Hz, as 80 columns and 28 rows of characters
+of 16×32 pixels, as in the emulator. Under them are the 4 rows of the
+on-board debugger's strip ([DEBUGGER.md](DEBUGGER.md)), black unless it
+is shown, and the 32 rows fill the picture.
 
 Word `80 * row + column` is one character, as in nice_cpu's DEVICES.md
 §1:
@@ -264,7 +264,7 @@ with blanks.
 
 The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192
 words, `0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the display
-shows 2000 from the display offset, so a program scrolls by adding
+shows 2240 from the display offset, so a program scrolls by adding
 80 to the offset and writing the next row after the rows shown, and scrolls
 back by taking 80 away, as the QNICE monitor does. The offset wraps at the
 end of the memory. The display also has a cursor, which swaps the colors
@@ -275,7 +275,7 @@ QNICE-FPGA, at `0xFF30` there:
 |---|---|
 | `0xFFFFFF80` | State. Bit 6 shows the cursor, bit 5 makes it blink, about twice a second, bit 4 makes it small, the bottom 4 lines of the character, and bit 10 enables the display offset. Bits 11..4 are kept and read back; the rest read 0. |
 | `0xFFFFFF81` | The cursor's column, 0 to 79. |
-| `0xFFFFFF82` | The cursor's row, 0 to 24. |
+| `0xFFFFFF82` | The cursor's row, 0 to 27. |
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
 | `0xFFFFFF86` | The font base of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font), all 32 bits kept and read back: `0xFFFE0000` shows the font RAM, and 0 shows the character ROM, as do the other values, which are reserved (see [The font](#the-font)). |
 | `0xFFFFFF87` | The mode word of [nice_cpu's DEVICES.md §1.10](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#110-chunky-mode): 0 shows the text, and 1 the chunky mode (see [The chunky mode](#the-chunky-mode)). A write of 1 keeps 1 on the MEGA65, and any other write keeps 0. The Nexys4DDR has no chunky mode, and there the word stays 0. |
@@ -292,10 +292,10 @@ bits 6..0 of the column and 4..0 of the row are kept.
 
 ### The chunky mode
 
-In the chunky mode, the program's 25 rows show 160×100 pixels instead
+In the chunky mode, the program's 28 rows show 160×112 pixels instead
 of the characters, each a square of 8×8 pixels of the picture. Word
 `160 * y + x` from the display offset is the pixel in column `x`, 0 to
-159, and row `y`, 0 to 99, so the 16000 words of a picture fit twice in
+159, and row `y`, 0 to 111, so the 17920 words of a picture fit once in
 the screen's 32768. The pixel's color is the word's background color,
 bits 31..20, and its other bits are ignored, so a screen of blanks looks
 the same in both modes. The cursor and the font are not shown, and the

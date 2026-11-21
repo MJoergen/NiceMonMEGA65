@@ -119,6 +119,9 @@ READY.
 HALT
 Halted
 Screen:
+|READY.
+|710 = 1
+|PROCR
 |= without FN in 710
 |READY.
 |710 RETURN

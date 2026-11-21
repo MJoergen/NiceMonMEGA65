@@ -6,8 +6,8 @@ Usage: test/ring.py NICEEMU MONITOR.bin:WORDS ...
 
 Each MONITOR.bin is the monitor of the tests, built to take WORDS as the
 size of the screen's memory (Makefile): 32768, as niceemu and the MEGA65
-have it, 8192, as the Nexys4DDR has, and 2048, which leaves no room for
-the history. For each, the monitor runs with DUMP 0x8000, N, for an N whose
+have it, 8192, as the Nexys4DDR has, and 4096, the fewest that a board
+can have, which leaves room for 23 rows of history. For each, the monitor runs with DUMP 0x8000, N, for an N whose
 rows fill part of the history and one whose rows go round its ring, and
 with Page Up more times than there are rows back, then the same and
 three Page Downs, then the same and one Page Up more, then the same and
@@ -32,14 +32,14 @@ SCREEN = 0xFFFF0000
 VARS = 0xFFFFF000
 SCR_CTL = 0xFFFFFF80
 SCR_OFFS = 0xFFFFFF85
-ROWS, COLS = 25, 80
-PAGE = 24                   # the rows of a Page Up (monitor.nasm, PAGE)
+ROWS, COLS = 28, 80
+PAGE = ROWS - 1             # the rows of a Page Up (monitor.nasm, PAGE)
 HIST_SHOWN = 0x400          # SCR_CTL while the history is shown
 PAGE_UP, PAGE_DOWN = b"\x1b[5~", b"\x1b[6~"
 STEPS = 20_000_000
 # The d counts for each size: one whose rows leave part of the history
 # empty, and one whose rows go round the ring
-COUNTS = {32768: [0x100, 0x800], 8192: [0x100, 0x200], 2048: [0x100]}
+COUNTS = {32768: [0x100, 0x800], 8192: [0x100, 0x200], 4096: [0x100]}
 
 failed = False
 
@@ -82,7 +82,7 @@ def run(emu: str, monitor: str, words: int, keys: bytes,
 
 
 def shown(mem: dict[int, int], words: int) -> list[str]:
-    """The rows a board shows: the 2000 words from the display offset, if
+    """The rows a board shows: the 2240 words from the display offset, if
     it is on, modulo the size of the memory, with a blank for a word that
     is no printable character."""
     offset = mem[SCR_OFFS] if mem[SCR_CTL] & HIST_SHOWN else 0
@@ -97,14 +97,14 @@ def shown(mem: dict[int, int], words: int) -> list[str]:
 
 def expected(text: list[str], back: int) -> list[str]:
     """The rows of the console output that the screen shows, back rows
-    back from its last 25."""
+    back from its last ROWS."""
     first = len(text) - ROWS - back
     return [text[i].rstrip() if i >= 0 else ""
             for i in range(first, first + ROWS)]
 
 
 def test(emu: str, monitor: str, words: int, tmp: str) -> None:
-    hcap = max(0, (words - 2000) // COLS)
+    hcap = max(0, (words - ROWS * COLS) // COLS)
     for count in COUNTS[words]:
         base = f"dump 0x8000, 0x{count:X}\r".encode()
         ups = PAGE_UP * 20

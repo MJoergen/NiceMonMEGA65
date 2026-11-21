@@ -95,7 +95,7 @@ SUITES = {
                  'load "\t\003load p\t\003load pad\t\003halt\r'),
         Run("TAB with slot 1 mounted by DIR 1: its names, a directory left out, "
             "names that end at the 76th character, or past it, which the editor's "
-            "line of 254 takes (issue #118), and a list of 30 names, more than the screen's 25 rows", "lfn.img", "tab1.img",
+            "line of 254 takes (issue #118), and a list of 30 names, more than the screen's 28 rows", "lfn.img", "tab1.img",
             keys='dir 1\rload h\t\003load hd\t\003load a\t\003load b\t\003load "a\t\003'
                  'load "b\t\003load r\t\t\003halt\r'),
         Run("TAB after SAVE and DELETE", "super.img",

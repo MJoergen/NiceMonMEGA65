@@ -134,7 +134,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
 | [src/](src/) | The synthesizable VHDL, shared by both boards (see [What is in src/](#what-is-in-src)). |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
-| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font.vhd` holds the fonts at `0xFFFE0000`–`3FFF`, the font RAM (`font_ram.vhd`) and the character ROM (`font_rom.vhd`), each a memory of two clocks. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font of the ROM, made by `font/gen_font_pkg.py`. |
+| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×28 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font.vhd` holds the fonts at `0xFFFE0000`–`3FFF`, the font RAM (`font_ram.vhd`) and the character ROM (`font_rom.vhd`), each a memory of two clocks. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font of the ROM, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
@@ -213,7 +213,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   `dbg/dbg_host.vhd` its adapter to the debug link's side port, which
   turns a request of a word or more into the port's single words, and
   gives the words read back one at a time. `dbg/dbg_decode.vhd` decodes
-  the instruction of the strip's row 27, and `dbg/dbg_set.vhd` has the
+  the instruction of the strip's row 30, and `dbg/dbg_set.vhd` has the
   text and the parse of the settings page. `kbd_m65_toggle.vhd` and
   `kbd_ps2_toggle.vhd` detect the boards' toggle keys.
 - `system.vhd` is what every board has: the system, the text display of
@@ -320,7 +320,7 @@ The testbenches are these:
   `sim/dbg_watch.nasm`, which reads one word for good, writes a
   watchpoint on its reads from the page, and shows WCH 1 after `g`, with
   the PC after the read, PAUSED after `s`, and WCH 1 after `g` again.
-- `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
+- `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 30
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,
   modifier, and mode, with constant words, and the text nicedis writes

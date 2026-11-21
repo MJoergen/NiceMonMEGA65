@@ -386,7 +386,7 @@ def extra(d: str, tmp: str) -> None:
     _, e = v.entry(b"CUT     BIN")
     v.set(v.chain(cluster(e))[1], 0)
     # fattab: slot 1's card, with names of 68 and 69 characters, a
-    # directory, and ROW01.TXT to ROW30.TXT, more than the screen's 25 rows
+    # directory, and ROW01.TXT to ROW30.TXT, more than the screen's 28 rows
     img = copy(super_img, at("tab1.img"))
     mcopy(img, 0, b"", "NICE/" + "a" * 64 + ".bin", tmp)
     mcopy(img, 0, b"", "NICE/" + "b" * 65 + ".bin", tmp)

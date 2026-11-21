@@ -6,7 +6,7 @@
 -- THEORY OF OPERATION
 -- This is stage 10 of the design note: the live strip, the core keys, the
 -- sticky setting, the catch, the page, the breakpoints, the Nexys4DDR's
--- buttons and display, the decode of row 27, the link's side port with
+-- buttons and display, the decode of row 30, the link's side port with
 -- the registers live, and the settings page of the link (issue #75). The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
@@ -39,8 +39,8 @@
 -- has halted, and the word at R15 has not been read since the stop, it
 -- reads it, and then the constant words that the word says the
 -- instruction takes, and no word past them, which may be a device's.
--- dbg_decode.vhd turns them into the text at the end of row 27. While the page is shown and the core is
--- stopped, paused, halted, or held, it reads the window's 176 words in one
+-- dbg_decode.vhd turns them into the text at the end of row 30. While the page is shown and the core is
+-- stopped, paused, halted, or held, it reads the window's 200 words in one
 -- request, into mem_ram, unless they were read since the stop; a move of
 -- the window reads them again, and drops a read that it overtook
 -- (mem_kill). A word's write from the page goes as a key's write does,
@@ -101,19 +101,19 @@
 -- dashes otherwise; system.vhd shows it in Focus, and masks the core's
 -- buttons then.
 --
--- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
--- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
+-- The strip is rows 28 to 31 of the overlay of text.vhd, the words 2240 to
+-- 2559, addressed row * 80 + column. C_CELLS says what each word shows: a
 -- fixed character, a hex digit of a word that the debugger read, a
 -- character of the state's name, a flag of SR (R14), a character of the
 -- decode, or a character of row
--- 28, the keys in Focus or a note in Strip. p_draw writes the
+-- 31, the keys in Focus or a note in Strip. p_draw writes the
 -- whole strip, one word a cycle, through a pipeline of three stages, after
 -- reset and whenever what it shows has changed. R0-R15 are dimmed while
 -- they are not the core's: while it is held, the link keeps the values of
--- the last stop, which may be another program's (DEBUG.md §6), and row 27
+-- the last stop, which may be another program's (DEBUG.md §6), and row 30
 -- and the display show no PC then. While the page
--- is shown (page_o), the pass covers rows 0 to 24 too: the window's and
--- the cursor's address, the 22 rows of the window, the field with its
+-- is shown (page_o), the pass covers rows 0 to 27 too: the window's and
+-- the cursor's address, the 25 rows of the window, the field with its
 -- message, and the page's keys, from the templates of row_cells; the
 -- cursor's word has its colors swapped, and a word at an enabled
 -- breakpoint is on dark red. The header lists the 4 breakpoints. The
@@ -137,7 +137,7 @@ library work;
 entity dbg is
    generic (
       G_CLOCK_HZ      : positive := 100_000_000;
-      -- The board's key that toggles the debugger, named in row 28
+      -- The board's key that toggles the debugger, named in row 31
       G_TOGGLE_KEY    : string   := "MEGA+HELP";
       -- The board has buttons and a seven-segment display, the Nexys4DDR's
       G_BOARD_IO      : boolean  := false;
@@ -204,12 +204,12 @@ architecture synthesis of dbg is
    subtype t_word is std_logic_vector(31 downto 0);
 
    constant C_COLS       : natural := 80;
-   constant C_STRIP_ROW  : natural := 25;
+   constant C_STRIP_ROW  : natural := 28;
    constant C_STRIP_ROWS : natural := 4;
    constant C_STRIP_LEN  : natural := C_STRIP_ROWS * C_COLS;
    constant C_STRIP_ADDR : natural := C_STRIP_ROW * C_COLS;
-   -- The page: rows 0 to 24, the memory in rows 1 to 22, 8 words a row
-   constant C_MEM_ROWS  : natural := 22;
+   -- The page: rows 0 to 27, the memory in rows 1 to 25, 8 words a row
+   constant C_MEM_ROWS  : natural := 25;
    constant C_MEM_LEN   : natural := C_MEM_ROWS * 8;
    constant C_FIELD_ROW : natural := C_MEM_ROWS + 1;
    constant C_ALL_LEN   : natural := (C_STRIP_ROW + C_STRIP_ROWS) * C_COLS;
@@ -301,7 +301,7 @@ architecture synthesis of dbg is
    constant C_IDX_ROW    : natural := 20;
    constant C_IDX_BRK    : natural := 21;
 
-   -- The columns of row 27: the state's name, the PC, the word at the PC,
+   -- The columns of row 30: the state's name, the PC, the word at the PC,
    -- and the flags, every second column
    constant C_COL_STATE : natural := 1;
    constant C_COL_PC    : natural := 10;
@@ -335,7 +335,7 @@ architecture synthesis of dbg is
       variable res_v : t_cells := (others => C_FIX);
       variable c_v   : natural;
    begin
-      -- Rows 25 and 26: R0-R7 and R8-R15, a word in 8 digits and a space
+      -- Rows 28 and 29: R0-R7 and R8-R15, a word in 8 digits and a space
       for r in 0 to 1 loop
          for c in 0 to C_COLS - 1 loop
             if c < 8 then
@@ -350,7 +350,7 @@ architecture synthesis of dbg is
          end loop;
       end loop;
 
-      -- Row 27: the state, the PC, the word at the PC, and the flags
+      -- Row 30: the state, the PC, the word at the PC, and the flags
       c_v := 2 * C_COLS;
       for i in 0 to C_STATE_LEN - 1 loop
          res_v(c_v + C_COL_STATE + i) := (kind => CELL_STATE, idx => i, nib => 0, ch => to_byte(' '));
@@ -366,7 +366,7 @@ architecture synthesis of dbg is
          res_v(c_v + C_COL_DEC + i) := (kind => CELL_DEC, idx => i, nib => 0, ch => to_byte(' '));
       end loop;
 
-      -- Row 28: the keys
+      -- Row 31: the keys
       for c in 0 to C_COLS - 1 loop
          res_v(3 * C_COLS + c) := (kind => CELL_KEYS, idx => c, nib => 0, ch => to_byte(' '));
       end loop;
@@ -420,7 +420,7 @@ architecture synthesis of dbg is
       return res_v;
    end function row_cells;
 
-   -- Row 0, the rows of memory, row 23, and row 24 of the page
+   -- Row 0, the rows of memory, row 26, and row 27 of the page
    constant C_HEAD_ROW  : t_row := row_cells(" Window %%%%%%%%  Cursor &&&&&&&&  Breaks @@@@@@@@ @@@@@@@@ @@@@@@@@ @@@@@@@@");
    constant C_MEM_ROW   : t_row := row_cells("$$$$$$$$ ######## ######## ######## ######## ######## ######## ######## ########");
    constant C_INPUT_ROW : t_row := row_cells(" <<<<<<<< ????????  !!!!!!!!!!");
@@ -612,7 +612,7 @@ architecture synthesis of dbg is
    constant C_HALT_DIG  : natural := 7;
    constant C_FLAG_CHAR : string(1 to 7) := "XCZNVEI";
 
-   -- Row 28: the keys in Focus, with the sticky setting, and the note of
+   -- Row 31: the keys in Focus, with the sticky setting, and the note of
    -- Strip, which names the toggle key
    type t_keys is array (0 to 2, 0 to C_COLS - 1) of t_byte;
 
@@ -805,7 +805,7 @@ architecture synthesis of dbg is
    signal instr_ok  : std_logic := '0';                   -- The word at the PC was read since the stop, and its constants
    signal consts_r  : std_logic_vector(95 downto 0) := (others => '0');
 
-   -- The decode of row 27
+   -- The decode of row 30
    signal dec_start : std_logic := '0';
    signal dec_text  : std_logic_vector(8 * C_DEC_LEN - 1 downto 0);
    signal dec_chars : t_dec(0 to C_DEC_LEN - 1);
@@ -1739,7 +1739,7 @@ begin
          if stop = '1' then
             own_r <= '0';
          end if;
-         -- Row 28 changes with the state and the sticky setting, and the
+         -- Row 31 changes with the state and the sticky setting, and the
          -- page with its keys
          if toggle_i = '1' or leave = '1' or key_act = ACT_STICKY or catch = '1' or pg_dirty = '1' then
             dirty <= '1';

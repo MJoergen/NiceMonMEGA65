@@ -1,4 +1,4 @@
--- The decode of an instruction for the on-board debugger's row 27
+-- The decode of an instruction for the on-board debugger's row 30
 -- (doc/DEBUGGER.md): the instruction word and its constant words in, the
 -- text of the instruction out, in the assembler's syntax
 -- (nice_cpu/doc/ISA.md §10), as nicedis.py writes it.

@@ -220,6 +220,9 @@ READY.
 HALT
 Halted
 Screen:
+|Syntax error in 10
+|PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+|READY.
 |10 IF 1 THEN 2 X
 |10 GOTO X
 |10 GOSUB 1.5

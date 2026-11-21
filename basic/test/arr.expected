@@ -180,6 +180,9 @@ READY.
 HALT
 Halted
 Screen:
+|5
+|READY.
+|LIST
 |10 PRINT "A"
 |READY.
 |LOAD

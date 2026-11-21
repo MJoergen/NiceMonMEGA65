@@ -192,7 +192,7 @@ board differs from the MEGA65 in three ways:
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
   take 16, not 64. With the fonts, the debugger's overlay, and the
   smaller memories of the table of [Block RAM](#block-ram), that is 134
-  of 135 with the ROM. 8K words are still more than three screens of 80×25 for
+  of 135 with the ROM. 8K words are still more than three screens of 80×28 for
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a

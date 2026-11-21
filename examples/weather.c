@@ -42,7 +42,7 @@
 #define ROW_STATUS 18
 #define ROW_ERROR 19
 #define ROW_CFG 21
-#define ROW_KEYS 24
+#define ROW_KEYS (NICE_SCREEN_ROWS - 1)
 
 #define FONT_RAM 0xFFFE0000u
 #define FONT_ROM 0xFFFE2000u
