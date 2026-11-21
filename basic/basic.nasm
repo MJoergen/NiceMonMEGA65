@@ -4,7 +4,8 @@
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
 ; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
 ; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, basic_dis.nasm,
-; basic_edit.nasm, and basic_str.nasm, and the monitor's common.nasm,
+; basic_edit.nasm, basic_str.nasm, basic_struct.nasm, and
+; basic_mach.nasm, and the monitor's common.nasm,
 ; monlib.nasm, and mon.nasm, of which BASIC has copies of its own.
 ;
 ; This file has the main loop, the scanner of a statement's items, and
@@ -19,6 +20,9 @@
 ; Stage 4 (issue #60) has the programs' texts on a card and from a TFTP
 ; server: SAVE "NAME", LOAD "NAME", and RUN "NAME", in basic_cmd.nasm.
 ; Stage 5 (issue #116) has the strings, DATA, and READ, in basic_str.nasm.
+; Stage 8 (issue #119) has the structure, in basic_struct.nasm, and stage
+; 10 (issue #121) the machine, TI, SLEEP, the colors, and the cursor, in
+; basic_mach.nasm.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
@@ -150,7 +154,8 @@ bas_start
                 MOVE    R1, S_HINT
                 CALL    puts_b_crlf
 
-; main: READY., on a row of its own, the row after it blank, whatever
+; main: READY., on a row of its own, with the cursor shown and blinking,
+; as a program may have hidden it (CURSOR), the row after it blank, whatever
 ; was left there (ed_fresh), and the lines, each tokenized and run with a
 ; fresh SP. A PRINT with ; that filled its row left the cursor at the
 ; next row's start, which goes on from it (scr_links): scr_moveto to
@@ -170,6 +175,8 @@ main_auto
                 CLR     @V_STORE
                 CLR     @V_ETOK
                 CLR     @V_REDO
+                AND     R1, @SCR_CTL, 0xFFFFFF8F  ; the cursor shown and blinking,
+                OR      @SCR_CTL, R1, 0x60  ; which a program may have changed
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
@@ -645,6 +652,7 @@ ACTS
                 .DAT    st_renum+65536*st_data, st_read+65536*st_restore
                 .DAT    st_def+65536*st_on, st_do+65536*st_loop
                 .DAT    st_exit+65536*st_endif, st_endproc+65536*st_local
+                .DAT    st_sleep+65536*st_fg, st_bg+65536*st_cursor, st_rcursor
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -667,7 +675,8 @@ I_ON            .EQU    45              ; of ON,
 I_DO            .EQU    46              ; of DO,
 I_LOOP          .EQU    47              ; of LOOP,
 I_ENDIF         .EQU    49              ; of ENDIF,
-N_STMT          .EQU    52              ; and of AND, the first keyword that is no statement
+I_RCURSOR       .EQU    56              ; of RCURSOR,
+N_STMT          .EQU    57              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -714,7 +723,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    40              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -740,7 +749,8 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
                 .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
-                .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_P, H_PG, 0
+                .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_SLEEP, H_FG, H_BG, H_CUR, H_CURP, H_RCUR
+                .DAT    H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -823,6 +833,15 @@ H_PROC          .ASCII_B 'DEF PROCA(X)        the lines up to ENDPROC, run by PR
                 .DAT    0
 H_FNL           .ASCII_B 'DEF FNA(X)          the lines up to = E, whose E is the value of FNA(2)'
 H_LOCAL         .ASCII_B 'LOCAL X, Y$         X 0 and Y$ empty in a PROC or FN, until it ends'
+H_SLEEP         .ASCII_B 'SLEEP S             wait S seconds, such as 0.5; TI is the microseconds counted'
+H_FG            .ASCII_B 'FOREGROUND N        the color of the characters, 0 to 15, or of R, G, B 0 to 15'
+H_BG            .ASCII_B 'BACKGROUND N        their background, likewise; 0 black, 1 white, 6 blue'
+                .DAT    0
+H_CUR           .ASCII_B 'CURSOR ON | OFF     show the cursor, or hide it'
+H_CURP          .ASCII_B 'CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking'
+                .DAT    0
+H_RCUR          .ASCII_B 'RCURSOR C, R        C and R the column and the row of the cursor'
+                .DAT    0
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

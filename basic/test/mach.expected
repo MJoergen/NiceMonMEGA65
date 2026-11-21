@@ -1,0 +1,200 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+PRINT TI > 0, TI < 1E9
+-1      -1
+READY.
+A = TI: B = TI: PRINT B >= A, B - A < 1000
+-1      -1
+READY.
+FOREGROUND 7: BACKGROUND 6: PRINT "X";: RCURSOR C, R: PRINT
+X
+READY.
+PRINT HEX$(PEEK(0xFFFF0000 + 80 * R + C - 1))
+00FFF058
+READY.
+FOREGROUND 15, 8, 0: BACKGROUND 0, 0, 1: PRINT "Y";: RCURSOR C, R: PRINT
+Y
+READY.
+PRINT HEX$(PEEK(0xFFFF0000 + 80 * R + C - 1))
+001F8059
+READY.
+FOREGROUND 13: PRINT "Z";: RCURSOR C, R: PRINT
+Z
+READY.
+PRINT HEX$(PEEK(0xFFFF0000 + 80 * R + C - 1))
+0019F952
+READY.
+FOREGROUND 1: BACKGROUND 0
+READY.
+RCURSOR C, R: CURSOR 40, R: PRINT "AT 40";: RCURSOR X, Y: PRINT: PRINT X, Y - R
+AT 40
+45      0
+READY.
+RCURSOR C, R: CURSOR 100, R: RCURSOR X, Y: PRINT: PRINT X, Y - R
+
+79      0
+READY.
+CURSOR 0, 100: RCURSOR X, Y: PRINT X, Y
+0       24
+READY.
+PRINT HEX$(PEEK(0xFFFFFF80))
+00000060
+READY.
+CURSOR OFF: PRINT HEX$(PEEK(0xFFFFFF80))
+00000020
+READY.
+RCURSOR C, R: CURSOR ON, 0, R, 0: PRINT HEX$(PEEK(0xFFFFFF80))
+00000040
+READY.
+RCURSOR C, R: CURSOR OFF, 0, R, 3: PRINT HEX$(PEEK(0xFFFFFF80))
+00000030
+READY.
+RCURSOR C, R: CURSOR 0, R, 2: PRINT HEX$(PEEK(0xFFFFFF80))
+00000050
+READY.
+PRINT HEX$(PEEK(0xFFFFFF80))
+00000060
+READY.
+RCURSOR P, Q(1)
+Undefined array
+READY.
+RCURSOR P, Q: PRINT P
+0
+READY.
+DIM Q(2): RCURSOR Q(1), Q(2): PRINT Q(1), Q(2) > 0
+0       -1
+READY.
+CURSOR
+Syntax error
+CURSOR ON | OFF     show the cursor, or hide it
+CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
+READY.
+CURSOR -1, 0
+Illegal quantity
+READY.
+CURSOR 0, -1
+Illegal quantity
+READY.
+CURSOR 0, 0, 4
+Illegal quantity
+READY.
+CURSOR ON 1
+Syntax error
+CURSOR ON | OFF     show the cursor, or hide it
+CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
+READY.
+CURSOR OFF, 1
+Syntax error
+CURSOR ON | OFF     show the cursor, or hide it
+CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
+READY.
+CURSOR 1
+Syntax error
+CURSOR ON | OFF     show the cursor, or hide it
+CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
+READY.
+FOREGROUND 16
+Illegal quantity
+READY.
+FOREGROUND -1
+Illegal quantity
+READY.
+FOREGROUND 1, 2
+Syntax error
+FOREGROUND N        the color of the characters, 0 to 15, or of R, G, B 0 to 15
+READY.
+FOREGROUND 1, 2, 16
+Illegal quantity
+READY.
+BACKGROUND "A"
+Type mismatch
+READY.
+FOREGROUND
+Syntax error
+FOREGROUND N        the color of the characters, 0 to 15, or of R, G, B 0 to 15
+READY.
+RCURSOR C
+Syntax error
+RCURSOR C, R        C and R the column and the row of the cursor
+READY.
+RCURSOR C$, R
+Syntax error
+RCURSOR C, R        C and R the column and the row of the cursor
+READY.
+SLEEP -1
+Illegal quantity
+READY.
+SLEEP
+Syntax error
+SLEEP S             wait S seconds, such as 0.5; TI is the microseconds counted
+READY.
+SLEEP 1, 2
+Syntax error
+SLEEP S             wait S seconds, such as 0.5; TI is the microseconds counted
+READY.
+OFF = 1
+Syntax error; HELP lists the statements
+READY.
+TI = 1
+Syntax error; HELP lists the statements
+READY.
+10 CURSOR ON, 1, 2, 3: CURSOR OFF: RCURSOR C, R: SLEEP 0.5: PRINT TI - 1
+20 FOREGROUND 1, 2, 3: BACKGROUND 0
+LIST
+10 CURSOR ON, 1, 2, 3: CURSOR OFF: RCURSOR C, R: SLEEP 0.5: PRINT TI - 1
+20 FOREGROUND 1, 2, 3: BACKGROUND 0
+READY.
+NEW
+READY.
+10 SLEEP 100: PRINT "AFTER"
+RUN
+Break in 10
+READY.
+CONT
+AFTER
+READY.
+NEW
+READY.
+10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000, B - A < 251000
+20 A = TI: SLEEP 0: SLEEP -0: B = TI: PRINT B - A < 1000
+30 A = TI: SLEEP 1.5: B = TI: PRINT B - A >= 1.5E6, B - A < 1501000
+40 CURSOR OFF: SLEEP 0.01: PRINT PEEK(-128)
+RUN
+-1      -1
+-1
+-1      -1
+32
+READY.
+? PEEK(-128)
+96
+READY.
+HALT
+Halted
+Screen:
+|10 SLEEP 100: PRINT "AFTER"
+|RUN
+|Break in 10
+|READY.
+|CONT
+|AFTER
+|READY.
+|NEW
+|READY.
+|10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000, B - A < 251000
+|20 A = TI: SLEEP 0: SLEEP -0: B = TI: PRINT B - A < 1000
+|30 A = TI: SLEEP 1.5: B = TI: PRINT B - A >= 1.5E6, B - A < 1501000
+|40 CURSOR OFF: SLEEP 0.01: PRINT PEEK(-128)
+|RUN
+|-1      -1
+|-1
+|-1      -1
+|32
+|READY.
+|? PEEK(-128)
+|96
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0
