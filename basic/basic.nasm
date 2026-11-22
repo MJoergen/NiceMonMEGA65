@@ -485,9 +485,13 @@ bas_dis
                 MOVE    R3, R11
                 JMP     st_dis
 
-; DIR, DIR SLOT, and DIR "IP" [, "PAT"]. A negative SLOT, which st_dir
-; would take as none, is one that no board has.
+; DIR, DIR SLOT, DIR "PATH", and DIR "IP" [, "PAT"]. A negative SLOT,
+; which st_dir would take as none, is one that no board has. A string
+; is a TFTP server's when it is an IP address, as tftp_req takes it,
+; with a port or not, or when a pattern comes after it; any other is the
+; path of a folder of the card mounted (issue #168).
 bas_dir
+                CLR     R4              ; no path
                 TST     R11
         ?Z      JMP     :+
                 TST     R1
@@ -497,8 +501,36 @@ bas_dir
                 TST     R1
         ?Z      NOT     R1, R0          ; the card mounted
         ?Z      JMP     st_dir
+                TST     R2
+        ?!Z     JMP     :+              ; a pattern
+                PUSH    R1
+                CALL    ip_like
+                POP     R4
+                TST     R2
+        ?!Z     MOVE    R1, R4
+        ?!Z     CLR     R2
+        ?!Z     JMP     :+              ; an IP address
+                NOT     R1, R0          ; a path, of the card mounted
+                JMP     st_dir
+:
                 ONE     R3
                 JMP     st_tftp
+
+; ip_like: R2 = 1 when the string at R1 is an IP address after blanks,
+; with a : or only blanks after it, as tftp_req takes it, or else 0.
+; Uses R1-R6.
+ip_like
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     ip_like
+                CALL    get_ip
+                TST     R2
+        ?Z      RET
+                CMP     @R3, 0x3A       ; :
+        ?Z      RET
+                CALL    rest_blank
+        ?!Z     CLR     R2
+                RET
 
 ; LOAD, LOAD "NAME", LOAD "NAME", SLOT, and LOAD "NAME", "IP". A name that ends with .BIN,
 ; in either case, is a .bin file. A load that wrote a word below HIMEM,
@@ -564,8 +596,8 @@ slot_mount
                 JMP     FS_MOUNT        ; which returns to the caller
 
 ; name_copy: the name R1 copied to V_BLINE, with the extension at the
-; byte address R3 after it when it has no dot, and R1 = V_BLINE. Keeps
-; R2. Uses R1, R3, R4, and R5.
+; byte address R3 after it when its last part, after its last /, has no
+; dot, and R1 = V_BLINE. Keeps R2. Uses R1, R3, R4, and R5.
 name_copy
                 MOVE    R4, V_BLINE
                 CLR     R5              ; no dot
@@ -574,6 +606,8 @@ name_copy
         ?Z      JMP     :+
                 CMP     @-1[R4], 0x2E   ; .
         ?Z      ONE     R5
+                CMP     @-1[R4], 0x2F   ; /, after which a dot is the last part's (issue #168)
+        ?Z      CLR     R5
                 JMP     :-
 :
                 MOVE    R1, V_BLINE
@@ -763,7 +797,7 @@ S_DOTBAS
 
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
-HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_TFTPB, H_DEL, H_DELL, H_DIR, H_TFTPL, H_SLOT, H_D, H_U
+HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_TFTPB, H_DEL, H_DELL, H_DIR, H_DIRP, H_TFTPL, H_SLOT, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
@@ -785,6 +819,7 @@ H_DEL           .ASCII_B 'DELETE "NAME" [, S] delete the file NAME of the SD car
 H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
                 .DAT    0
 H_DIR           .ASCII_B 'DIR [S]             list the files of the card in slot S, or of the one mounted'
+H_DIRP          .ASCII_B 'DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"'
 H_SLOT          .ASCII_B '  S, a slot, mounts its card first, for the statements after it too'
 H_TFTPL         .ASCII_B 'DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT'
 H_D             .ASCII_B 'DUMP [A] [, N]      show N words from A, in hex, or the next ones'

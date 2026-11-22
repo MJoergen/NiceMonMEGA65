@@ -307,11 +307,13 @@ READY.
 dir 0x
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 0x"1.2.3.4"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 99999999999"1.2.3.4"
@@ -324,21 +326,24 @@ dir "1.2.3.4", "*.bin"
 No IP address; IP or DHCP sets one
 READY.
 dir "bad"
-Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
+SD error 1 in slot 1, no card
 READY.
 dir "1.2.3.4",
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 1,
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 1 "x"
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 5

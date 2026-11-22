@@ -322,7 +322,13 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   it is refused, with no fallback to the root, and the ROM never creates
   it, so writing happens only in a folder that the user made, on a PC
   or with `nicemon.py sd mkdir` over the link (#140), or that
-  `nicemon.py sd format` made with the file system (#142).
+  `nicemon.py sd format` made with the file system (#142). The folders
+  inside it are reached by paths, `GAMES/CHESS.BIN` (#168), with no
+  current directory: the walk starts at the folder's cluster for each
+  name, and gives the cluster that the name's last part is looked up
+  in. A part that is empty, `.`, or `..` is an error, so a path never
+  leaves the folder, and cores that share a card stay apart. The ROM
+  makes and deletes no folder.
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is
@@ -419,12 +425,12 @@ program cannot do without it, as for state that the monitor keeps. So:
 | Entry | Arguments | Result |
 |---|---|---|
 | `fs_mount` | R1 the slot | 0, or an error |
-| `fs_open` | R1 the name, one character per word up to a 0 word; R2 the mode: 0 read, 1 write (create or truncate), 2 the directory | a handle |
+| `fs_open` | R1 the name, one character per word up to a 0 word, which may be a path of the folders inside `NICE`; R2 the mode: 0 read, 1 write (create or truncate), 2 a directory, `NICE` for an empty name or `/`, or one by its path | a handle |
 | `fs_read` | R1 the handle, R2 the buffer, R3 the number of bytes | the bytes read, one per word; 0 at the end |
 | `fs_write` | R1 the handle, R2 the buffer, R3 the number of bytes, one per word | the bytes written, fewer when the card is full |
 | `fs_close` | R1 the handle | 0, or an error |
 | `fs_readdir` | R1 the handle of a directory, R2 a buffer of 4 words | 1 with the 8.3 name, the size, and the attributes in the buffer, or 0 at the end |
-| `fs_delete` | R1 the name | 0, or an error |
+| `fs_delete` | R1 the name, or a path | 0, or an error |
 | `fs_readname` | R1 the handle of a directory, R2 a buffer of 4 words, R3 a buffer of 256 words | as `fs_readdir`, and the name in R3's buffer, one character per word up to a 0 word: the long name, or the 8.3 name as a name |
 
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
@@ -441,13 +447,14 @@ program cannot do without it, as for state that the monitor keeps. So:
 
 Issue #60, stage 4 of BASIC, is written. `SAVE "NAME"` writes the
 program as the text that `LIST` gives, each line ended by LF, with
-`.BAS` added when the name has no dot. `LOAD "NAME"` reads the file as
+`.BAS` added when the name's last part has no dot. `LOAD "NAME"` reads the file as
 lines typed in, after a `NEW` at its first line, and stops at the first
 line that cannot be stored, which it shows. `RUN "NAME"` loads and runs
 it, and `LOAD` and `RUN` take a TFTP server as a second argument, and
 since V2.4.1 `SAVE` too (#155). A name
 that ends in `.BIN` is a `.bin` file, as before. `DIR` lists the
-directory. The text format is the one that a host pastes into the
+directory, and `DIR "PATH"` a folder inside it, and every name may be a
+path, `LOAD "GAMES/CHESS.BIN"` (#168). The text format is the one that a host pastes into the
 console, so a program moves between a PC, the console, and the card in
 one format, as the plan for BASIC wants. There are no device numbers
 and no Commodore DOS. [basic/README.md](../basic/README.md#the-statements)

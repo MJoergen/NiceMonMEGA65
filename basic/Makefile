@@ -132,6 +132,8 @@ CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\
 # server without a comma, or with no closing quote, and the arguments
 # that are too few or too many for each statement, and four that fail
 # with no card or no IP address, whose tokens test/trap.bas dumps.
+# dir "bad" is no TFTP server but the path of a folder, which fails with
+# no card (issue #168).
 # ip "1.2.3.4, with no closing quote, writes the IP address, which the
 # dump of 0xFFFFFFB0 shows. Last, 9 ver is no statement but line 9 of a
 # program, which list shows.

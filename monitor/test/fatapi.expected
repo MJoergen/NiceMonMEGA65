@@ -17,10 +17,10 @@ The calls:
 segment 0
   open 0 "" 2 -> 0
   close 0 -> 0
-  open 0 "x" 2 -> -20
-  open 0 "/x" 2 -> -20
+  open 0 "x" 2 -> -21
+  open 0 "/x" 2 -> -21
   open 0 "//" 2 -> -20
-  open 0 "NICE" 2 -> -20
+  open 0 "NICE" 2 -> -21
   open 0 "HELLO.BIN" -1 -> -25
   open 0 "HELLO.BIN" 2147483647 -> -25
   open 0 "" 0 -> -20

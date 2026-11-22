@@ -550,6 +550,18 @@ def extra(d: str, tmp: str) -> None:
     v.put(v.entry(b"HUGE    BIN")[0] + 28, "<I", 0xFFFFFFFF)
 
 
+    # fatpath: folders inside NICE, two levels deep, with long names, a
+    # file named as a folder would be, and V2.0, a folder with a dot
+    # (issue #168)
+    path = copy(super_img, at("path.img"))
+    for sub in ("GAMES", "GAMES/OLD", "My Games", "V2.0"):
+        run("mmd", "-i", f"{path}@@0", f"::NICE/{sub}")
+    mcopy(path, 0, b"00009000 0000C0DE\n", "NICE/GAMES/CHESS.BIN", tmp)
+    mcopy(path, 0, b"00009001 0000BEEF\n", "NICE/GAMES/OLD/PONG.BIN", tmp)
+    mcopy(path, 0, text("LONG", 2), "NICE/My Games/a long name.txt", tmp)
+    mcopy(path, 0, text("FILE", 1), "NICE/FILE.TXT", tmp)
+
+
 def blank_fat(img: str, mb: int, *opts: str) -> str:
     """FAT12 or FAT16 on the whole card, with the folder NICE"""
     blank(img, mb * MB)

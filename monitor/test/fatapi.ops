@@ -5,10 +5,10 @@
 seg                             ; 0x8000: names and modes
 open 0, "", 2                   ; 0: the folder
 close 0                         ; 0
-open 0, "x", 2                  ; -20: mode 2 takes "" or /, nothing else
-open 0, "/x", 2                 ; -20
-open 0, "//", 2                 ; -20
-open 0, "NICE", 2               ; -20
+open 0, "x", 2                  ; -21: mode 2 takes "", /, or a folder's path (issue #168)
+open 0, "/x", 2                 ; -21
+open 0, "//", 2                 ; -20: an empty part
+open 0, "NICE", 2               ; -21: no NICE inside NICE
 open 0, "HELLO.BIN", -1         ; -25: the mode is signed
 open 0, "HELLO.BIN", 0x7FFFFFFF ; -25
 open 0, "", 0                   ; -20

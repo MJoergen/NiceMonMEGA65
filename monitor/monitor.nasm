@@ -223,6 +223,7 @@ V_BYLONG        .EQU    0xFFFFF995      ; not 0 when find matches long names too
 V_N             .EQU    0xFFFFF996      ; an 8.3 name, 3 words, as an entry's first, 0 for none,
 V_LOWER         .EQU    0xFFFFF999      ; the lower-case flags of its byte 12,
 V_NL            .EQU    0xFFFFF99A      ; and the long-name entries of a new one
+V_FOLD          .EQU    0xFFFFF99B      ; the first cluster of the folder of a name's last part, which path walks to from V_DIR
 FATBUF          .EQU    0xFFFFF9B0      ; a sector of the FAT, 128 words
 SEC             .EQU    0xFFFFFA30      ; a sector for FSInfo, an entry, or zeros, and TAB's and LOAD's line, 256 words
 LNAME           .EQU    0xFFFFFB30      ; the name of the entry found last, a character a word, up to a 0, 256 words

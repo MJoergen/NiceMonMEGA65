@@ -1,0 +1,78 @@
+; The program of the suite fatpath of test/fat_runs.py: paths to the
+; folders inside NICE (issue #168), on path.img, which has GAMES,
+; GAMES/OLD, My Games, V2.0, and FILE.TXT. The format is
+; test/fat_tool.py's, OPS.
+
+seg                             ; 0x8000: reads through a path
+open 0, "GAMES/CHESS.BIN", 0    ; 0
+read 0, 20                      ; 18, its line
+close 0
+open 0, "games/old/pong.bin", 0 ; 0: two levels, in either case
+read 0, 20
+close 0
+open 0, "/GAMES/OLD/PONG.BIN", 0  ; 0: a leading / is NICE
+close 0
+open 0, "My Games/A LONG NAME.TXT", 0  ; 0: long names in a path
+close 0
+open 0, "MYGAME~1/ALONGN~1.TXT", 0     ; 0: and their 8.3 names
+close 0
+open 0, "GAMES", 2              ; 0: a folder by its path
+readname 0                      ; OLD
+readname 0                      ; CHESS.BIN
+readname 0                      ; 0
+close 0
+open 0, "/games/old/", 2        ; 0: a trailing / in mode 2
+readname 0                      ; PONG.BIN
+readname 0                      ; 0
+close 0
+open 0, "/", 2                  ; 0: NICE
+close 0
+
+seg                             ; 0x8400: the errors
+open 0, "GAMES/../HELLO.BIN", 0 ; -20: never above NICE
+open 0, "../HELLO.BIN", 0       ; -20
+open 0, "./HELLO.BIN", 0        ; -20
+open 0, "GAMES/.", 0            ; -20
+open 0, "GAMES//CHESS.BIN", 0   ; -20: an empty part
+open 0, "//", 2                 ; -20
+open 0, "GAMES/", 0             ; -20: a trailing / in mode 0,
+open 0, "GAMES/", 1             ; -20: and in mode 1
+open 0, "GAMES/..", 2           ; -20
+open 0, "NOPE/X.BIN", 0         ; -21: a folder that is not there
+open 0, "GAMES/NOPE/X.BIN", 1   ; -21
+open 0, "NOPE", 2               ; -21
+open 0, "FILE.TXT/X", 0         ; -22: a file used as a folder
+open 0, "FILE.TXT/X", 1         ; -22
+open 0, "FILE.TXT", 2           ; -22
+open 0, "GAMES/CHESS.BIN/", 2   ; -22
+open 0, "GAMES/OLD", 0          ; -22: a folder used as a file
+delete "GAMES/OLD"              ; -22
+delete "NOPE/X.BIN"             ; -21
+open 0, "a/" * 127 + "b", 0     ; -21: 255 characters are a path,
+open 0, "a/" * 128, 0           ; -20: 256 are not
+
+seg                             ; 0x8800: writes through a path
+open 0, "GAMES/OLD/NEW.TXT", 1  ; 0
+writew 0, 0x4E, 0x45, 0x57, 0x0A  ; 4
+close 0
+open 0, "games/old/new.txt", 0  ; 0
+read 0, 10                      ; 4, "NEW\n"
+close 0
+open 0, "GAMES/HELLO.BIN", 1    ; 0: beside NICE's HELLO.BIN, which stays
+writew 0, 0x58                  ; 1
+close 0
+open 0, "HELLO.BIN", 0          ; 0: NICE's
+read 0, 3                       ; 3, "000"
+close 0
+open 0, "My Games/a much longer name of a file.txt", 1  ; 0: long-name entries
+write 0, 0, 40                  ; 40
+close 0
+open 1, "GAMES/CHESS.BIN", 0    ; 1
+delete "games/chess.bin"        ; -31: open
+close 1
+delete "GAMES/OLD/PONG.BIN"     ; 0
+open 0, "GAMES/OLD/PONG.BIN", 0 ; -21
+open 0, "GAMES/OLD", 2          ; 0
+readname 0                      ; NEW.TXT
+readname 0                      ; 0
+close 0

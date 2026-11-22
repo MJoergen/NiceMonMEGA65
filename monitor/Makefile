@@ -155,7 +155,7 @@ $(BUILD)/fsw.bin: test/fsw.nasm mon.nasm $(TOOLS) | $(BUILD)
 # is the images of the suites of test/fat_runs.py, made from the first.
 FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img nonice.img \
                                     nicefile.img full.img lfn.img \
-               lines.img tab1.img chains.img lfnx.img rows.img bigdir.img \
+               lines.img tab1.img chains.img lfnx.img rows.img bigdir.img path.img \
                spc8.img spc64.img fat1.img i_total.img i_last.img i_wrap.img i_ff.img i_nosig.img \
                i_bpb0.img i_bpbff.img i_top.img \
                $(addprefix m_,$(addsuffix .img,fat12 fat16 fat12p nopart zero p83 pb nosig \
@@ -342,7 +342,7 @@ MAX_STEPS = 10000000
 # test/fat_image.py, compared with test/SUITE.expected: make test
 # FAT_SUITES=fatapi runs one
 FAT_SUITES = fatstate fatload fattab fatdrop fatchain fatlfn fatmount fatgeo fatinfo \
-             fatfull fatrows fatapi
+             fatfull fatrows fatapi fatpath
 # The first sector of fat32.img's FAT32 partition (test/fat_image.py), and
 # its byte offset, for mtools
 FAT32_START = 34816

@@ -109,6 +109,7 @@ READY.
 dir 1 2
 Syntax error
 DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 READY.
 dir 0x123456789
@@ -127,7 +128,6 @@ halt
 Halted
 ffffe810: 00000322 00008000 00008321 00000000 00000000
 Screen:
-|LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 |LOAD "NAME", "IP"   load it from the TFTP server at IP
 |READY.
 |dirx
@@ -139,6 +139,7 @@ Screen:
 |dir 1 2
 |Syntax error
 |DIR [S]             list the files of the card in slot S, or of the one mounted
+|DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
 |DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
 |READY.
 |dir 0x123456789

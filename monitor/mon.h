@@ -90,9 +90,11 @@ int mon_fs_mount(unsigned slot);
 
 // A file of the folder NICE of the card's root directory opened, with
 // mode 0 to read, with mode 1 to write, made or truncated (table 1.2), or
-// with mode 2 the folder itself, whose name is empty or /. The name is
-// its long name, up to 255 characters, or its 8.3 name, in either case
-// (table 1.4). Two may be open at once. A handle, 0 or 1, or an error.
+// with mode 2 a folder: NICE itself, whose name is empty or /, or one
+// inside it by its path. The name is its long name, up to 255
+// characters, or its 8.3 name, in either case (table 1.4), and may be a
+// path, GAMES/CHESS.BIN, of the folders inside NICE. Two may be open at
+// once. A handle, 0 or 1, or an error.
 int mon_fs_open(unsigned name, int mode);
 
 // Up to n bytes of a file read, one per word from buf. The number read, 0
@@ -113,8 +115,8 @@ int mon_fs_close(int handle);
 // error. Table 1.2.
 int mon_fs_write(int handle, unsigned buf, unsigned n);
 
-// A file of the folder NICE deleted, with its long-name entries. 0, or an
-// error.
+// A file of the folder NICE, or of a folder inside it by its path,
+// deleted, with its long-name entries. 0, or an error.
 // Table 1.2.
 int mon_fs_delete(unsigned name);
 

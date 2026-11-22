@@ -514,24 +514,28 @@ load_part
                 POP     R1
                 RET
 
-; DIR [SLOT]: R1 the slot, or one from 2^31 without it. The folder NICE
-; of the card in SLOT, mounted first with fs_mount, entry 9, or of the
-; card mounted, opened with fs_open, entry 10, and read with
-; fs_readname, entry 20: a row with its name and the slot, then a row for each file,
+; DIR [SLOT] and DIR "PATH": R1 the slot, or one from 2^31 without it,
+; and R4 the path, or 0. The folder NICE of the card in SLOT, mounted
+; first with fs_mount, entry 9, or of the card mounted, or its folder
+; PATH (issue #168), opened with fs_open, entry 10, in mode 2, and read
+; with fs_readname, entry 20: a row with its name, NICE/ and the path
+; without a leading /, and the slot, then a row for each file,
 ; its name, the long name or the 8.3 name, in DIR_NAME columns and its
 ; size in decimal in 12, and for each directory, its name and <DIR>,
 ; then the numbers of both. A name of DIR_NAME characters or more has a
 ; row of its own. R8 is the folder's handle, and R9 and R10 count the
 ; files and the directories.
 st_dir
+                PUSH    R4              ; the path
                 TST     R1
         ?N      JMP     :+
                 CALL    FS_MOUNT
                 TST     R1
         ?N      JMP     io_fail
 :
-                MOVE    R1, V_ENT
-                CLR     @R1             ; the folder's name, empty
+                MOVE[M] R1, @SP
+        ?Z      MOVE    R1, V_ENT
+        ?Z      CLR     @R1             ; the folder's name, empty
                 MOVE    R2, 2
                 CALL    FS_OPEN
                 TST     R1
@@ -541,6 +545,19 @@ st_dir
                 CLR     R10
                 MOVE    R1, S_DIROF
                 CALL    puts_b
+                POP     R7
+                TST     R7
+        ?Z      JMP     :++
+                CMP     @R7, 0x2F
+        ?Z      ADD     R7, R7, 1       ; without a leading /
+                TST     @R7
+        ?Z      JMP     :++
+                MOVE    R1, 0x2F
+:
+                CALL    MON_PUTC
+                MOVE[M] R1, @R7++
+        ?!Z     JMP     :-
+:
                 MOVE    R1, S_INSLOT
                 CALL    puts_b
                 MOVE    R1, @SD_SELECT  ; the mounted slot, as a mount is
@@ -1095,7 +1112,7 @@ E_FS20          .ASCII_B 'not a valid name'
                 .DAT    0
 E_FS21          .ASCII_B 'no such file'
                 .DAT    0
-E_FS22          .ASCII_B 'a directory'
+E_FS22          .ASCII_B 'a directory, or a file used as one'
 E_FS23          .ASCII_B 'too many open files'
 E_FS24          .ASCII_B 'not an open file'
                 .DAT    0

@@ -2,9 +2,9 @@
 ; header): the file entries fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, fs_delete, and fs_readname of the dispatch table,
 ; and fat_complete for the TAB key of con_getline (issues #58, #59, #91,
-; #102, #137, #149, and #152, doc/SDCARD.md, "The file system"). BASIC's
-; DIR, LOAD, and SAVE are BASIC's, in ../basic/basic_cmd.nasm, on the
-; entries.
+; #102, #137, #149, #152, and #168, doc/SDCARD.md, "The file system").
+; BASIC's DIR, LOAD, and SAVE are BASIC's, in ../basic/basic_cmd.nasm, on
+; the entries.
 ;
 ; Names are long names (VFAT) of up to 255 characters, matched in either
 ; case, or 8.3 names. A long name is read from the long-name entries
@@ -30,7 +30,11 @@
 ; The files are those of the folder FOLDER of the root directory, NICE
 ; unless the build sets another (make FOLDER=NAME), as a card may be
 ; shared by several cores. A mount looks the folder up, and fails without
-; it, so nothing reaches the root's files or another core's.
+; it, so nothing reaches the root's files or another core's. A name may
+; be a path of the folders inside it, GAMES/CHESS.BIN (issue #168), which
+; path walks down for each call from FOLDER's cluster, V_DIR, to that of
+; the name's last part, V_FOLD, where lookup, newname, make, and sdir
+; work; a part that is empty, . or .. fails, so a path never leaves it.
 ;
 ; The state is in the monitor's RAM (monitor.nasm, from FAT_RAM): the
 ; volume's fields, a cache of one sector of the FAT, FATBUF, the two file
@@ -500,6 +504,7 @@ mount_fat
                 CALL    clok
         ?!C     JMP     fail26
                 MOVE    @V_DIR, R1
+                MOVE    @V_FOLD, R1
                 ONE     @V_MOUNTED
                 CLR     R1
                 RET
@@ -600,11 +605,11 @@ ep
                 ADD     R10, R10, F_BUF
                 RET
 
-; sdir: the folder FOLDER at R12 from its start. startd: the folder from
-; the cluster R1. start: the file R12 from the cluster R1, of the kind R2
-; and the size R3, open. Use R1-R4.
+; sdir: the folder V_FOLD, which path gave, at R12 from its start.
+; startd: the folder from the cluster R1. start: the file R12 from the
+; cluster R1, of the kind R2 and the size R3, open. Use R1-R4.
 sdir
-                MOVE    R1, @V_DIR
+                MOVE    R1, @V_FOLD
 startd
                 MOVE    R2, K_DIR
                 CLR     R3
@@ -714,26 +719,96 @@ SET_U
 LFNAT
                 .DAT    0x07050301, 0x12100E09, 0x1C181614, 0x0000001E
 
-; getname: the name at the word address R1, one character per word up to
-; a 0 word, in WANT, with a 0 after it, and V_WLEN its length. Fails 20
-; when it is empty or longer than 255, or has a character outside bits
-; 7..0. Uses R1-R4.
-getname
+; path: the name at the word address R1, one character per word up to
+; a 0 word, walked from the folder FOLDER (issue #168): it is split at
+; each /, and each part before a / is a directory of the folder before
+; it, found as lookup finds a file, by its long name or its 8.3 name, in
+; either case. V_FOLD is the first cluster of the folder of the last
+; part, which is in WANT, as getpart has it. A leading / is FOLDER
+; itself. With R2 not 0, for mode 2 of fs_open, the last part is a
+; directory too, and V_FOLD is its cluster; an empty last part, as in
+; "", "/", or "GAMES/", is the folder before it. Fails 20 for a name
+; longer than 255, a character outside bits 7..0, a part that is empty,
+; . or .., so that a path never leaves FOLDER, or an empty name of a
+; file; 21 for a directory that is not there; 22 for a file where a
+; directory is due; and 26 for a directory's cluster outside the volume.
+; R5 is R2. Uses R1-R12.
+path
+                MOVE    R3, R1
+:               TST     @R3++
+        ?!Z     JMP     :-
+                SUB     R3, R3, R1      ; the length, and 1
+                CMP     R3, 257
+        ?!C     JMP     fail20
+                MOVE    R5, R2
+                MOVE    @V_FOLD, @V_DIR
+                CMP     @R1, 0x2F
+        ?Z      ADD     R1, R1, 1       ; a leading /
+path_part
+                CALL    getpart
+        ?Z      JMP     path_last
+                TST     @V_WLEN
+        ?Z      JMP     fail20          ; an empty part, as in //
+                ADD     R1, R1, 1       ; over the /
+                CALL    path_dir
+                JMP     path_part
+path_last
+                TST     @V_WLEN
+        ?Z      JMP     :+
+                TST     R5
+        ?Z      RET                     ; a file's name
+; path_dir: V_FOLD the cluster of the directory in WANT of the folder
+; V_FOLD, and R1 and R5 kept; for mode 2, the last part's, which returns
+; from path
+path_dir
+                PUSH    R1
+                PUSH    R5
+                CALL    lookup
+        ?Z      MOVE    R1, -21
+        ?Z      JMP     fat_fail
+                SHR     R1, @2[R10], 24
+                AND[M]  R0, R1, 0x10
+        ?Z      MOVE    R1, -22
+        ?Z      JMP     fat_fail
+                CALL    cluster
+                CALL    clok
+        ?!C     JMP     fail26
+                MOVE    @V_FOLD, R1
+                POP     R5
+                POP     R1
+                RET
+:               TST     R5
+        ?Z      JMP     fail20          ; no name of a file
+                RET                     ; the folder before, for mode 2
+
+; getpart: the part of a name at the word address R1 up to a / or a 0
+; word in WANT, with a 0 after it, and V_WLEN its length, which path
+; keeps within 255; R1 at the / or the 0: Z clear for a /, or Z for the
+; 0. Fails 20 for a character outside bits 7..0, and for a part . or ..
+; Uses R1-R4.
+getpart
                 MOVE    R2, WANT
                 CLR     R3
-:               MOVE[M] R4, @R1++
+:               MOVE[M] R4, @R1
         ?Z      JMP     :+
-                CMP     R3, 255
-        ?Z      JMP     fail20
+                CMP     R4, 0x2F
+        ?Z      JMP     :+
                 CMP     R4, 0x100
         ?!C     JMP     fail20
                 MOVE    @R2++, R4
                 MOVE    R3++, R3
+                ADD     R1, R1, 1
                 JMP     :-
 :               CLR     @R2
                 MOVE    @V_WLEN, R3
-                TST     R3
-        ?Z      JMP     fail20
+                CMP     @WANT, 0x2E
+        ?!Z     JMP     :+
+                CMP     R3, 1
+        ?Z      JMP     fail20          ; .
+                CMP     R3, 2
+        ?Z      CMP     @WANT+1, 0x2E
+        ?Z      JMP     fail20          ; ..
+:               TST     @R1
                 RET
 
 ; blankn: V_N 11 blanks, as an entry's words 0 to 2 have an 8.3 name.
@@ -995,13 +1070,14 @@ find_yes
                 NOT[M]  R0, R0          ; Z clear
                 RET
 
-; lookup: the entry of the name in WANT, as find gives it: by its 8.3
-; name, when WANT is one, and by its long name. Uses R1-R12.
+; lookup: the entry of the name in WANT in the folder V_FOLD, as find
+; gives it: by its 8.3 name, when WANT is one, and by its long name.
+; Uses R1-R12.
 lookup
                 CALL    name83
         ?C      CLR     @V_N
                 ONE     @V_BYLONG
-                MOVE    R1, @V_DIR
+                MOVE    R1, @V_FOLD
                 JMP     find
 
 ; busy: fails 31 when a file is open whose entry is the entry R10 of
@@ -1045,12 +1121,10 @@ open_b
                 PUSH    R1              ; the handle
                 CMP     R8, 2
         ?!Z     JMP     :+
-; The folder, the only directory: an empty name, or /
-                MOVE[M] R1, @R9
-        ?Z      JMP     open_dir
-                CMP     R1, 0x2F
-        ?Z      TST     @1[R9]
-        ?!Z     JMP     fail20
+; A folder: FOLDER for an empty name, or /, or a directory by its path
+                MOVE    R1, R9
+                MOVE    R2, R8
+                CALL    path
 open_dir
                 MOVE[M] R1, @SP
         ?N      JMP     fat_fail
@@ -1059,7 +1133,10 @@ open_dir
                 MOVE    R1, @SP
                 JMP     fat_fail        ; the handle
 :               MOVE    R1, R9
-                CALL    getname
+                CLR     R2
+                PUSH    R8
+                CALL    path
+                POP     R8
                 TST     R8
         ?!Z     JMP     open_write
                 CALL    lookup
@@ -1439,7 +1516,7 @@ nn_tail
 :               PUSH    R7
                 PUSH    R8
                 CLR     @V_BYLONG
-                MOVE    R1, @V_DIR
+                MOVE    R1, @V_FOLD
                 CALL    find
                 POP     R8
                 POP     R7
@@ -1818,7 +1895,8 @@ delete_b
                 PUSH    R1
                 CALL    mounted
                 POP     R1
-                CALL    getname
+                CLR     R2
+                CALL    path
                 CALL    lookup
         ?Z      MOVE    R1, -21
         ?Z      JMP     fat_fail
@@ -1849,19 +1927,26 @@ delete_e
 ; fat_complete: R1 the line, R2 the cursor, R3 the end (its header
 ; above). The word before the cursor, from the last blank outside quotes,
 ; and after an opening quote, is the start of a name. Unless it is the
-; first word, the statement, the files of the folder whose names start
-; with it, in either case, are its matches: directories, and names with a
-; ? for a character outside ASCII, are left out. With one match, the rest
-; of its name goes onto the line, then the closing quote, and a blank;
-; with several, the rest of the start that they share. The start typed
-; takes the case of the first match, and a start that is not in quotes
-; gets an opening quote before it, as BASIC takes a name as a string, so
-; that the word is typed again after BS. The new cursor, or 0 when
-; several matches add nothing: then they are listed, a name to a row, and
-; the line is shown again. The start that the matches share is the first
-; match's characters in SEC, one a word. V_T is the cursor, then the end,
-; p, the start's address, its length, q, 1 after an opening quote, the
-; matches, the length of their shared start, and 1 for the list.
+; first word, the statement, its part up to its last / is a path of a
+; folder, as fs_open's mode 2 has it, walked with path (issue #168), and
+; the files and the directories of that folder whose names start with
+; the part after it, in either case, are its matches: names with a ? for
+; a character outside ASCII are left out. With one match, the rest of its
+; name goes onto the line, then for a file the closing quote and a
+; blank, and for a directory a /, so that TAB walks down a path; with
+; several, the rest of the start that they share. The start typed takes
+; the case of the first match, and a start that is not in quotes gets an
+; opening quote before it, as BASIC takes a name as a string, so that
+; the word is typed again after BS. The new cursor, or 0 when several
+; matches add nothing: then they are listed, a name to a row, with a /
+; after a directory's, and the line is shown again. The start that the
+; matches share is the folder's part of the start typed and the first
+; match's characters, in SEC, one a word, which holds the folder's path
+; for path before. V_T is the cursor, then the end, p, the start's
+; address, its length, q, 1 after an opening quote, the matches, the
+; length of their shared start, 1 for the list, the length of the
+; folder's part with its /, 0 for none, and 1 when the first match is a
+; directory.
 comp_b
                 MOVE    @V_T, R2
                 MOVE    @V_T+1, R3
@@ -1892,15 +1977,34 @@ comp_b
                 CMP     R3, 256
         ?!C     JMP     comp_cur
                 CALL    mounted
+; The start in SEC, and R6 the length of its folder's part, up to its
+; last / and with it; the part before that / walked to V_FOLD
+                MOVE    R1, @V_T+2
+                CLR     R5
+                CLR     R6
+:               CMP     R5, @V_T+3
+        ?Z      JMP     :+
+                MOVE    R4, @R1++
+                CMP     R4, 0x100
+        ?!C     JMP     comp_cur
+                MOVE    @SEC[R5], R4
+                MOVE    R5++, R5
+                CMP     R4, 0x2F
+        ?Z      MOVE    R6, R5
+                JMP     :-
+:               MOVE    @V_T+8, R6
+                TST     R6
+        ?!Z     SUB     R6, R6, 1
+                CLR     @SEC[R6]
+                MOVE    R1, SEC
+                ONE     R2
+                CALL    path
                 MOVE    R1, @V_T+2
                 MOVE    R2, WANT
                 MOVE    R3, @V_T+3
 :               TST     R3
         ?Z      JMP     :+
-                MOVE    R4, @R1++
-                CMP     R4, 0x100
-        ?!C     JMP     comp_cur
-                MOVE    @R2++, R4
+                MOVE    @R2++, @R1++
                 SUB     R3, R3, 1
                 JMP     :-
 :               CLR     @V_T+5
@@ -1912,35 +2016,49 @@ comp_pass
 comp_entry
                 CALL    entry
         ?Z      JMP     comp_end
-                SHR     R1, @2[R10], 24
-                AND[M]  R0, R1, 0x10
-        ?!Z     JMP     comp_entry      ; a directory
                 TST     @V_LASCII
         ?Z      JMP     comp_entry
                 MOVE    R3, LNAME
                 MOVE    R4, WANT
-                MOVE    R6, @V_T+3
+                ADD     R4, R4, @V_T+8
+                SUB     R6, @V_T+3, @V_T+8
 :               TST     R6
         ?Z      JMP     :+
                 CALL    ucmp
         ?!Z     JMP     comp_entry
                 SUB     R6, R6, 1
                 JMP     :-
-:               TST     @V_T+7
+:               SHR     R1, @2[R10], 24
+                AND     R7, R1, 0x10    ; a directory
+                TST     @V_T+7
         ?Z      JMP     :+
                 MOVE    R1, LNAME
-                CALL    puts_crlf
+                CALL    _io_puts
+                MOVE    R1, 0x2F
+                TST     R7
+        ?!Z     CALL    mon_putc
+                CALL    _io_crlf
                 JMP     comp_entry
 :               TST     @V_T+5
-        ?!Z     JMP     :++
-                MOVE    R1, LNAME       ; the first match
+        ?!Z     JMP     comp_shared
+                MOVE    @V_T+9, R7      ; the first match
+                MOVE    R1, WANT
                 MOVE    R2, SEC
+                MOVE    R3, @V_T+8
+:               TST     R3
+        ?Z      JMP     :+
+                MOVE    @R2++, @R1++
+                SUB     R3, R3, 1
+                JMP     :-
+:               MOVE    R1, LNAME
 :               MOVE[M] @R2++, @R1++
         ?!Z     JMP     :-
                 SUB     @V_T+6, R2, SEC+1
                 JMP     comp_more
-:               MOVE    R6, @V_T+3      ; k from plen, while the start is shared
-                ADD     R3, R6, LNAME
+comp_shared
+                MOVE    R6, @V_T+3      ; k from plen, while the start is shared
+                SUB     R3, R6, @V_T+8
+                ADD     R3, R3, LNAME
                 ADD     R4, R6, SEC
 :               CMP     R6, @V_T+6
         ?!C     JMP     :+
@@ -1967,7 +2085,8 @@ comp_end
                 JMP     comp_pass
 ; The new word, from the start typed, or from the cursor, R7: an opening
 ; quote when it has none, R5, the start in the case of the first match,
-; the rest, and after one match a closing quote and a blank. What is
+; the rest, and after one match a closing quote and a blank, or a / for
+; a directory. What is
 ; typed again is first rubbed out with BS.
 :               XOR     R5, @V_T+4, 1
                 MOVE    R7, @V_T
@@ -1986,8 +2105,11 @@ comp_end
                 ADD     R1, R1, @V_T+6
                 SUB     R1, R1, @V_T+3
                 CMP     @V_T+5, 1
-        ?Z      ADD     R1, R1, 2
-                CMP     @V_T+1, R1
+        ?!Z     JMP     :+
+                ADD     R1, R1, 2       ; the quote and the blank,
+                TST     @V_T+9
+        ?!Z     SUB     R1, R1, 1       ; or a directory's /
+:               CMP     @V_T+1, R1
         ?C      JMP     comp_cur        ; no room
                 MOVE    R6, R7
 :               CMP     R6, @V_T
@@ -2007,11 +2129,14 @@ comp_end
                 MOVE    R6++, R6
                 JMP     :-
 :               CMP     @V_T+5, 1
-        ?!Z     JMP     :+
+        ?!Z     JMP     :++
+                MOVE    R1, 0x2F
+                TST     @V_T+9
+        ?!Z     JMP     :+              ; a directory's /
                 MOVE    R1, 0x22
                 CALL    type
                 MOVE    R1, 0x20
-                CALL    type
+:               CALL    type
 :               MOVE    R1, R7
                 RET
 comp_cur

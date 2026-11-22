@@ -78,7 +78,7 @@ halt
 Halted
 exit 0
 Slot 0: The card as lfn.img was
-== TAB with slot 1 mounted by DIR 1: its names, a directory left out, names that end at the 76th character, or past it, which the editor's line of 254 takes (issue #118), and a list of 30 names, more than the screen's 28 rows
+== TAB with slot 1 mounted by DIR 1: its names, a directory with a / (issue #168), names that end at the 76th character, or past it, which the editor's line of 254 takes (issue #118), and a list of 30 names, more than the screen's 28 rows
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
@@ -122,8 +122,11 @@ ROW29.TXT                          0
 ROW30.TXT                          0
 Files: 33, directories: 1
 READY.
-load h^H"HELLO.BIN" ^C
-load hd^C
+load h
+HELLO.BIN
+hdir/
+load h^C
+load hd^H^H"hdir/^C
 load a^H"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^C
 load b^H"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin" ^C
 load "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^C

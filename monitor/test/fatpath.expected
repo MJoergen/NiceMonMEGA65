@@ -1,0 +1,226 @@
+== fs_open, fs_delete, and mode 2 through paths, two levels deep, in either case, with long names, and their errors
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 00000554
+READY.
+sys 0x8400
+Returned 0000056A
+READY.
+sys 0x8800
+Returned 00000798
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 0 "GAMES/CHESS.BIN" 0 -> 0
+  read 0 20 -> 18 "00009000 0000C0DE\x0a"
+  close 0 -> 0
+  open 0 "games/old/pong.bin" 0 -> 0
+  read 0 20 -> 18 "00009001 0000BEEF\x0a"
+  close 0 -> 0
+  open 0 "/GAMES/OLD/PONG.BIN" 0 -> 0
+  close 0 -> 0
+  open 0 "My Games/A LONG NAME.TXT" 0 -> 0
+  close 0 -> 0
+  open 0 "MYGAME~1/ALONGN~1.TXT" 0 -> 0
+  close 0 -> 0
+  open 0 "GAMES" 2 -> 0
+  readname 0 -> 1 "OLD        " attr 10 size 0 name "OLD"
+  readname 0 -> 1 "CHESS   BIN" attr 20 size 18 name "CHESS.BIN"
+  readname 0 -> 0
+  close 0 -> 0
+  open 0 "/games/old/" 2 -> 0
+  readname 0 -> 1 "PONG    BIN" attr 20 size 18 name "PONG.BIN"
+  readname 0 -> 0
+  close 0 -> 0
+  open 0 "/" 2 -> 0
+  close 0 -> 0
+segment 1
+  open 0 "GAMES/../HELLO.BIN" 0 -> -20
+  open 0 "../HELLO.BIN" 0 -> -20
+  open 0 "./HELLO.BIN" 0 -> -20
+  open 0 "GAMES/." 0 -> -20
+  open 0 "GAMES//CHESS.BIN" 0 -> -20
+  open 0 "//" 2 -> -20
+  open 0 "GAMES/" 0 -> -20
+  open 0 "GAMES/" 1 -> -20
+  open 0 "GAMES/.." 2 -> -20
+  open 0 "NOPE/X.BIN" 0 -> -21
+  open 0 "GAMES/NOPE/X.BIN" 1 -> -21
+  open 0 "NOPE" 2 -> -21
+  open 0 "FILE.TXT/X" 0 -> -22
+  open 0 "FILE.TXT/X" 1 -> -22
+  open 0 "FILE.TXT" 2 -> -22
+  open 0 "GAMES/CHESS.BIN/" 2 -> -22
+  open 0 "GAMES/OLD" 0 -> -22
+  delete "GAMES/OLD" -> -22
+  delete "NOPE/X.BIN" -> -21
+  open 0 "a/a/a/a/a/a/..." (255 characters) 0 -> -21
+  open 0 "a/a/a/a/a/a/..." (256 characters) 0 -> -20
+segment 2
+  open 0 "GAMES/OLD/NEW.TXT" 1 -> 0
+  writew 0 4E,45,57,A -> 4
+  close 0 -> 0
+  open 0 "games/old/new.txt" 0 -> 0
+  read 0 10 -> 4 "NEW\x0a"
+  close 0 -> 0
+  open 0 "GAMES/HELLO.BIN" 1 -> 0
+  writew 0 58 -> 1
+  close 0 -> 0
+  open 0 "HELLO.BIN" 0 -> 0
+  read 0 3 -> 3 "000"
+  close 0 -> 0
+  open 0 "My Games/a m..." (41 characters) 1 -> 0
+  write 0 0 40 -> 40
+  close 0 -> 0
+  open 1 "GAMES/CHESS.BIN" 0 -> 0
+  delete "games/chess.bin" -> -31
+  close 1 -> 0
+  delete "GAMES/OLD/PONG.BIN" -> 0
+  open 0 "GAMES/OLD/PONG.BIN" 0 -> -21
+  open 0 "GAMES/OLD" 2 -> 0
+  readname 0 -> 1 "NEW     TXT" attr 20 size 4 name "NEW.TXT"
+  readname 0 -> 0
+  close 0 -> 0
+exit 0
+Slot 0: What the card holds that path.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7D7 -> FFFFFFFF
+FSInfo next free: 00000028 -> 00000026
+FAT entries changed: 4
+  38: 0FFFFFFF -> 00000000
+  41-43: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE/GAMES C33 entry 4:
+  was zeros
+  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 42 size 1
+NICE/GAMES/OLD C34 entry 2:
+  was "PONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 38 size 18
+  now "\xe5ONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 38 size 18
+NICE/GAMES/OLD C34 entry 3:
+  was zeros
+  now "NEW     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 41 size 4
+NICE/MYGAME~1 C35 entry 5:
+  was zeros
+  now long 43 "le.txt\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 58 cluster 0000
+NICE/MYGAME~1 C35 entry 6:
+  was zeros
+  now long 02 " name of a fi" attr 0F type 00 sum 58 cluster 0000
+NICE/MYGAME~1 C35 entry 7:
+  was zeros
+  now long 01 "a much longer" attr 0F type 00 sum 58 cluster 0000
+NICE/MYGAME~1 C35 entry 8:
+  was zeros
+  now "AMUCHL~1TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 43 size 40
+NICE/GAMES/OLD/NEW.TXT: 4 bytes, "NEW\x0a"
+NICE/GAMES/OLD/NEW.TXT: its sector 0 past the size: 508 bytes, zeros
+NICE/GAMES/HELLO.BIN: 1 bytes, "X"
+NICE/GAMES/HELLO.BIN: its sector 0 past the size: 511 bytes, zeros
+NICE/MYGAME~1/AMUCHL~1.TXT: 40 bytes, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE\x0aGHIJKLMN"
+NICE/MYGAME~1/AMUCHL~1.TXT: its sector 0 past the size: 472 bytes, zeros
+fsck.fat -n:
+Free cluster summary uninitialized (should be 128981)
+IMAGE: 12 files, 41/129022 clusters
+== BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, and SAVE into V2.0, a folder with a dot, which gets .BAS
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+dir "games"
+Directory of NICE/games in slot 0
+OLD                            <DIR>
+CHESS.BIN                         18
+Files: 1, directories: 1
+READY.
+dir "/GAMES/OLD/"
+Directory of NICE/GAMES/OLD/ in slot 0
+PONG.BIN                          18
+Files: 1, directories: 0
+READY.
+dir "nope"
+File error 21, no such file
+READY.
+dir "file.txt"
+File error 22, a directory, or a file used as one
+READY.
+dir "1.2.3.4"
+No IP address; IP or DHCP sets one
+READY.
+load "games/chess.bin"
+Words loaded: 1, 00009000 to 00009000
+READY.
+dump 0x9000, 1
+00009000 0000C0DE
+READY.
+bsave "games/old/w", 0x9000, 1
+Words saved: 1, 00009000 to 00009000
+READY.
+10 print "v2"
+save "v2.0/prog"
+READY.
+new
+READY.
+load "V2.0/PROG"
+READY.
+list
+10 PRINT "v2"
+READY.
+run "v2.0/prog"
+v2
+READY.
+dir "v2.0"
+Directory of NICE/v2.0 in slot 0
+prog.BAS                          14
+Files: 1, directories: 0
+READY.
+delete "games/old/w.bin"
+Deleted games/old/w.bin
+READY.
+dir "GAMES/OLD"
+Directory of NICE/GAMES/OLD in slot 0
+PONG.BIN                          18
+Files: 1, directories: 0
+READY.
+halt
+Halted
+exit 0
+Slot 0: What the card holds that path.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7D7 -> FFFFFFFF
+FSInfo next free: 00000028 -> 00000029
+FAT entries changed: 1
+  42: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE/GAMES/OLD C34 entry 3:
+  was zeros
+  now "\xe5       BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 41 size 18
+NICE/V2      0 C36 entry 2:
+  was zeros
+  now "PROG    BAS" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 42 size 14
+C41, of no file: 18 bytes not 0, SHA-256 da3c009d33bc86e9
+NICE/V2      0/PROG.BAS: 14 bytes, "10 PRINT "v2"\x0a"
+NICE/V2      0/PROG.BAS: its sector 0 past the size: 498 bytes, zeros
+fsck.fat -n:
+Free cluster summary uninitialized (should be 128982)
+IMAGE: 11 files, 40/129022 clusters
+== TAB down a path: a folder gets a /, then its names; a long name in a path, and none in a folder that is not there
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+load "ga^H^HGAMES/
+OLD/
+CHESS.BIN
+load "GAMES/^C
+load "games/o^H^H^H^H^H^H^Hgames/OLD/^C
+load "games/old/PONG.BIN" ^C
+load my^H^H"My Games/a long name.txt" ^C
+load "my games/a long name.txt" ^C
+load "nope/x^C
+load "/gam^H^H^H^H/GAMES/^C
+dir "g^HGAMES/^C
+halt
+Halted
+exit 0
+Slot 0: The card as path.img was

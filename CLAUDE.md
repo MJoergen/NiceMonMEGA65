@@ -51,7 +51,9 @@ cold start (#153), of which all five stages are written.
 its subtasks, of which the controller, the slots, the ROM's sector
 routines, FAT32's
 reading with `DIR` and `LOAD`, and its writing with `SAVE` and `DELETE`
-(#55, #56, #57, #58, and #59) are written. `doc/` also has `CODING_STYLE.md`,
+(#55, #56, #57, #58, and #59) are written, and paths to the folders
+inside `NICE`, `LOAD "GAMES/CHESS.BIN"`, in the ROM (#168).
+`doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its

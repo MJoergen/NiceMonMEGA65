@@ -178,12 +178,12 @@ program starts with none of the values that this one left there.
 | 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. |
 | 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. The `MON_FG_` and `MON_BG_` colors of `mon.h` and `mon.nasm`, added: `MON_FG_YELLOW+MON_BG_BLUE`. |
 | 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files below). → R1 0, or an error. Table 1.1. |
-| 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for the folder itself, whose name is empty or `/`. The name is a long name or an 8.3 name, in either case (table 1.4). Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. |
+| 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for a folder: `NICE` itself, whose name is empty or `/`, or one inside it by its path. The name is a long name or an 8.3 name, in either case (table 1.4), and may be a path, `GAMES/CHESS.BIN` (Files below). Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. |
 | 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. A chain of clusters shorter than the file's size gives the bytes up to its break, and error -26 at the next call. → R1 the number read, 0 at the end, or an error. Table 1.1. |
 | 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. An entry made or deleted while the handle is open is seen when the handle has not passed it. → R1 1, 0 at the end, or an error. Table 1.1. |
 | 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. |
 | 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. |
-| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`. Deletes the file of the folder `NICE`, with the long-name entries right before its entry, also those whose checksum does not fit it, which are orphans. A damaged chain that meets a free cluster ends there, so the file is deleted, and the clusters that it had after the break stay taken, which `fsck.fat` reclaims; the truncation of `fs_open` does the same. → R1 0, or an error. Table 1.2. |
+| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`, or a path. Deletes the file of the folder `NICE`, or of the folder that the path names, with the long-name entries right before its entry, also those whose checksum does not fit it, which are orphans. A damaged chain that meets a free cluster ends there, so the file is deleted, and the clusters that it had after the break stay taken, which `fsck.fat` reclaims; the truncation of `fs_open` does the same. → R1 0, or an error. Table 1.2. |
 | 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network below). → R1 the port, or an error. Table 1.3. |
 | 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. |
 | 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. |
@@ -208,7 +208,7 @@ program starts with none of the values that this one left there.
 | 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.5`, for BASIC's banner. Table 1.7. |
 | 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, it keeps the network going, as `con_getline` does. Table 1.7. |
 | 39 | `4E` | `scr_back` | R1 a number of rows: the scrollback that many rows further back when it is above 0, forward when below 0, and the screen again when it is 0 or reaches the screen. → R1 the rows shown back now, 0 for the screen. Table 1.7. |
-| 40 | `50` | `fs_complete` | R1 the word address of a line, one character a word, R2 that of the cursor in it, and R3 that of the word after the last that the line may take. TAB on that line, as `con_getline` has it: completes the name of a file of the card's folder before the cursor, or lists the matches and shows the line again, up to the cursor. → R1 the new cursor. Table 1.7. |
+| 40 | `50` | `fs_complete` | R1 the word address of a line, one character a word, R2 that of the cursor in it, and R3 that of the word after the last that the line may take. TAB on that line, as `con_getline` has it: completes the name of a file or a directory of the card's folder before the cursor, or of the folder that its path names, a directory with a `/` after it, or lists the matches and shows the line again, up to the cursor. → R1 the new cursor. Table 1.7. |
 | 41 | `52` | `scr_links` | R1 the word of the rows of the screen that go on from the row above, bit r for row r, 1 to 27, or -1 to keep it; bit 0 and the bits from 28 are dropped. `mon_putc` sets a row's bit when it wraps to the row past the last column, clears it at a LF and when a row is written again from its column 0, and moves the bits up with the rows when the screen scrolls; `scr_cls` clears them, and so does the end of a program that moved the cursor through its registers. A wrap leaves the cursor at column 0 of the row it set the bit of, and what goes there next is more of that line, unless `scr_moveto` or the end of a program came between: BASIC's screen editor takes a line of up to four rows by them. The two forget the wrap since V2.4.1. The monitor of V2.4 does not, and its table is 1.8 too, so `mon_version` does not tell the two apart. A program that writes the screen's words itself, and leaves text for the editor, writes the word too, or 0. → R1 the old word. Table 1.8. |
 
 By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
@@ -300,6 +300,17 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   is built, `make rom FOLDER=NAME`, an 8.3 name of 1 to 8 letters,
   digits, `_`, and `-`, in either case, which error -29's text names; the
   tests need `NICE`. Deleted entries, `.`, and `..` are passed over.
+- **Paths** reach the folders inside `NICE` (issue #168): a name may be
+  `SUB/SUB/NAME`, split at each `/`, and each part before the last is a
+  directory of the folder before it, found as a file is, by its long
+  name or its 8.3 name, in either case. `LOAD "GAMES/CHESS.BIN"` reads
+  `NICE/GAMES/CHESS.BIN`. A leading `/` is `NICE` itself. A part that is
+  empty, `.`, or `..` is error -20, so a path never leaves `NICE`, and
+  the whole path is at most 255 characters. A directory that is not
+  there is error -21, and a file where a directory is due is -22. Mode
+  2 of `fs_open` opens a folder by its path, `GAMES`, `/GAMES`, or
+  `GAMES/`; modes 0 and 1 take no `/` at the end. The ROM makes no
+  folder and deletes none: one is made on a PC.
 - **Names** are long names (VFAT) of up to 255 characters, or 8.3
   names, matched in either case: `mandelbrot.bin` and `MANDEL~1.BIN`
   are the same file. A long name is read from the long-name entries
@@ -324,7 +335,7 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   and `fs_close` puts its size into its directory entry, so a file is
   finished only when it is closed: a reset in the middle of a write leaves
   at worst clusters that no file has, which `fsck.fat` frees. `fs_delete`
-  deletes a file, with its long name, and no directory. A file open to
+  deletes a file, with its long name, and no directory (error -22). A file open to
   write may not be opened again, a file open at all may not be truncated
   or deleted, and a read-only one is not changed. A file written gets the
   date and the time of the clock, which BASIC's `TIME` sets, and a new one as its
