@@ -605,7 +605,7 @@ tput_close
                 MOVE[M] R1, @V_SERR
         ?Z      CALL    tput_block
                 TST     R1
-        ?!Z     JMP     tftp_end        ; which returns to the caller
+        ?!Z     JMP     tftp_end        ; which raises the error, and does not return
                 CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 CLR     R1

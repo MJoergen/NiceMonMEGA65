@@ -196,8 +196,8 @@ after the one in the field in it, starting from the UART's.
 The overlay is a memory of its own, like the copy of the screen
 (`src/video/scr_ram.vhd`): 2^12 words of 32 bits, 4 block RAMs, each
 word a character and its colors as a screen word is, written by the
-debugger in the system clock and read in the VGA clock. Rows 0 to 24 are
-the page and 25 to 28 the strip, addressed row * 80 + column as the
+debugger in the system clock and read in the VGA clock. Rows 0 to 27 are
+the page and 28 to 31 the strip, addressed row * 80 + column as the
 screen is, without the display offset. Stage 2 of the pipeline reads it
 beside the screen's copy, and stage 3 takes the overlay's word in the
 strip's rows while the strip is on, and in the text's rows while the

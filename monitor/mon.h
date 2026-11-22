@@ -30,7 +30,7 @@ unsigned mon_out(unsigned outputs);
 // The screen blank in the current color, the cursor at the top left.
 void mon_scr_cls(void);
 
-// The cursor to a column, 0 to 79, and a row, 0 to 24.
+// The cursor to a column, 0 to 79, and a row, 0 to 27.
 void mon_scr_moveto(int col, int row);
 
 // The cursor's column, and its row. The table's scr_getxy gives both at
@@ -302,7 +302,7 @@ MON_ENTRY(fs_complete) unsigned *mon_fs_complete(unsigned *line, unsigned *curso
 // that mon_version is 0x00010008 or more.
 
 // The rows of the screen that go on from the row above, bit r for row r,
-// 1 to 24: mon_putc sets a row's bit when it wraps to it past the last
+// 1 to 27: mon_putc sets a row's bit when it wraps to it past the last
 // column, clears it at a LF and when the row is written again from its
 // column 0, and shifts the word when the screen scrolls; scr_cls clears
 // it, and so does the end of a program that moved the cursor through

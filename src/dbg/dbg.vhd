@@ -71,7 +71,7 @@
 --
 -- p_page has the window's address, the cursor, a word of the window, and
 -- the input field. The cursor keys move the cursor, and past the top or
--- bottom row the window a row; Page Up and Page Down move the window 22
+-- bottom row the window a row; Page Up and Page Down move the window 25
 -- rows. The digits shift into the field, RETURN writes it to the cursor's
 -- word, and a on an empty field makes it an address, which RETURN moves
 -- the window to. b on an empty field is the key of a breakpoint; after a
