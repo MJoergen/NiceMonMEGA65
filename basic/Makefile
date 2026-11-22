@@ -330,6 +330,13 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # parameters, LOCAL, READ, and three variables of one name, LIST and RUN,
 # CLR. Last the layout: an array of doubles and one with %, whose data
 # is a word an element.
+# kw: a keyword where a variable's name goes (issue #164), test/kw.bas
+# typed line by line: the Syntax error that names it, at the start of a
+# statement, in a direct line and in a program, and in FOR, NEXT's
+# list, READ, INPUT, DIM, GET, LET, RCURSOR, a DEF's parameters, and
+# LOCAL, with AND, PRINT, and TIME$ among them; a number, a +, and an
+# item of DATA that does not fit, whose Syntax error names none; and
+# one trapped, as error 11, whose line LIST shows as it was typed.
 # str: the strings of stage 5 (issue #116), test/str.bas typed line by
 # line, with --step-time, so that TIME$ is the same in each run. String
 # variables, +, and each function, with the edges of their arguments:
@@ -505,7 +512,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/int.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/int.bas test/kw.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -531,6 +538,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
 	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
 	@tr '\n' '\r' < test/int.bas > $(BUILD)/int.txt
+	@tr '\n' '\r' < test/kw.bas > $(BUILD)/kw.txt
 	@{ tr '\n' '\r' < test/mach.bas; printf '$(MACH_TAIL)'; } > $(BUILD)/mach.txt
 	@{ tr '\n' '\r' < test/trap.bas; printf '$(TRAP_TAIL)'; } > $(BUILD)/trap.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
@@ -542,13 +550,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap int load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap int kw load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap|int) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap|int|kw) prog=; dump=;; \
 	    str|mach) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \

@@ -936,7 +936,7 @@ lvalue_s
                 CMP     R2, K_SARR
         ?Z      JMP     arr_elem
                 CMP     R2, K_SVAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name
                 AND     R1, R1, 0xFFFFFF
                 ADD     R1, R1, @V_PEND
                 RET
@@ -1108,7 +1108,7 @@ st_read
                 CALL    data_item
                 POP     R11
                 CALL    get_item
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     rd_name
                 CMP     @R11, T_COMMA
         ?!Z     JMP     :+
                 MOVE    R11++, R11
@@ -1116,6 +1116,9 @@ st_read
 :
                 MOVE    R8, R11
                 JMP     stmt_end
+rd_name
+                MOVE    R1, @R11        ; READ ERR$, a keyword, or an item that does not fit
+                JMP     err_name
 
 ; data_item: R6 and R7 the next item of DATA, as item gives it, and the
 ; next after it at V_DPTR, or 0 at the end of its DATA, after which the

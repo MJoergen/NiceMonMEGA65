@@ -488,7 +488,7 @@ if_false
 st_for
                 SHR     R2, @R8, 24
                 CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name8
                 AND     R10, @R8++, 0xFFFFFF  ; the variable
                 CMP     @R8++, T_EQ
         ?!Z     JMP     err_syntax
@@ -561,7 +561,7 @@ st_next
                 MOVE    R8++, R8
                 SHR     R2, @R8, 24
                 CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name8
                 JMP     st_next
 :
                 MOVE    @V_FP, R9
@@ -988,7 +988,7 @@ st_input
         ?Z      JMP     in_arr
                 CMP     R2, K_VAR
         ?!Z     CMP     R2, K_SVAR
-        ?!Z     JMP     in_syntax
+        ?!Z     JMP     in_name
                 MOVE    R8++, R8
 in_vnext
                 CMP     @R8, T_COMMA
@@ -1028,6 +1028,9 @@ in_var
 in_syntax
                 CLR     @V_REDO
                 JMP     err_syntax
+in_name
+                CLR     @V_REDO
+                JMP     err_name8
 ; in_arr: an array's element, passed over to its ) at its depth
 in_arr
                 MOVE    R8++, R8
@@ -1166,7 +1169,7 @@ lvalue
                 CMP     R2, K_ARR
         ?Z      JMP     arr_elem
                 CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name
                 AND     R1, R1, 0xFFFFFF
                 ADD     R1, R1, @V_PEND
                 AND[M]  R0, @2[R1], WHOLE
@@ -1239,7 +1242,7 @@ st_dim
                 SHR     R2, R1, 24
                 CMP     R2, K_ARR
         ?!Z     CMP     R2, K_SARR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name
                 AND     R1, R1, 0xFFFFFF
                 ADD     R1, R1, @V_PEND
                 CMP     @1[R1], 0xFFFFFFFF
@@ -1328,14 +1331,28 @@ put_blank
                 JMP     putc
 
 ; put_msg: the packed text R1 on a row of its own, with " in N" after it
-; while a line runs, N its number, and CR LF. Uses R1-R6.
+; while a line runs, N its number, and CR LF. A Syntax error has
+; "; K is a keyword" after it when V_EKW has K's token (err_name). Uses
+; R1-R6.
 put_msg
                 PUSH    R1
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf
-                POP     R1
+                MOVE    R1, @SP
                 CALL    msg_text        ; basic_trap.nasm
+                POP     R1
+                CMP     R1, S_SYNTAX
+        ?!Z     JMP     :+
+                MOVE[M] R6, @V_EKW
+        ?Z      JMP     :+
+                MOVE    R1, S_SEMI
+                CALL    puts_b
+                SHR     R5, R6, 24
+                CALL    @LIST_KINDS[R5]  ; as LIST writes it
+                MOVE    R1, S_ISKW
+                CALL    puts_b
+:
                 MOVE[M] R1, @V_CUR
         ?Z      JMP     _io_crlf
                 MOVE    R1, S_IN
@@ -1348,6 +1365,9 @@ put_msg
 S_BREAK         .ASCII_B 'Break'
 S_IN            .ASCII_B ' in '
                 .DAT    0
+S_SEMI          .ASCII_B '; '
+                .DAT    0
+S_ISKW          .ASCII_B ' is a keyword'
 S_LINE          .ASCII_B 'Undefined line'
 S_NEXT          .ASCII_B 'NEXT without FOR'
                 .DAT    0

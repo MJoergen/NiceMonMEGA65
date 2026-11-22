@@ -88,7 +88,7 @@ Syntax error
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
 and = 1
-Syntax error; HELP lists the statements
+Syntax error; AND is a keyword
 READY.
 ? D
 Undefined variable

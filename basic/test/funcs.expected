@@ -88,13 +88,13 @@ Syntax error
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
 SIN = 1
-Syntax error; HELP lists the statements
+Syntax error; SIN is a keyword
 READY.
 LOG10 = 1
-Syntax error; HELP lists the statements
+Syntax error; LOG10 is a keyword
 READY.
 PI = 3
-Syntax error; HELP lists the statements
+Syntax error; PI is a keyword
 READY.
 halt
 Halted
@@ -116,13 +116,13 @@ Screen:
 |PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 |READY.
 |SIN = 1
-|Syntax error; HELP lists the statements
+|Syntax error; SIN is a keyword
 |READY.
 |LOG10 = 1
-|Syntax error; HELP lists the statements
+|Syntax error; LOG10 is a keyword
 |READY.
 |PI = 3
-|Syntax error; HELP lists the statements
+|Syntax error; PI is a keyword
 |READY.
 |halt
 |Halted

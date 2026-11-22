@@ -134,10 +134,10 @@ Syntax error
 SLEEP S             wait S seconds, such as 0.5; TI is the microseconds counted
 READY.
 OFF = 1
-Syntax error; HELP lists the statements
+Syntax error; OFF is a keyword
 READY.
 TI = 1
-Syntax error; HELP lists the statements
+Syntax error; TI is a keyword
 READY.
 10 CURSOR ON, 1, 2, 3: CURSOR OFF: RCURSOR C, R: SLEEP 0.5: PRINT TI - 1
 20 FOREGROUND 1, 2, 3: BACKGROUND 0

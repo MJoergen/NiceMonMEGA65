@@ -1,0 +1,163 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+TI = 5
+Syntax error; TI is a keyword
+READY.
+AND = 1
+Syntax error; AND is a keyword
+READY.
+10 PRINT 1: 5 = 3
+RUN
+1
+Syntax error; HELP lists the statements in 10
+READY.
+10 TI = 5
+RUN
+Syntax error; TI is a keyword in 10
+READY.
+10 FOR TI = 1 TO 2: NEXT
+RUN
+Syntax error; TI is a keyword in 10
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+READY.
+10 FOR I = 1 TO 2: NEXT I, EL
+RUN
+Syntax error; EL is a keyword in 10
+NEXT [V]            the loop of FOR again, or its end
+READY.
+10 FOR I = 1 TO 2: NEXT I, 5
+RUN
+Syntax error in 10
+NEXT [V]            the loop of FOR again, or its end
+READY.
+10 FOR AND = 1 TO 2
+RUN
+Syntax error; AND is a keyword in 10
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+READY.
+10 FOR PRINT = 1 TO 2
+RUN
+Syntax error; PRINT is a keyword in 10
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+READY.
+10 FOR + = 1 TO 2
+RUN
+Syntax error in 10
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+READY.
+10 READ EL: DATA 1
+RUN
+Syntax error; EL is a keyword in 10
+READ V, W$, ...     V and W$ the next items of DATA
+READY.
+10 READ ERR$: DATA "X"
+RUN
+Syntax error; ERR$ is a keyword in 10
+READ V, W$, ...     V and W$ the next items of DATA
+READY.
+10 READ A: DATA "X"
+RUN
+Syntax error in 10
+READ V, W$, ...     V and W$ the next items of DATA
+READY.
+10 INPUT DS
+RUN
+Syntax error; DS is a keyword in 10
+INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+READY.
+10 INPUT TIME$
+RUN
+Syntax error; TIME$ is a keyword in 10
+INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+READY.
+10 DIM ER(3)
+RUN
+Syntax error; ER is a keyword in 10
+DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1
+READY.
+10 GET OFF
+RUN
+Syntax error; OFF is a keyword in 10
+GET V               V the code of the next key typed, 0 when none; V$ the key
+READY.
+10 LET PI = 3
+RUN
+Syntax error; PI is a keyword in 10
+LET V = X           set the variable V, or V$ to a string; LET may be left out
+READY.
+10 RCURSOR A, CURSOR
+RUN
+Syntax error; CURSOR is a keyword in 10
+RCURSOR C, R        C and R the column and the row of the cursor
+READY.
+NEW
+READY.
+10 DEF FNA(TI) = 1
+20 PRINT FNA(2)
+RUN
+Syntax error; TI is a keyword in 20
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+NEW
+READY.
+10 PROCQ(1): END
+20 DEF PROCQ(EL)
+30 ENDPROC
+RUN
+Syntax error; EL is a keyword in 10
+READY.
+NEW
+READY.
+10 DEF PROCP: LOCAL SLEEP: ENDPROC
+20 PROCP
+RUN
+Syntax error; SLEEP is a keyword in 10
+LOCAL X, Y$         X 0 and Y$ empty in a PROC or FN, until it ends
+READY.
+NEW
+READY.
+10 TRAP 100
+20 TI = 5: PRINT "NOT HERE"
+30 PRINT "END": END
+100 PRINT ER, EL, ERR$(ER): RESUME NEXT
+RUN
+11      20      Syntax error
+NOT HERE
+END
+READY.
+LIST 20
+20 TI = 5: PRINT "NOT HERE"
+READY.
+HALT
+Halted
+Screen:
+|RUN
+|Syntax error; EL is a keyword in 10
+|READY.
+|NEW
+|READY.
+|10 DEF PROCP: LOCAL SLEEP: ENDPROC
+|20 PROCP
+|RUN
+|Syntax error; SLEEP is a keyword in 10
+|LOCAL X, Y$         X 0 and Y$ empty in a PROC or FN, until it ends
+|READY.
+|NEW
+|READY.
+|10 TRAP 100
+|20 TI = 5: PRINT "NOT HERE"
+|30 PRINT "END": END
+|100 PRINT ER, EL, ERR$(ER): RESUME NEXT
+|RUN
+|11      20      Syntax error
+|NOT HERE
+|END
+|READY.
+|LIST 20
+|20 TI = 5: PRINT "NOT HERE"
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0

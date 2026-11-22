@@ -69,7 +69,10 @@ toward zero, so `SYS 0xFFFF0000` and `SYS -65536` are the same, and
 
 A line that is no statement prints `Syntax error` and the lines of
 `HELP` of its statement, or `Syntax error; HELP lists the statements`
-when it starts with no keyword. The other errors print their message,
+when it starts with no keyword. A keyword where a variable's name
+goes is named, as in `Syntax error; TI is a keyword in 10` for `10 TI =
+5` or `10 FOR TI = 1 TO 2`: a name that is a keyword cannot be a
+variable. The other errors print their message,
 such as `Division by zero`, and the statements after it do not run.
 The line is read from the left, and the first error decides:
 `SAVE "X", "Y", 1/0` is a `Syntax error`, as `SAVE` with an IP address
@@ -809,6 +812,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `mach` | The ROM, with `--step-time` and `test/mach.bas` typed | `TI`; `FOREGROUND` and `BACKGROUND` by number and by red, green, and blue, read back from the screen's words; `CURSOR` to a place, its limits, `ON`, `OFF`, and the styles; `RCURSOR`; their errors and `LIST`; and `SLEEP`, timed with `TI`, broken by CTRL-C and gone on with `CONT`. |
 | `trap` | The ROM alone, with `test/trap.bas` typed | `ER`, `EL`, and `ERR$` before any error; each error that a program can come to, trapped once, with its number, its line, and its message, and `RESUME NEXT` after it: after `THEN`, a block `IF`, and a `DO`, in a `FOR` loop, which goes on, in a subroutine, whose `GOSUB` to no line is dropped, in a `FN` over lines, after which its caller goes on with its parameter set again, and in a `PROC`; `RESUME` after a fix, `RESUME N`, `ERR$` of 0 to 113, an error in the handler, `TRAP` alone, `RENUMBER` and `LIST` of the lines; `DS` and `DS$` before any failure, the failures with no card and no IP address, of a server and an offset that are not, and of a slot that is not, trapped, with the dump of the program's tokens, with the 0 after each string, which `BSAVE` leaves as they were, a failure with no `TRAP`, and `LOAD` of a program's text, which a `TRAP` does not take; the `Bad subscript` of `INPUT`'s element, trapped, and a `RESUME` to no line in the handler, which stops the program; a handler that goes on with `GOTO` and a `TRAP`, and CTRL-C, which a `TRAP` does not take. |
 | `int` | The ROM alone, with `test/int.bas` typed | The names with `%`: a value cut toward zero, the largest and smallest word, and a value past them; `%` in a function's and a procedure's name; arrays with `%` of one and two dimensions, and their errors; `INPUT`, with a value past a word and a subscript outside, `GET`, `FOR`, `RCURSOR`, `READ`, `LOCAL`, and the parameters into them; `A`, `A%`, and `A$` side by side, `LIST`, and the layout of an array with `%` in memory. |
+| `kw` | The ROM alone, with `test/kw.bas` typed | A keyword where a variable's name goes, named in its `Syntax error`, at the start of a statement, in a direct line and in a program, and in `FOR`, `NEXT`'s list, `READ`, `INPUT`, `DIM`, `GET`, `LET`, `RCURSOR`, a `DEF`'s parameters, and `LOCAL`; a number, a `+`, and an item of `DATA` that does not fit, which name none; and one trapped, as error 11. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `INPUT` of an element outside, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
@@ -846,16 +850,16 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2267 | 1464 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1876 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1986 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2272 | 1464 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1908 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2023 | 52 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1769 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1071 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1604 | 11 |
-| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1201 | 45 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1607 | 11 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1204 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
 | `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 670 | 20 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
@@ -863,5 +867,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15687 | 2213 |
+| In all | | 15767 | 2219 |
 <!-- /romsize basic -->

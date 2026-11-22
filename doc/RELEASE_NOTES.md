@@ -59,6 +59,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `FOREGROUND`, `BACKGROUND`, `CURSOR`, `RCURSOR`, and `OFF`. A saved
   program with a variable of one of these names still loads, but the
   statement that sets the variable is a `Syntax error` when it runs,
+  such as `Syntax error; TI is a keyword in 10`
+  ([#164](https://github.com/MJoergen/NiceMonMEGA65/issues/164)),
   and runs once the variable is renamed. No names are reserved for
   later keywords
   ([#160](https://github.com/MJoergen/NiceMonMEGA65/issues/160)).

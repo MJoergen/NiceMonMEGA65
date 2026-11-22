@@ -117,9 +117,13 @@ settle the three open questions of #54.
   silent: a statement that sets a variable of the keyword's name, by
   `=`, `FOR`, `READ`, `INPUT`, `GET`, or `DIM`, is a `Syntax error`
   when it runs, and a keyword is a whole name, so only a variable of
-  exactly that name breaks.
-  [#164](https://github.com/MJoergen/NiceMonMEGA65/issues/164) makes
-  the error say so. The names of graphics, sprites, and sound wait for
+  exactly that name breaks. The error names the keyword, `Syntax
+  error; TI is a keyword in 10`, with the number 11 of any `Syntax
+  error`
+  ([#164](https://github.com/MJoergen/NiceMonMEGA65/issues/164)). The
+  line is stored and `LOAD` takes it, as only the run knows which
+  names of a statement are its variables, and the program can then be
+  listed and fixed. The names of graphics, sprites, and sound wait for
   their design, and the virtual screens (#163) have none yet.
 
 ## What it runs on

@@ -114,6 +114,7 @@ TOK_MAX         .EQU    160             ; which V_TLIM holds a line to: the edit
 V_TP            .EQU    0xFFFFED50      ; the next statement's token
 V_VEND          .EQU    0xFFFFED51      ; the end of the variables
 V_KW            .EQU    0xFFFFED52      ; the statement's index in KEYWORDS plus 1, or 0
+V_EKW           .EQU    0xFFFFED6B      ; a Syntax error's keyword where a name goes, or 0
 V_TBEG          .EQU    0xFFFFED53      ; for the tokenizer: the first token,
 V_TTHEN         .EQU    0xFFFFED67      ; and the word after the last THEN, or 0
 V_PNAME         .EQU    0xFFFFED54      ; a name, packed, 4 words
@@ -1271,7 +1272,33 @@ put_digits
 err_unknown
                 MOVE    R1, S_UNKNOWN
                 JMP     err
+; err_name: a Syntax error at the token R1, or at R8 from err_name8,
+; where a variable's name goes. A keyword there, a name that a later
+; version made one, is named in the error (issue #164): its token is
+; kept in V_EKW for put_msg. Its number is 11, as any Syntax error's.
+err_name8
+                MOVE    R1, @R8
+err_name
+                SHR     R2, R1, 24
+                SHR     R3, KW_KINDS, R2
+                AND[M]  R0, R3, 1
+        ?Z      JMP     err_syntax
+                CMP     R2, K_OP
+        ?!Z     JMP     :++
+                MOVE    R3, KW_TOK      ; AND, OR, XOR, DIV, and MOD, not + or <
+:
+                CMP     R3, KW_TOK_END
+        ?Z      JMP     err_syntax
+                CMP     @R3++, R1
+        ?!Z     JMP     :-
+:
+                MOVE    @V_EKW, R1
+                MOVE    R1, S_SYNTAX
+                JMP     err
+; The kinds of the tokens of keywords, a bit each, K_OP's only some
+KW_KINDS        .EQU    0x80+0x200+0x400+0x800+0x1000+0x2000+0x80000+0x100000
 err_syntax
+                CLR     @V_EKW
                 MOVE    R1, S_SYNTAX
                 JMP     err
 err_quant
@@ -1332,6 +1359,7 @@ err
         ?!Z     JMP     in_redo         ; in INPUT's line
                 CMP     R1, S_SYNTAX
         ?Z      TST     @V_KW
+        ?Z      TST     @V_EKW          ; nor one that names a keyword
         ?Z      MOVE    R1, S_UNKNOWN   ; not in a statement
                 MOVE    R7, R1
                 CALL    trap            ; ER and EL, and the TRAP's line (basic_trap.nasm)

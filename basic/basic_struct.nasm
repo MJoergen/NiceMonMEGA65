@@ -261,6 +261,11 @@ fn_eq
         ?Z      JMP     s_own
                 RET
 
+; fa_name: a parameter of a DEF that is no variable's name, at R10
+fa_name
+                MOVE    R1, @R10
+                JMP     err_name
+
 ; fn_args: a call of the function or the procedure of the token R1, with
 ; its arguments at R8: its DEF, found once, an argument for each of its
 ; parameters, a number's or a string's, evaluated, and an L frame with
@@ -293,7 +298,7 @@ fa_arg
                 CMP     R2, K_SVAR
         ?Z      JMP     :+
                 CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     fa_name
                 CALL    eval_num
                 JMP     :++
 :
@@ -514,7 +519,7 @@ st_local
                 SHR     R2, R1, 24
                 CMP     R2, K_VAR
         ?!Z     CMP     R2, K_SVAR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     err_name
                 AND     R1, R1, 0xFFFFFF
                 CMP     R1, NO_VAR
         ?Z      JMP     err_syntax

@@ -296,6 +296,8 @@ run_other
         ?Z      JMP     st_fnret
                 CMP     R1, T_TIMES
         ?Z      JMP     st_timeset
+                CMP     @1[R8], T_EQ
+        ?Z      JMP     err_name        ; TI = 5: a keyword as a variable
                 JMP     err_unknown
 run_else
                 CALL    tok_skip
