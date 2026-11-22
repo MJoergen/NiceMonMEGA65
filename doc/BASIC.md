@@ -894,11 +894,15 @@ Stage 9 (#120) is written, in `basic/basic_trap.nasm` (decided on
   into the buffer of `LOAD`, and kept packed in BASIC's last 22 words
   of RAM, 87 characters at most, as the buffers that it comes from,
   such as a TFTP server's message, are used again.
-- `LOAD` and `RUN` of a program's text set the line that runs to none
-  before they open the file, so a `TRAP` does not take their failures:
-  only the statements that keep the program running are trapped. A
-  `LOAD` of a `.bin` file that wrote a word below `HIMEM` before it
-  failed runs `NEW`, which drops the `TRAP`, so it stops the program.
+- `LOAD` and `RUN` of a program's text keep the line that runs until
+  the file's first line, so a `TRAP` takes a failure before it, of
+  the card, the file, or the server, with the program whole (decided
+  on 2026-11-22). From the first line on, the line that runs is none,
+  as the load replaces the program, so a `TRAP` does not take its
+  errors: only the statements that keep the program running are
+  trapped. A `LOAD` of a `.bin` file that wrote a word below `HIMEM`
+  before it failed runs `NEW`, which drops the `TRAP`, so it stops
+  the program.
 
 The messages of stage 2 are `Syntax error`, `Illegal quantity`,
 `Division by zero`, `Overflow`, `Formula too complex`, `Undefined

@@ -508,7 +508,11 @@ bas_dir
 ; when NAME has no dot, which is copied to V_BLINE, as the statements
 ; after it may go. Its lines are stored as lines typed in, after a NEW
 ; at the first (basic_cmd.nasm, bas_eol), so that a file that is not
-; there keeps the program; then READY. With SLOT, a number, the card in
+; there keeps the program; then READY. The line that runs stays until
+; bas_eol has the file's first line, so that a failure before it, of
+; the card, the file, or the server, is an error that a TRAP takes, with
+; the program whole; after it, the load is no running program, and its
+; errors are not trapped. With SLOT, a number, the card in
 ; it is mounted first, with slot_mount. RUN "NAME" comes to bas_lrun,
 ; with V_RUNF set, and load_fin runs what was loaded.
 bas_load
@@ -535,7 +539,6 @@ bas_lrun
 :
                 MOVE    R3, TEXT_B+4*S_DOTBAS
                 CALL    name_copy
-                CLR     @V_CUR
                 ONE     @V_LBAS         ; NEW at the first line
 load_go
                 AND[M]  R0, R11, 2

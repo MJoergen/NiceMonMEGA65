@@ -736,9 +736,11 @@ save_lines
 ; a line typed in is, after a NEW at the first. Any other line, one with
 ; a 0x7F of bin_char, and one that cannot be stored, is an error, which
 ; ends the load: err shows the line after the error, and main closes the
-; file with files_end. The lines before it stay. Keeps R7-R12, which
-; st_load and st_tftp use.
+; file with files_end. The lines before it stay. From the first line on,
+; the load is no running program (bas_load), so that no TRAP takes its
+; errors. Keeps R7-R12, which st_load and st_tftp use.
 bas_eol
+                CLR     @V_CUR          ; direct mode
                 MOVE    R5, V_BLINE
 :
                 MOVE[M] R1, @R5++
