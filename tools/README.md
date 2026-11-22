@@ -330,13 +330,13 @@ other.
 **A bare program**, as in [Running a program](#running-a-program), has
 the whole machine to itself. It starts at address 0, so `nicemon.py
 load` hides the ROM, and there is no monitor and no BASIC. The program
-has only the hardware: it prints by writing the console register, which
-sends a byte on the line, and it shows something on the screen only if it
-writes the screen's memory itself. When it ends, it halts the core. This
-is how `niceemu` runs a program of its own, so a bare program runs on the
-board and in the emulator alike. Use it for the tests of the hardware,
-for programs that compare the board with `niceemu`, and for programs that
-want no ROM in their way.
+has only the [hardware](../doc/SYSTEM.md): it prints by writing the
+console register, which sends a byte on the line, and it shows something
+on the screen only if it writes the screen's memory itself. When it
+ends, it halts the core. This is how `niceemu` runs a program of its
+own, so a bare program runs on the board and in the emulator alike. Use
+it for the tests of the hardware, for programs that compare the board
+with `niceemu`, and for programs that want no ROM in their way.
 
 **A program under the monitor** runs as a guest of the ROM. It starts at
 `0x8000`, above the ROM, and the monitor and BASIC stay where they are.
