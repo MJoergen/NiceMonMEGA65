@@ -1,14 +1,18 @@
--- Tests the PS/2 keyboard: the receiver (src/kbd_ps2.vhd), the ASCII
--- mapping (src/kbd_ps2_ascii.vhd), and the debugger's Scroll Lock detector
--- (src/kbd_ps2_toggle.vhd), with a model of the keyboard.
+-- Tests the PS/2 keyboard: the receiver and the LEDs (src/kbd_ps2.vhd), the
+-- ASCII mapping (src/kbd_ps2_ascii.vhd), and the debugger's Scroll Lock
+-- detector (src/kbd_ps2_toggle.vhd), with a model of the keyboard.
 --
 -- THEORY OF OPERATION
--- send() is the keyboard: it sends a frame on the two lines, with the clock
--- at 12.5 kHz, as a keyboard drives them. p_main sends the scan codes of
+-- ps2_kbd_model.vhd is the keyboard: send() has it send a frame on the two
+-- lines, with the clock at 12.5 kHz, as a keyboard drives them, and it takes
+-- the host's commands and answers them. p_main sends the scan codes of
 -- keys being pressed and released, and checks the bytes that kbd_ps2_ascii
 -- sends. It also sends frames with a wrong parity, start, or stop bit, and
--- half a frame, which the receiver must drop. p_rx takes the bytes, and
--- counts the detector's pulses. The
+-- half a frame, which the receiver must drop. It checks the commands that
+-- set the LEDs, ED and the LED byte, at reset, after CAPS LOCK and Num Lock,
+-- after the keyboard's AA, and with a keyboard that answers late or not at
+-- all. p_rx
+-- takes the bytes and the detector's pulses, and p_cmds the commands. The
 -- system clock is 10 MHz, so that the filter and the timeout of the receiver
 -- have their real lengths.
 
@@ -34,8 +38,28 @@ architecture simulation of tb_ps2 is
    signal clk : std_logic;
    signal rst : std_logic;
 
-   signal ps2_clk  : std_logic := '1';
-   signal ps2_data : std_logic := '1';
+   -- The lines, with their pull-ups, and the host's side of them
+   signal ps2_clk      : std_logic;
+   signal ps2_data     : std_logic;
+   signal ps2_clk_out  : std_logic;
+   signal ps2_data_out : std_logic;
+   signal leds         : std_logic_vector(2 downto 0);
+
+   -- The keyboard model's frames, and the commands it takes
+   signal kbd_send   : std_logic := '0';
+   signal kbd_byte   : std_logic_vector(7 downto 0) := X"00";
+   signal kbd_bits   : natural range 1 to 11 := 11;
+   signal kbd_bad    : std_logic_vector(1 downto 0) := "00";
+   signal kbd_sent   : std_logic;
+   signal kbd_answer : std_logic := '1';
+   signal kbd_delay  : time      := 1 ms;
+   signal kbd_cmd    : std_logic_vector(7 downto 0);
+   signal kbd_cmds   : natural;
+   signal kbd_errs   : natural;
+
+   type t_cmds is array (natural range <>) of std_logic_vector(7 downto 0);
+
+   signal cmd_log : t_cmds(1 to 64);
 
    signal code_valid : std_logic;
    signal code       : std_logic_vector(7 downto 0);
@@ -65,8 +89,11 @@ begin
       port map (
          clk_i        => clk,
          rst_i        => rst,
-         ps2_clk_i    => ps2_clk,
-         ps2_data_i   => ps2_data,
+         ps2_clk_i    => to_x01(ps2_clk),
+         ps2_data_i   => to_x01(ps2_data),
+         ps2_clk_o    => ps2_clk_out,
+         ps2_data_o   => ps2_data_out,
+         leds_i       => leds,
          data_valid_o => code_valid,
          data_o       => code
       ); -- i_kbd_ps2
@@ -79,8 +106,41 @@ begin
          code_i       => code,
          data_valid_o => valid,
          data_ready_i => ready,
-         data_o       => data
+         data_o       => data,
+         leds_o       => leds
       ); -- i_kbd_ps2_ascii
+
+   -- The lines are open drain, with pull-ups
+   ps2_clk  <= 'H';
+   ps2_data <= 'H';
+   ps2_clk  <= '0' when ps2_clk_out = '0' else 'Z';
+   ps2_data <= '0' when ps2_data_out = '0' else 'Z';
+
+   i_ps2_kbd_model : entity work.ps2_kbd_model
+      generic map (
+         G_HALF => C_HALF
+      )
+      port map (
+         ps2_clk_io  => ps2_clk,
+         ps2_data_io => ps2_data,
+         send_i      => kbd_send,
+         byte_i      => kbd_byte,
+         bits_i      => kbd_bits,
+         bad_i       => kbd_bad,
+         sent_o      => kbd_sent,
+         answer_i    => kbd_answer,
+         delay_i     => kbd_delay,
+         cmd_o       => kbd_cmd,
+         cmds_o      => kbd_cmds,
+         errs_o      => kbd_errs
+      ); -- i_ps2_kbd_model
+
+   p_cmds : process (kbd_cmds)
+   begin
+      if kbd_cmds > 0 then
+         cmd_log(kbd_cmds) <= kbd_cmd;
+      end if;
+   end process p_cmds;
 
    i_kbd_ps2_toggle : entity work.kbd_ps2_toggle
       port map (
@@ -107,32 +167,21 @@ begin
 
 
    p_main : process
-      variable pos_v : natural := 0;
+      variable pos_v     : natural := 0;
+      variable cmd_pos_v : natural := 0;
 
       -- Send the first n bits of a frame of byte b, then a pause. bad flips
       -- the start ("01"), parity ("10"), or stop bit ("11").
       procedure send(b   : std_logic_vector(7 downto 0);
                      n   : natural                      := 11;
                      bad : std_logic_vector(1 downto 0) := "00") is
-         variable frame_v : std_logic_vector(10 downto 0);
       begin
-         frame_v := '1' & not (xor b) & b & '0';
-         case bad is
-            when "01"   => frame_v(0)  := '1';
-            when "10"   => frame_v(9)  := not frame_v(9);
-            when "11"   => frame_v(10) := '0';
-            when others => null;
-         end case;
-         for i in 0 to n - 1 loop
-            ps2_data <= frame_v(i);
-            wait for C_HALF / 2;
-            ps2_clk  <= '0';
-            wait for C_HALF;
-            ps2_clk  <= '1';
-            wait for C_HALF / 2;
-         end loop;
-         ps2_data <= '1';
-         wait for 4 * C_HALF;
+         kbd_byte <= b;
+         kbd_bits <= n;
+         kbd_bad  <= bad;
+         kbd_send <= not kbd_send;
+         wait for 0 ns;
+         wait until kbd_sent = kbd_send;
       end procedure send;
 
       -- A key pressed and released, with E0 before its code if ext
@@ -160,6 +209,32 @@ begin
          send(c);
       end procedure lift;
 
+      -- The commands that the keyboard took since the last check must be
+      -- the bytes of v, which come within 1 s, and no more within 25 ms.
+      procedure expect_cmds(v : std_logic_vector) is
+         constant C_N : natural := v'length / 8;
+         variable v_v : std_logic_vector(v'length - 1 downto 0);
+      begin
+         v_v := v;
+         if kbd_cmds < cmd_pos_v + C_N then
+            wait until kbd_cmds >= cmd_pos_v + C_N for 1 sec;
+         end if;
+         wait for 25 ms;
+         assert kbd_cmds = cmd_pos_v + C_N and kbd_errs = 0
+            report "tb_ps2: expected " & integer'image(C_N) & " commands, got " &
+                   integer'image(kbd_cmds - cmd_pos_v) & ", and " &
+                   integer'image(kbd_errs) & " bad ones"
+            severity failure;
+         for i in 0 to C_N - 1 loop
+            assert cmd_log(cmd_pos_v + 1 + i) = v_v(v'length - 1 - 8 * i downto v'length - 8 - 8 * i)
+               report "tb_ps2: command " & integer'image(i) & " is " &
+                      to_hstring(cmd_log(cmd_pos_v + 1 + i)) & ", not " &
+                      to_hstring(v_v(v'length - 1 - 8 * i downto v'length - 8 - 8 * i))
+               severity failure;
+         end loop;
+         cmd_pos_v := kbd_cmds;
+      end procedure expect_cmds;
+
       -- The bytes sent since the last check must be s.
       procedure expect(s : string) is
       begin
@@ -176,6 +251,9 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
       wait for 10 us;
+
+      report "tb_ps2: the LEDs are set off at reset";
+      expect_cmds(X"ED00");
 
       report "tb_ps2: keys";
       tap(X"1C");                    -- A
@@ -205,6 +283,7 @@ begin
       tap(X"58");
       tap(X"1C");
       expect("A3a");
+      expect_cmds(X"ED04ED00");      -- the CAPS LOCK LED on and off
 
       report "tb_ps2: CTRL, left and right";
       press(X"14");
@@ -225,15 +304,66 @@ begin
       lift(X"14");
       expect(C_DEL & C_DEL);
 
-      report "tb_ps2: the cursor keys, Delete, and the keypad";
+      report "tb_ps2: the cursor keys, Delete, and the keypad with Num Lock off";
       tap(X"75", true);              -- up
       tap(X"72", true);              -- down
       tap(X"74", true);              -- right
       tap(X"6B", true);              -- left
       tap(X"71", true);              -- Delete
-      tap(X"6B");                    -- the keypad's 4
+      tap(X"6B");                    -- the keypad's 4, or the PIC24's left
       tap(X"4A", true);              -- the keypad's /
-      expect(C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[C" & C_ESC & "[D" & C_DEL & "4/");
+      tap(X"7C");                    -- the keypad's *
+      expect(C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[C" & C_ESC & "[D" & C_DEL &
+             C_ESC & "[D" & "/*");
+
+      report "tb_ps2: the Nexys4DDR's PIC24's up and down, the keypad's 8 and 2";
+      tap(X"75");
+      tap(X"72");
+      tap(X"74");                    -- the keypad's 6
+      tap(X"71");                    -- the keypad's dot
+      tap(X"69");                    -- the keypad's 1, nothing
+      tap(X"73");                    -- the keypad's 5, nothing
+      tap(X"70");                    -- the keypad's 0, nothing
+      tap(X"16");                    -- 1
+      expect(C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[C" & C_DEL & "1");
+
+      report "tb_ps2: Num Lock on gives the keypad's digits, a held one switches once";
+      press(X"77");
+      press(X"77");                  -- the repeat of a held key
+      lift(X"77");
+      tap(X"69");
+      tap(X"72");
+      tap(X"7A");
+      tap(X"6B");
+      tap(X"73");
+      tap(X"74");
+      tap(X"6C");
+      tap(X"75");
+      tap(X"7D");
+      tap(X"70");
+      tap(X"71");
+      tap(X"75", true);              -- up, with E0, stays up
+      expect("1234567890." & C_ESC & "[A");
+      expect_cmds(X"ED02");          -- the Num Lock LED on
+
+      report "tb_ps2: Pause, CTRL with Num Lock, leaves Num Lock on";
+      send(X"E1");
+      send(X"14");
+      send(X"77");
+      send(X"E1");
+      send(X"F0");
+      send(X"14");
+      send(X"F0");
+      send(X"77");
+      tap(X"6B");
+      expect("4");
+      expect_cmds("");
+
+      report "tb_ps2: Num Lock again switches it off";
+      tap(X"77");
+      tap(X"6B");
+      expect(C_ESC & "[D");
+      expect_cmds(X"ED00");
 
       report "tb_ps2: the function keys, as xterm sends them";
       tap(X"05");                    -- F1
@@ -251,10 +381,14 @@ begin
       tap(X"6C", true);              -- Home
       tap(X"7D", true);              -- Page Up
       tap(X"7A", true);              -- Page Down
+      tap(X"6C");                    -- the keypad's 7, Home with Num Lock off
+      tap(X"77");                    -- Num Lock on
       tap(X"6C");                    -- the keypad's 7
       tap(X"7D");                    -- the keypad's 9
       tap(X"7A");                    -- the keypad's 3
-      expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & "793");
+      tap(X"77");                    -- Num Lock off again
+      expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & C_ESC & "[H" & "793");
+      expect_cmds(X"ED02ED00");
 
       report "tb_ps2: a key repeats as the keyboard repeats it";
       press(X"22");                  -- X
@@ -271,6 +405,31 @@ begin
       send(X"FA");                   -- acknowledge
       tap(X"1D");                    -- W
       expect("w");
+      expect_cmds(X"ED00");          -- the LEDs again, after AA
+
+      report "tb_ps2: a keyboard that answers late gets the LED byte";
+      kbd_delay <= 50 ms;
+      tap(X"58");                    -- CAPS LOCK on
+      expect_cmds(X"ED04");
+      tap(X"58");                    -- CAPS LOCK off
+      expect_cmds(X"ED00");
+      kbd_delay <= 1 ms;
+
+      report "tb_ps2: a keyboard that does not answer gets ED and the LED " &
+             "byte once a change";
+      kbd_answer <= '0';
+      tap(X"58");                    -- CAPS LOCK on
+      tap(X"1C");                    -- A
+      expect_cmds(X"ED04");
+      tap(X"58");                    -- CAPS LOCK off
+      tap(X"1C");
+      expect_cmds(X"ED00");
+      expect("Aa");
+      wait for 250 ms;               -- the wait for the last FA ends
+      kbd_answer <= '1';
+      tap(X"77");                    -- Num Lock on
+      tap(X"77");                    -- and off, while the first change is sent
+      expect_cmds(X"ED02ED00");
 
       report "tb_ps2: bad frames are dropped";
       send(X"1C", 11, "01");         -- start bit

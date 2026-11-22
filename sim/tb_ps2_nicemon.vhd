@@ -5,7 +5,8 @@
 -- them, and that a PS/2 keyboard, which cannot wait, loses keys.
 --
 -- THEORY OF OPERATION
--- send() is the keyboard of tb_ps2. p_main loads programs over the debug
+-- ps2_kbd_model.vhd is the keyboard, as in tb_ps2, which also takes the
+-- commands that set the LEDs, and answers them. p_main loads programs over the debug
 -- link as tb_nicemon does, with fewer helpers, and p_uart_rx splits the
 -- UART output into console bytes and packets. The steps:
 --
@@ -60,8 +61,18 @@ architecture simulation of tb_ps2_nicemon is
    signal uart_rx : std_logic := '1';
    signal uart_tx : std_logic;
 
-   signal ps2_clk  : std_logic := '1';
-   signal ps2_data : std_logic := '1';
+   -- The lines, with their pull-ups, and the host's side of them
+   signal ps2_clk      : std_logic;
+   signal ps2_data     : std_logic;
+   signal ps2_clk_out  : std_logic;
+   signal ps2_data_out : std_logic;
+   signal ps2_leds     : std_logic_vector(2 downto 0);
+
+   -- The keyboard model's frames
+   signal kbd_send : std_logic := '0';
+   signal kbd_byte : std_logic_vector(7 downto 0) := X"00";
+   signal kbd_sent : std_logic;
+   signal kbd_cmds : natural;
 
    signal ps2_valid : std_logic;
    signal ps2_code  : std_logic_vector(7 downto 0);
@@ -110,11 +121,38 @@ begin
       port map (
          clk_i        => clk,
          rst_i        => rst,
-         ps2_clk_i    => ps2_clk,
-         ps2_data_i   => ps2_data,
+         ps2_clk_i    => to_x01(ps2_clk),
+         ps2_data_i   => to_x01(ps2_data),
+         ps2_clk_o    => ps2_clk_out,
+         ps2_data_o   => ps2_data_out,
+         leds_i       => ps2_leds,
          data_valid_o => ps2_valid,
          data_o       => ps2_code
       ); -- i_kbd_ps2
+
+   -- The lines are open drain, with pull-ups
+   ps2_clk  <= 'H';
+   ps2_data <= 'H';
+   ps2_clk  <= '0' when ps2_clk_out = '0' else 'Z';
+   ps2_data <= '0' when ps2_data_out = '0' else 'Z';
+
+   i_ps2_kbd_model : entity work.ps2_kbd_model
+      generic map (
+         G_HALF => C_HALF
+      )
+      port map (
+         ps2_clk_io  => ps2_clk,
+         ps2_data_io => ps2_data,
+         send_i      => kbd_send,
+         byte_i      => kbd_byte,
+         bits_i      => 11,
+         bad_i       => "00",
+         sent_o      => kbd_sent,
+         answer_i    => '1',
+         cmd_o       => open,
+         cmds_o      => kbd_cmds,
+         errs_o      => open
+      ); -- i_ps2_kbd_model
 
 
    i_kbd_ps2_ascii : entity work.kbd_ps2_ascii
@@ -125,7 +163,8 @@ begin
          code_i       => ps2_code,
          data_valid_o => kbd_valid,
          data_ready_i => kbd_ready,
-         data_o       => kbd_data
+         data_o       => kbd_data,
+         leds_o       => ps2_leds
       ); -- i_kbd_ps2_ascii
 
 
@@ -330,22 +369,13 @@ begin
          file_close(f);
       end procedure load;
 
-      -- Send a frame of byte b on the keyboard's lines, then a pause, as
-      -- tb_ps2 does.
+      -- The keyboard sends a frame of byte b, then a pause, as in tb_ps2.
       procedure ps2_send(b : std_logic_vector(7 downto 0)) is
-         variable frame_v : std_logic_vector(10 downto 0);
       begin
-         frame_v := '1' & not (xor b) & b & '0';
-         for i in 0 to 10 loop
-            ps2_data <= frame_v(i);
-            wait for C_HALF / 2;
-            ps2_clk  <= '0';
-            wait for C_HALF;
-            ps2_clk  <= '1';
-            wait for C_HALF / 2;
-         end loop;
-         ps2_data <= '1';
-         wait for 4 * C_HALF;
+         kbd_byte <= b;
+         kbd_send <= not kbd_send;
+         wait for 0 ns;
+         wait until kbd_sent = kbd_send;
       end procedure ps2_send;
 
       -- A key pressed and released, with E0 before its code if ext
@@ -420,6 +450,11 @@ begin
       assert pkt_len = pkt_pos_v and con_len = con_pos_v
          report "tb_ps2_nicemon: more output than expected: """ & con_str(con_pos_v + 1 to con_len) &
                 """ and the packets """ & pkt_str(pkt_pos_v + 1 to pkt_len) & """"
+         severity failure;
+
+      assert kbd_cmds = 2
+         report "tb_ps2_nicemon: the keyboard took " & integer'image(kbd_cmds) &
+                " commands, not ED and the LEDs of the reset"
          severity failure;
 
       report "tb_ps2_nicemon: PASS";

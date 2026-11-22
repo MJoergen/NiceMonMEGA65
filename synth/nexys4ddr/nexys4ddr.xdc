@@ -7,8 +7,8 @@ set_property -dict {PACKAGE_PIN E3   IOSTANDARD LVCMOS33} [get_ports {clk_i}];  
 set_property -dict {PACKAGE_PIN C12  IOSTANDARD LVCMOS33} [get_ports {reset_n_i}];  # CPU_RESETN
 set_property -dict {PACKAGE_PIN C4   IOSTANDARD LVCMOS33} [get_ports {uart_rxd_i}]; # UART_TXD_IN
 set_property -dict {PACKAGE_PIN D4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {uart_txd_o}]; # UART_RXD_OUT
-set_property -dict {PACKAGE_PIN F4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_clk_i}];  # PS2_CLK
-set_property -dict {PACKAGE_PIN B2   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_data_i}]; # PS2_DATA
+set_property -dict {PACKAGE_PIN F4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_clk_io}];  # PS2_CLK
+set_property -dict {PACKAGE_PIN B2   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_data_io}]; # PS2_DATA
 
 set_property -dict {PACKAGE_PIN A3   IOSTANDARD LVCMOS33} [get_ports {vga_red_o[0]}];   # VGA_R[0]
 set_property -dict {PACKAGE_PIN B4   IOSTANDARD LVCMOS33} [get_ports {vga_red_o[1]}];   # VGA_R[1]
@@ -204,13 +204,13 @@ set_property IOB TRUE [get_ports {i2c_scl_io i2c_sda_io}]
 ## design. Their first registers are in the I/O tiles, so that their timing
 ## does not depend on placement. The reset button is not inverted before its
 ## first register (synth/common/clk_rst.vhd), so that register is one too.
-set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i btn_i[*] sw_i[*]}]
-set_false_path -to   [get_ports {uart_txd_o led_o[*] rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*]}]
+set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_io ps2_data_io btn_i[*] sw_i[*]}]
+set_false_path -to   [get_ports {uart_txd_o ps2_clk_io ps2_data_io led_o[*] rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*]}]
 ## The first IOB group is the UART, the reset button, the LEDs, and the
 ## PS/2 keyboard, and the second is the RGB LEDs, the seven-segment display,
 ## the buttons, and the switches. Both are set the same way; the split is
 ## only in how the lines are written.
-set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o[*] ps2_clk_i ps2_data_i}]
+set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o[*] ps2_clk_io ps2_data_io}]
 set_property IOB TRUE [get_ports {rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*] btn_i[*] sw_i[*]}]
 
 ## Configuration from the board's quad SPI flash. CONFIGRATE is the

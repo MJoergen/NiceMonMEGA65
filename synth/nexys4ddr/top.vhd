@@ -4,7 +4,8 @@
 -- board's USB-UART, and LED0 is on while the core runs, or while the program
 -- sets it. A USB keyboard in the board's USB HID port types into the same
 -- input as the UART: the board's PIC24 turns it into PS/2, which
--- kbd_ps2.vhd receives and kbd_ps2_ascii.vhd turns into ASCII. Scroll Lock
+-- kbd_ps2.vhd receives and kbd_ps2_ascii.vhd turns into ASCII, and the
+-- keyboard's Num Lock and CAPS LOCK LEDs show their state. Scroll Lock
 -- toggles the on-board debugger (kbd_ps2_toggle.vhd, doc/DEBUGGER.md), as
 -- the board has no MEGA key. The board's 16 LEDs, two RGB LEDs,
 -- seven-segment display, five buttons, and 16 switches are registers of
@@ -76,9 +77,9 @@ entity top is
       btn_i        : in  std_logic_vector(4 downto 0);
       sw_i         : in  std_logic_vector(15 downto 0);
 
-      -- The keyboard, as PS/2 from the PIC24
-      ps2_clk_i    : in  std_logic;
-      ps2_data_i   : in  std_logic;
+      -- The keyboard, as PS/2 from the PIC24, open drain
+      ps2_clk_io   : inout std_logic;
+      ps2_data_io  : inout std_logic;
 
       -- VGA, 4 bits per color
       vga_red_o    : out std_logic_vector(3 downto 0);
@@ -127,6 +128,11 @@ architecture synthesis of top is
    signal brd_rgb1 : std_logic_vector(11 downto 0);
    signal brd_seg  : std_logic_vector(63 downto 0);
 
+   signal ps2_clk    : std_logic;
+   signal ps2_data   : std_logic;
+   signal ps2_clk_in : std_logic;
+   signal ps2_dat_in : std_logic;
+   signal ps2_leds   : std_logic_vector(2 downto 0);
    signal ps2_valid  : std_logic;
    signal ps2_code   : std_logic_vector(7 downto 0);
    signal kbd_valid  : std_logic;
@@ -254,8 +260,11 @@ begin
       port map (
          clk_i        => clk,
          rst_i        => rst,
-         ps2_clk_i    => ps2_clk_i,
-         ps2_data_i   => ps2_data_i,
+         ps2_clk_i    => ps2_clk_in,
+         ps2_data_i   => ps2_dat_in,
+         ps2_clk_o    => ps2_clk,
+         ps2_data_o   => ps2_data,
+         leds_i       => ps2_leds,
          data_valid_o => ps2_valid,
          data_o       => ps2_code
       ); -- i_kbd_ps2
@@ -269,7 +278,8 @@ begin
          code_i       => ps2_code,
          data_valid_o => kbd_valid,
          data_ready_i => kbd_ready,
-         data_o       => kbd_data
+         data_o       => kbd_data,
+         leds_o       => ps2_leds
       ); -- i_kbd_ps2_ascii
 
 
@@ -365,6 +375,22 @@ begin
          O  => i2c_sda_in,
          IO => i2c_sda_io
       ); -- i_sda_iobuf
+
+   i_ps2_clk_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => ps2_clk,
+         O  => ps2_clk_in,
+         IO => ps2_clk_io
+      ); -- i_ps2_clk_iobuf
+
+   i_ps2_data_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => ps2_data,
+         O  => ps2_dat_in,
+         IO => ps2_data_io
+      ); -- i_ps2_data_iobuf
 -- vsg_on
 
 

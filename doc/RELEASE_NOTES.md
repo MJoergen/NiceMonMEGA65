@@ -21,6 +21,23 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.5.1 (unreleased)
+
+**New.**
+
+- The Nexys4DDR's USB keyboard shows CAPS LOCK and Num Lock on its
+  LEDs, set by the board with no program
+  ([#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
+
+**Fixed.**
+
+- Up, Down, and Left on the Nexys4DDR's USB keyboard typed 8, 2, and
+  4. The board's PIC24, which turns the keyboard into PS/2, sends them
+  as the keypad's keys. The keypad now follows Num Lock, which is off
+  at the start, so these keys move the cursor. Num Lock gives the
+  keypad's digits
+  ([#165](https://github.com/MJoergen/NiceMonMEGA65/issues/165)).
+
 ## V2.5 (2026-11-22)
 
 **Upgrade notes.**

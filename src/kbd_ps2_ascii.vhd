@@ -18,18 +18,28 @@
 -- from @ to _ or ` to ~ gives the control code, so CTRL-C is 0x03; CTRL-@
 -- would be NUL, which means no byte, so it gives nothing. Backspace and
 -- Delete give DEL (0x7F), also with SHIFT or CTRL, as INST/DEL does on the
--- MEGA65. The keypad gives its digits and symbols, whatever Num Lock is,
--- and its Enter gives CR. F1 to F4 give ESC O P to ESC O S, and F5 to F12
+-- MEGA65. The keypad's Enter gives CR, and its /, *, -, and + their
+-- symbols. Its other keys follow Num Lock, which each press switches on or
+-- off, and which is off at reset: on, they give their digits and the dot;
+-- off, 8, 2, 4, and 6 are the cursor keys, 7 is Home, 9 Page Up, 3 Page
+-- Down, and the dot Delete, and 1, 5, and 0 give nothing, as on a PC. The
+-- Nexys4DDR's PIC24, which turns a USB keyboard into PS/2, sends Up, Down,
+-- and Left as the keypad's 8, 2, and 4, without E0, so only Num Lock off
+-- makes them the cursor keys, and the PIC24 does not keep Num Lock itself. CTRL with Num Lock is Pause, which leaves Num
+-- Lock as it is. F1 to F4 give ESC O P to ESC O S, and F5 to F12
 -- ESC [, a number, and ~, as xterm sends them, also with SHIFT. Page Up,
 -- Page Down, and Home give ESC [ 5 ~, ESC [ 6 ~, and ESC [ H, as xterm
 -- sends them. Other keys give nothing.
+--
+-- leds_o shows CAPS LOCK and Num Lock on the keyboard's LEDs, which kbd_ps2
+-- sets, so the LEDs follow the keys with no program.
 --
 -- The bytes of a key wait in out_bytes until data_ready_i takes them. A key
 -- that comes while they wait gives nothing, but the modifiers still change.
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i. It releases the modifiers, switches CAPS
--- LOCK off, and drops the bytes that wait.
+-- LOCK and Num Lock off, and drops the bytes that wait.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -48,7 +58,11 @@ entity kbd_ps2_ascii is
       -- The ASCII bytes
       data_valid_o : out std_logic;
       data_ready_i : in  std_logic;
-      data_o       : out std_logic_vector(7 downto 0)
+      data_o       : out std_logic_vector(7 downto 0);
+
+      -- The keyboard's LEDs, for kbd_ps2: Scroll Lock in bit 0, always off,
+      -- Num Lock in bit 1, and CAPS LOCK in bit 2
+      leds_o       : out std_logic_vector(2 downto 0)
    );
 end entity kbd_ps2_ascii;
 
@@ -61,6 +75,7 @@ architecture synthesis of kbd_ps2_ascii is
    constant C_RSHIFT  : std_logic_vector(7 downto 0) := X"59";
    constant C_CTRL    : std_logic_vector(7 downto 0) := X"14"; -- either, E0 for the right
    constant C_CAPS    : std_logic_vector(7 downto 0) := X"58";
+   constant C_NUMLOCK : std_logic_vector(7 downto 0) := X"77";
    constant C_F7_CODE : std_logic_vector(7 downto 0) := X"83"; -- the only key above 7F
 
    -- The cursor keys: ESC [ A, B, C, or D
@@ -174,6 +189,20 @@ architecture synthesis of kbd_ps2_ascii is
       end case;
    end function ext_byte;
 
+   -- Whether a code without E0 is one of the keypad's keys that follow Num
+   -- Lock: its digits and its dot. With Num Lock off, they give what
+   -- ext_byte gives for the same code with E0, or nothing.
+   function is_keypad(code : std_logic_vector(7 downto 0)) return boolean is
+   begin
+      case code is
+         when X"69" | X"6B" | X"6C" | X"70" | X"71" | X"72" | X"73" |
+              X"74" | X"75" | X"7A" | X"7D" =>
+            return true;
+         when others =>
+            return false;
+      end case;
+   end function is_keypad;
+
    -- The bytes that a byte of the tables stands for, the first in bits
    -- 39..32: itself, ESC [ and A to D for a cursor key, or ESC and the
    -- bytes of C_FKEYS for a function key, Page Up, Page Down, or Home
@@ -212,6 +241,8 @@ architecture synthesis of kbd_ps2_ascii is
    signal ctrl      : std_logic_vector(1 downto 0) := "00";
    signal caps      : std_logic := '0';
    signal caps_held : std_logic := '0';
+   signal num       : std_logic := '0';
+   signal num_held  : std_logic := '0';
 
    -- The bytes to send: the first is in bits 39..32
    signal out_bytes : std_logic_vector(39 downto 0) := (others => '0');
@@ -221,6 +252,7 @@ begin
 
    data_valid_o <= '1' when out_cnt /= 0 else '0';
    data_o       <= out_bytes(39 downto 32);
+   leds_o       <= caps & num & '0';
 
    p_decode : process (clk_i)
       variable byte_v : std_logic_vector(7 downto 0);
@@ -261,12 +293,20 @@ begin
                   end if;
                end if;
 
+               -- Num Lock likewise, but not in Pause, which is CTRL with it
+               if ext = '0' and code_i = C_NUMLOCK then
+                  num_held <= not brk;
+                  if brk = '0' and num_held = '0' and ctrl = "00" then
+                     num <= not num;
+                  end if;
+               end if;
+
                -- The byte of the key
                if ext = '0' and code_i = C_F7_CODE then
                   byte_v := C_F7;
                elsif code_i(7) = '1' then
                   byte_v := X"00";
-               elsif ext = '1' then
+               elsif ext = '1' or (num = '0' and is_keypad(code_i)) then
                   byte_v := ext_byte(code_i);
                elsif lshift = '1' or rshift = '1' then
                   byte_v := C_SHIFTED(to_integer(code_i));
@@ -296,6 +336,8 @@ begin
             ctrl      <= "00";
             caps      <= '0';
             caps_held <= '0';
+            num       <= '0';
+            num_held  <= '0';
             out_cnt   <= 0;
          end if;
       end if;

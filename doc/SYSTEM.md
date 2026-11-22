@@ -393,10 +393,19 @@ same input (the board's PIC24 turns it into PS/2). Its keys give the same
 bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
 cursor keys are `ESC [ A` to `ESC [ D`, F1 to F12 are as on the MEGA65,
 also with SHIFT, Home, Page Up, and Page Down give `ESC [ H`, `ESC [ 5 ~`,
-and `ESC [ 6 ~`, and CTRL with a letter is its control code. The keypad gives its digits and symbols, whatever Num Lock
-is. Scroll Lock gives nothing, and toggles the on-board debugger, as MEGA
-and HELP do on the MEGA65. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
-not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2
+and `ESC [ 6 ~`, and CTRL with a letter is its control code. The keypad's
+Enter is CR, and its `/`, `*`, `-`, and `+` are themselves. Its other
+keys follow Num Lock, which each press turns on or off, and which is off
+at the start: on, they give their digits and the dot; off, 8, 2, 4, and 6
+are the cursor keys, 7 is Home, 9 Page Up, 3 Page Down, and the dot
+Delete, and 1, 5, and 0 give nothing, as on a PC. The PIC24 sends the
+cursor keys Up, Down, and Left as the keypad's 8, 2, and 4, so they move
+the cursor only while Num Lock is off. CTRL with Num Lock is Pause, and
+leaves Num Lock as it is. Scroll Lock gives nothing, and toggles the on-board debugger, as MEGA
+and HELP do on the MEGA65. A held key repeats as the keyboard repeats it. The keyboard's CAPS LOCK
+and Num Lock LEDs show whether they are on, with no program: the board
+sends the keyboard the LEDs each time one of them changes, at reset, and
+when a keyboard is plugged in. The Scroll Lock LED stays off. A PS/2
 keyboard can't wait, so keys typed while the core's input is full are
 lost: the bytes of one key wait until there is room, and the keys typed
 meanwhile give nothing. The MEGA65's keyboard loses only the keys pressed

@@ -179,7 +179,8 @@ LED0 is on while the core runs, or while the program sets it. A USB
 keyboard in the USB HID port types into the console too: the board's
 PIC24 turns it into PS/2, which
 `src/kbd_ps2.vhd` receives and `src/kbd_ps2_ascii.vhd` turns into ASCII.
-The receiver only listens, so the keyboard's LEDs are not set. The board's
+`src/kbd_ps2.vhd` also sends the keyboard its CAPS LOCK and Num Lock
+LEDs, so the PS/2 pins are open drain, as the I2C pins are. The board's
 16 LEDs, two RGB LEDs, seven-segment display, five buttons, and 16 switches
 are registers in `0xFFFFFF90`–`96` (see
 [SYSTEM.md](../doc/SYSTEM.md#the-nexys4ddrs-devices)). `src/seg7.vhd` scans the

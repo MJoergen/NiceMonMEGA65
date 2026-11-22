@@ -257,10 +257,16 @@ The testbenches are these:
   and the debugger's MEGA+HELP detector, which pulses once while the
   keys are held.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
-  PS/2 keyboard, and checks that bad and broken frames are dropped, and
+  PS/2 keyboard, `sim/ps2_kbd_model.vhd`, and checks that bad and broken
+  frames are dropped, and
   that Home, Page Up, and Page Down differ from the keypad's keys with
-  the same codes. It also tests the debugger's Scroll Lock detector: one pulse for a held
-  key, and none in Ctrl+Break.
+  the same codes, which follow Num Lock, as the cursor keys of the
+  Nexys4DDR's PIC24 do. It checks the commands that set the keyboard's
+  LEDs, at reset, after CAPS LOCK, Num Lock, and the keyboard's AA, that
+  a keyboard that answers late still gets the LED byte, and that one that
+  does not answer gets one command a change. It also tests the
+  debugger's Scroll Lock detector: one pulse for a held key, and none in
+  Ctrl+Break.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as
   the Nexys4DDR wires it. Keys typed while the core is held in reset are
   dropped, `sim/fifo.nasm` echoes the keys typed, and `sim/switch.nasm`,

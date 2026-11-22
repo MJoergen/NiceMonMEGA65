@@ -159,8 +159,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   numbers in `synth/HISTORY.md`, and
   `.claude/rules/synth.md` when working there.
 - `sim/`: the GHDL testbenches and their `.nasm` programs, a model of
-  an SD card, `sd_card_model.vhd`, and of an I2C chip with registers,
-  `i2c_chip_model.vhd`; `sim/cosim/` is
+  an SD card, `sd_card_model.vhd`, of an I2C chip with registers,
+  `i2c_chip_model.vhd`, and of a PS/2 keyboard, `ps2_kbd_model.vhd`;
+  `sim/cosim/` is
   the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`), with a
   model of the R6's real-time clock on its I2C bus. `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
