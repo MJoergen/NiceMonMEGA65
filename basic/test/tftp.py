@@ -32,8 +32,8 @@ the next runs with it, each line waiting for the frames sent before it
 The runs list, with the input LIST, DIR "10.0.0.2", "*.bin", and port,
 with PORT, LOAD "prog.bin", "10.0.0.2:6969", have ports of their own, which a run
 with only the ARP reply gives first: list gets a listing as
-tools/tftpd.py sends it, which is shown, and port gets the first block of
-PROG from the RRQ to port 6969. The listing has a name in UTF-8, whose
+tools/lib/tftpd.py sends it, which is shown, and port gets the first block
+of PROG from the RRQ to port 6969. The listing has a name in UTF-8, whose
 bytes from 0x80 are dropped, one with a control code and a DEL, which
 are dropped too, so that no 0x7F goes to a terminal, and a line of 81
 characters, of which 77 are shown.
@@ -57,7 +57,7 @@ server's ACK 0, from the TID 3456, comes in each but wnone and wref:
   gets its ACK; then the empty DATA 3.
 - werr: BSAVE of 300 words, whose DATA 1 gets an ERROR 3, Disk full,
   which ends it, with no summary.
-- wref: SAVE, whose WRQ gets an ERROR 2, as tools/tftpd.py without
+- wref: SAVE, whose WRQ gets an ERROR 2, as tools/lib/tftpd.py without
   --write sends it.
 - wbrk: SAVE of 4 lines and a CTRL-C typed after it, which LIST takes
   at its first line, so the SAVE ends with Break, and an ERROR 0, Break,

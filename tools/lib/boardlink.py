@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """The debug link of nice_cpu/doc/DEBUG.md, with the board's transports.
 
 nice_cpu's debugger/nicelink.py is the link: the packets, the debug
@@ -26,8 +25,8 @@ import struct
 import sys
 from typing import cast
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "nice_cpu", "debugger"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "nice_cpu", "debugger"))
 import nicelink  # noqa: E402
 from nicelink import (BRK_ADDR, BRK_COUNT, BRK_EN, CLEAR,  # noqa: E402
                       CONTROL, DEFAULT_BAUD, FREE, FULL_WAIT, HALT_REASON,

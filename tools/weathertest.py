@@ -4,7 +4,7 @@
 
 It runs the monitor of the tests with examples/build/weather.bin in
 niceemu, with --eth-udp and --eth-peer, whose frames go to
-tools/tcppeer.py, the host 10.0.0.2, which serves HTTP on port 80 with
+lib/tcppeer.py, the host 10.0.0.2, which serves HTTP on port 80 with
 an answer of examples/test/ (the answers of the host's test,
 weather_test.c). The card in slot 0 has NICE/WEATHER.CFG with the server
 10.0.0.2, so no DNS server is needed, and BASIC's IP "10.0.0.9" gives
@@ -30,7 +30,7 @@ import threading
 from typing import Dict, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tcppeer import Conn, Peer, Script  # noqa: E402
+from lib.tcppeer import Conn, Peer, Script  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")

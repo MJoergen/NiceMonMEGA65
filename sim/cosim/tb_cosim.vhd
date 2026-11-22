@@ -1,7 +1,7 @@
 -- Runs the system with its debug UART on a TCP port of 127.0.0.1
 -- (cosim.c), so that the tools drive the RTL as they drive the board:
--- tools/run.py --cosim PORT, and likewise load.py. It runs until it is
--- stopped.
+-- tools/nicemon.py run --cosim PORT, and likewise load. It runs until
+-- it is stopped.
 --
 -- THEORY OF OPERATION
 -- p_to_board polls cosim.c for a byte from the host and sends each one to

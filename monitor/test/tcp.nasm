@@ -1,7 +1,7 @@
 ; The test of TCP, the entries 26 to 31 (issue #111), which
 ; tools/tcptest.py runs under the monitor of the tests in niceemu with
-; --eth-udp, against tools/tcppeer.py, the host 10.0.0.2. The Makefile
-; assembles it after the monitor's sources, as for dns.nasm, so that it
+; --eth-udp, against tools/lib/tcppeer.py, the host 10.0.0.2. The
+; Makefile assembles it after the monitor's sources, as for dns.nasm, so that it
 ; reaches the monitor's names. Each case connects to a port of its own,
 ; whose Script in tcptest.py decides what the peer does, and stores its
 ; results from TT_RES on, which tcptest.py dumps and checks, with what the

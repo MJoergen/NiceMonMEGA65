@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare tools/run.py on niceemu --link with niceemu, without a board.
+"""Compare nicemon.py run on niceemu --link with niceemu, without a board.
 
 It starts "niceemu --link 0", which picks a free port, and runs
 hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
@@ -40,7 +40,7 @@ from hwtest import (NICEEMU, NICEMON, REPO, assemble, assemble_labels,
                     test_pause, test_run, test_monitor, test_selftest,
                     test_step, test_break, test_watch, test_write_regs,
                     test_fpu, check, start_emu)
-from boardlink import HOLD, RAM, open_link
+from lib.boardlink import HOLD, RAM, open_link
 # After boardlink, which puts nice_cpu's debugger/ on the path
 import nicedbg
 

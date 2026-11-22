@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare tools/run.py on the simulated system with niceemu, without a
+"""Compare nicemon.py run on the simulated system with niceemu, without a
 board.
 
 It starts "make -C sim cosim", the RTL in GHDL with its debug UART on a
@@ -39,7 +39,7 @@ from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_fit, test_framing, test_monitor, test_pause,
                     test_run, test_step, test_break, test_watch,
                     test_write_regs, test_fpu)
-from boardlink import HOLD, RAM, open_link
+from lib.boardlink import HOLD, RAM, open_link
 
 # The time of the model of the RV-3032-C7 in sim/cosim/tb_cosim.vhd, as
 # the clock counts local time: seconds since 1970 as if it were UTC

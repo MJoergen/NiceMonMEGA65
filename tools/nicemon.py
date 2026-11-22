@@ -14,9 +14,9 @@
 go after the subcommand. "nicemon.py SUBCOMMAND --help" lists a
 subcommand's options, and tools/README.md describes each.
 
-Each subcommand is a module of tools/, which stays a library that the
-others import: load.py, run.py, mon.py, sdcard.py, sdnbd.py, flash.py,
-and tftpd.py. A module gives its options to the parser that this front
+Each subcommand is a module of tools/lib/, a library that the others
+import too: load.py, run.py, mon.py, sdcard.py, sdnbd.py, flash.py, and
+tftpd.py (issue #166). A module gives its options to the parser that this front
 end builds, with add_options(parser), and runs on the parsed options,
 with command(parser, args); mon.py gives nice_cpu's debugger/nicedbg.py
 its options and runs it on the parsed ones. A module is imported only
@@ -50,14 +50,14 @@ import subprocess
 import sys
 from typing import NamedTuple, Sequence
 
-import cli
-from cli import PROG
+from lib import cli
+from lib.cli import PROG
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Subcommand(NamedTuple):
-    module: str                         # the module of tools/ that runs it
+    module: str                         # the module of tools/lib/ that runs it
     help: str                           # its line in nicemon.py --help
 
 
@@ -202,7 +202,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 def run(name: str, argv: list[str]) -> None:
     """Imports the module of subcommand name, and runs it on argv."""
-    module = importlib.import_module(SUBCOMMANDS[name].module)
+    module = importlib.import_module(f"lib.{SUBCOMMANDS[name].module}")
     parser_class = getattr(module, "PARSER", argparse.ArgumentParser)
     parser = parser_class(prog=cli.command, description=module.DESCRIPTION)
     module.add_options(parser)

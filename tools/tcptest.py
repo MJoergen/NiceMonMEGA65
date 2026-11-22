@@ -4,7 +4,7 @@
 
 It runs the monitor of the tests with monitor/build/tcp.bin, the program
 of monitor/test/tcp.nasm, in niceemu with --eth-udp and --eth-peer,
-whose frames go to tools/tcppeer.py, the host 10.0.0.2, and checks the
+whose frames go to lib/tcppeer.py, the host 10.0.0.2, and checks the
 results that the program stores, and what the peer saw. Each case of the
 program connects to a port of its own, whose Script here decides what
 the peer does. In the cases where the program listens, a datagram from
@@ -28,9 +28,9 @@ import time
 from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tcppeer import (ACK, BOARD_IP, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn,  # noqa: E402
-                     Peer, Script, Segment, arp_reply, csum, ip_frame, is_arp_for_peer,
-                     mss_option, tcp_payload)
+from lib.tcppeer import (ACK, BOARD_IP, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn,  # noqa: E402
+                         Peer, Script, Segment, arp_reply, csum, ip_frame, is_arp_for_peer,
+                         mss_option, tcp_payload)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")

@@ -76,6 +76,6 @@ set_property -dict {PACKAGE_PIN M15  IOSTANDARD LVCMOS33} [get_ports {hdmi_ct_hp
 set_property -dict {PACKAGE_PIN AB8  IOSTANDARD LVCMOS33} [get_ports {hdmi_ls_oe_o}];           # LS_OE
 
 ## The bitstream's UserID, "M65" and the board revision, which the header of
-## top.bit shows, and from which tools/jtag.py tells the R3's bitstream from
-## the R6's, as both are for the same part (#125).
+## top.bit shows, and from which tools/lib/jtag.py tells the R3's
+## bitstream from the R6's, as both are for the same part (#125).
 set_property BITSTREAM.CONFIG.USERID 32'h4D363503 [current_design]

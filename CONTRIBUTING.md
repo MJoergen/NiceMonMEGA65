@@ -1130,8 +1130,8 @@ and its servers, the entries 26 to 31 (issue #111). It has two parts.
 
 - The first runs `monitor/test/tcp.nasm` under the monitor of the
   tests in `niceemu` with `--eth-udp`. Its frames go to
-  `tools/tcppeer.py`, a small TCP stack of its own at 10.0.0.2. Each
-  port of the peer has a script, which does what a real stack cannot be
+  `tools/lib/tcppeer.py`, a small TCP stack of its own at 10.0.0.2.
+  Each port of the peer has a script, which does what a real stack cannot be
   made to do. The cases are an echo; a close by either side; a refusal;
   a RST and a FIN in the middle; a read of no bytes while the peer's
   wait after its FIN; a RST, a SYN, and an old ACK during
@@ -1284,8 +1284,8 @@ network's entries from C. `make weathertest` checks it in two parts:
   below `0xE800`, the variables of the Nexys4DDR, so that it fits in the Nexys4DDR's memory with its
   page of wasm memory. Then it runs the program under the monitor of the
   tests in `niceemu`, with a card that holds `NICE/WEATHER.CFG` and
-  `tools/tcppeer.py` as the HTTP server at 10.0.0.2. Each case runs to
-  a step limit, and the script reads the screen's words, so that the
+  `tools/lib/tcppeer.py` as the HTTP server at 10.0.0.2. Each case runs
+  to a step limit, and the script reads the screen's words, so that the
   glyphs of the font RAM are checked too: the weather, a redirect, a
   status of 500, an answer of another format, a refused connection, a
   line of the settings not understood, a settings file of more than

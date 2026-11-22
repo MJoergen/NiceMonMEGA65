@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check tools/tftpd.py, and BASIC's TFTP against it, without a board.
+"""Check nicemon.py tftpd, and BASIC's TFTP against it, without a board.
 
 First it starts nicemon.py tftpd --listen 127.0.0.1:0 on a folder of test files and checks
 it with a client of its own: files of 0, 511, 512, 513, and 140,000

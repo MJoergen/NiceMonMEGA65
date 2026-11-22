@@ -34,7 +34,7 @@ Programming:
     part the bitstream was built for. The R3 and R6 have the same part, so
     on a MEGA65 it also reads the flash chip through openFPGALoader's
     bridge, and stops unless the chip is that of the bitstream's board: an
-    S25FL256S on the R3, and an S25FL512S on the R6 (tools/jtag.py). The
+    S25FL256S on the R3, and an S25FL512S on the R6 (lib/jtag.py). The
     bitstream names its board by its UserID, or else by its path; when
     neither tells, the check is skipped with a note. The bridge holds the
     UART's TX low, and programming over it sometimes sends a stray byte
@@ -142,7 +142,7 @@ Checks, in this order:
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
-    Last, programs run with tools/run.py and with niceemu, and their
+    Last, programs run with nicemon.py run and with niceemu, and their
     output and exit status are compared:
     - sim/eof.nasm, also for the end of the input, and an input file of
       1536 bytes
@@ -165,7 +165,7 @@ Checks, in this order:
       SYS 0x8000
     - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
       the monitor and without it
-    And the demo's self-test, F11, runs with tools/run.py, and its four
+    And the demo's self-test, F11, runs with nicemon.py run, and its four
     tests must pass, as their timer and instruction counts depend on the
     core.
     The programs run with the ROM hidden, so the RAM is at 0, but for
@@ -196,7 +196,7 @@ Checks, in this order:
     - sim/udp.nasm, loaded over TCP, answers a UDP datagram to port 4511
       through the port for Ethernet frames, with the addresses and the
       ports swapped, and halts
-    - programs run with tools/run.py --eth and with niceemu, and their
+    - programs run with nicemon.py run --eth and with niceemu, and their
       output and exit status are compared, as above, and so is the
       monitor's test program, with --monitor
     - monitor/test/tcphw.nasm, under the monitor of the tests, connects
@@ -243,21 +243,21 @@ import threading
 import time
 from typing import Callable, NamedTuple, Optional, TypeVar
 
-from jtag import check_board, wait_port
+from lib.jtag import check_board, wait_port
 # The SD controller's registers and its sectors, and FAT32 as the
-# monitor reads it, as tools/sdcard.py has them
-from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
-                    SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
-                    FolderError, Volume, read_buffer, sd_command, to_bytes)
+# monitor reads it, as lib/sdcard.py has them
+from lib.sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
+                        SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
+                        FolderError, Volume, read_buffer, sd_command, to_bytes)
 import basic_rom
-from load import (MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE, basic_image,
-                  load_basic, load_words, read_bin, read_part, start)
-from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
-                       ETH_PORT,
-                       FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
-                       PAUSE, RAM, REGS, STEP, STOP, VERSION, WCH_COUNT,
-                       WCH_EN, WCH_PC, WCH_READ, WCH_WRITE, Eth, Link,
-                       LinkError, Serial, Tcp, packet)
+from lib.load import (MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE, basic_image,
+                      load_basic, load_words, read_bin, read_part, start)
+from lib.boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL,
+                           DEFAULT_BAUD, ETH_PORT,
+                           FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
+                           PAUSE, RAM, REGS, STEP, STOP, VERSION, WCH_COUNT,
+                           WCH_EN, WCH_PC, WCH_READ, WCH_WRITE, Eth, Link,
+                           LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -1878,7 +1878,7 @@ class Folder(NamedTuple):
 
 def fat32_dir(link: Link, name: str) -> Folder | None:
     """The rows of BASIC's DIR for the card in the selected slot,
-    from its folder FOLDER, as tools/sdcard.py reads FAT32 over the link,
+    from its folder FOLDER, as lib/sdcard.py reads FAT32 over the link,
     or the monitor's error when the root has no such folder, and the
     names of its files. None when a
     sector cannot be read, and when the card has no FAT32 file system that
@@ -1934,7 +1934,7 @@ def boot_load() -> tuple[str, int] | None:
 
 def card_file(link: Link, name: str, file: str) -> bytes | None:
     """The bytes of file in the folder FOLDER of the card in the selected
-    slot, as tools/sdcard.py reads them over the link, or None."""
+    slot, as lib/sdcard.py reads them over the link, or None."""
     def read(lba: int) -> bytes:
         sector = sd_read(link, name, lba)
         if sector is None:

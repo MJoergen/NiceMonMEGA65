@@ -10,7 +10,7 @@ written too, in V1.7.1, and
 [monitor/INTERNALS.md](../monitor/INTERNALS.md) describes them, and so is
 FAT32's reading, with `dir` and `load`, in V1.9, and its writing, with
 `save` and `del`, in V1.9.1. It is `monitor/monitor_fat.nasm`, in NICE
-assembly since issue #149. The host tool `tools/sdcard.py` lists
+assembly since issue #149. The host tool `tools/lib/sdcard.py` lists
 the card, and reads, writes, and deletes its files from the host, in
 V1.9.1. Its end is written too, in V2.3.2: `SAVE`, `LOAD`, and `DIR`
 in the BASIC interpreter of the ROM (#60). The subtasks are listed at
@@ -508,7 +508,7 @@ has the details.
 4. **Host tools**: a host could read and write the board's card over the
    link while the core is paused, through these registers, and run a FAT
    library on the host, so that a file goes to the card with no PC slot.
-   Settled: `tools/sdcard.py`, with its own FAT32 in Python, as
+   Settled: `tools/lib/sdcard.py`, with its own FAT32 in Python, as
    the monitor's, and only in its folder, but for `mkdir`, which makes
    the folder in the root (#140), and `format`, which writes a new
    FAT32 to the whole card (#142). A write resets the core after it, as
@@ -529,6 +529,6 @@ ROM is developed in niceemu and needs no board.
 | FAT32 reading, `dir`, and `load` | Done in V1.9 |
 | The folder `NICE`, set at build time | Done in V1.9 |
 | FAT32 writing, `save`, and `del` | Done in V1.9.1 |
-| `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
-| `tools/sdnbd.py`, the whole card as a block device of a Linux host over NBD, for a mount, while the core is held | Done |
+| `tools/lib/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
+| `tools/lib/sdnbd.py`, the whole card as a block device of a Linux host over NBD, for a mount, while the core is held | Done |
 | BASIC's `SAVE`, `LOAD`, and `DIR` | Done in V2.3.2 |

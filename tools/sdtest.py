@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check tools/sdcard.py on niceemu --link with images of a card, without
+"""Check nicemon.py sd on niceemu --link with images of a card, without
 a board.
 
 The images are made with mkfs.fat, sfdisk, and mtools, as the monitor's
@@ -99,11 +99,11 @@ import sys
 import tempfile
 import time
 
-from boardlink import CONTROL, HOLD, PAUSE, RAM, Link, Tcp
-from load import load_words, read_bin
+from lib.boardlink import CONTROL, HOLD, PAUSE, RAM, Link, Tcp
+from lib.load import load_words, read_bin
 import nicelink
-from sdcard import (SD_CHUNK, SD_LBA, Volume, lfn_sum, read_buffer,
-                    to_bytes)
+from lib.sdcard import (SD_CHUNK, SD_LBA, Volume, lfn_sum, read_buffer,
+                        to_bytes)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",

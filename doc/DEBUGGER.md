@@ -1,7 +1,7 @@
 # The on-board debugger
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
-host: what `tools/mon.py` does over the debug link, in a strip of text
+host: what `nicemon.py mon` does over the debug link, in a strip of text
 under the program's screen, and a page over it. The README's
 [On its own](../README.md#the-on-board-debugger) says how to use it,
 with a picture. This note records the design and the decisions.

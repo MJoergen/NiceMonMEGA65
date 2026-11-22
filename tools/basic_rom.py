@@ -34,8 +34,8 @@ not refused there for its lines: each is an address and a word of 1 to
 BASE to BASE+11, all have their lines. The loader alone knows whether
 the image's interface is its monitor's.
 
-tools/load.py and tools/hwtest.py use the functions here: set_keep() for
-an image that a tool loads, ram_words() for the end of a program's RAM,
+tools/lib/load.py and tools/hwtest.py use the functions here: set_keep()
+for an image that a tool loads, ram_words() for the end of a program's RAM,
 and text() for the banner.
 
 Only the Python standard library is used.

@@ -1,6 +1,6 @@
 ; A program that has the SD card in use when tools/sdtest.py reads it with
-; tools/sdcard.py: with INIT 1 it starts the card in slot 0 up, reads
-; sector 5, and leaves SD_CHUNK at 3; with INIT 0 it only sets SD_LBA and
+; tools/lib/sdcard.py: with INIT 1 it starts the card in slot 0 up,
+; reads sector 5, and leaves SD_CHUNK at 3; with INIT 0 it only sets SD_LBA and
 ; SD_CHUNK, and the card is not ready. Then it loops, and the test checks
 ; that the tool left SD_LBA, SD_CHUNK, and the buffer as they were.
 SD_CSR          .EQU    0xFFFFFFA0

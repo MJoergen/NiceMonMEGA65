@@ -2,8 +2,8 @@
 // --monitor --asm mon.nasm --asm mon_c.nasm (Makefile), so that a pointer
 // of C, an offset in the wasm module's memory, goes through the stubs of
 // mon_c.nasm. tools/tcptest.py runs it under the monitor of the tests in
-// niceemu, against tools/tcppeer.py, whose port 2001 echoes. It sets
-// 10.0.0.9, reads it back, sends 1000 bytes from an odd address, receives
+// niceemu, against tools/lib/tcppeer.py, whose port 2001 echoes. It
+// sets 10.0.0.9, reads it back, sends 1000 bytes from an odd address, receives
 // them at another, compares, and closes. Then it listens on port 3010,
 // where the peer connects and sends 200 bytes, which it sends back, and
 // closes. It returns 0, or the number of the step that failed, times

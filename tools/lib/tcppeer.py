@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A TCP peer of its own on Ethernet frames, for the tests of the
 monitor's TCP (issue #111), in niceemu with --eth-udp and --eth-peer.
 

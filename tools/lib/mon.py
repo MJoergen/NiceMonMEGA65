@@ -1,0 +1,48 @@
+"""An interactive shell on the debug link of nice_cpu/doc/DEBUG.md.
+
+This is nice_cpu's debugger, debugger/nicedbg.py, on the board's links:
+it reads and writes memory, loads a .bin file, starts, holds, pauses,
+steps, and goes on, sets the breakpoints, shows and sets the registers,
+and disassembles, with one short command each. "help" lists them, one
+on a line, "help CMD" describes one in full, and nice_cpu's
+debugger/README.md describes them all.
+
+The board adds its links, --eth and --cosim, to nicedbg's --tcp and
+--port, with --baud at the rate of the board's UART after reset, and a
+loader that refuses a word that the board has no memory at, as
+load.py does. A FILE is checked before the link opens, and loaded
+at the start, with the processor held.
+
+Usage: tools/nicemon.py mon (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                            | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
+
+Only the Python standard library is used, so this runs on Linux and macOS.
+"""
+
+import argparse
+
+from lib.boardlink import Link, add_arguments, open_link
+from lib.load import load_words, read_bin
+# After boardlink, which puts nice_cpu's debugger/ on the path
+import nicedbg
+
+
+def load(link: Link, path: str) -> int:
+    """Loads the .bin file at path, with the checks of the board's memory,
+    and returns its number of words."""
+    words = read_bin(path)
+    load_words(link, words)
+    return len(words)
+
+
+DESCRIPTION = __doc__.splitlines()[0]
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """Adds nicedbg's options to parser, with the board's links."""
+    nicedbg.add_options(parser, add_arguments)
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Runs nicedbg on the board's links, with the checks of its memory."""
+    nicedbg.run(args, open_link=open_link, load=load, check_file=read_bin)

@@ -83,8 +83,8 @@ header is the authoritative address map.
     make linktest         # nicemon.py run --tcp on niceemu --link against plain niceemu, and mon's memory check, no board
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/nicemon.py tftpd for BASIC's LOAD and DIR, with listings for DIR "IP", "*.BIN"; ARGS=--write for SAVE and BSAVE (#155)
     make tftptest         # nicemon.py tftpd, and BASIC's TFTP in niceemu --eth-udp against it, no board
-    make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
-    make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/tcppeer.py, no board
+    make tcptest          # the monitor's TCP in niceemu against tools/lib/tcppeer.py, and its timers with --step-time, no board
+    make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/lib/tcppeer.py, no board
     make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir, --slot N format (ETH= or PORT=)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # nicemon.py sd and nbd on niceemu --link with images that mtools made, no board
@@ -167,27 +167,31 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicemon.py`, the one command of the tools that
   users run, with the subcommands `load`, `run`, `mon`, `sd`, `nbd`,
-  `flash`, and `tftpd`, each a module below that it imports when it
-  runs (#156; the old names, `load.py` and the others, call it until
-  V3.1), `cli.py` (the messages on stderr and the exit codes that the
-  subcommands share), `boardlink.py` (the link: nice_cpu's
+  `flash`, and `tftpd`, each a module of `tools/lib/` that it imports
+  when it runs (#156; the old names, `load.py` and the others, are
+  stubs in `tools/` that call it until V3.1). `tools/lib/` is a package
+  of the modules that are not commands (#166), imported as
+  `from lib.boardlink import ...` and `from lib import cli`: `cli.py`
+  (the messages on stderr and the exit codes that the subcommands
+  share), `boardlink.py` (the link: nice_cpu's
   `debugger/nicelink.py`, on the UART or over TCP to `niceemu --link`,
   with the board's Ethernet port and `make cosim`; the tools import it
   first, as it puts nice_cpu's `debugger/` on the path), `load.py`
   (around nice_cpu's `nicebin.py`, with the board's memory), `run.py`,
-  `mon.py` (nice_cpu's `nicedbg.py` with the board's hooks), `hwtest.py`, `flash.py` (with
-  `jtag.py`, the JTAG cable of the board's UART, which hwtest shares, and
-  `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
-  pyftdi, which clears the sectors' DYB protection),
-  `sdcard.py` (the SD card's files over the link, with FAT32 read and
-  written on the host in the ROM's order, which hwtest shares, #61),
-  `sdnbd.py` (the whole card as a block device over NBD, for a mount on
-  Linux, with sdcard.py's sectors), and `sdtest.py`,
-  `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
-  BASIC's `LOAD` and `DIR`, with listings, #95, and with `--write` for
-  its `SAVE` and `BSAVE`, #155) and `tftptest.py`,
-  `tcptest.py` (the monitor's TCP, against `tcppeer.py`, a scripted
-  peer on niceemu's frames, #111), `weathertest.py` (the weather
+  `mon.py` (nice_cpu's `nicedbg.py` with the board's hooks), `flash.py`
+  (with `jtag.py`, the JTAG cable of the board's UART, which hwtest
+  shares, and `spiflash.py`, the MEGA65's flash through
+  openFPGALoader's bridge with pyftdi, which clears the sectors' DYB
+  protection), `sdcard.py` (the SD card's files over the link, with
+  FAT32 read and written on the host in the ROM's order, which hwtest
+  shares, #61), `sdnbd.py` (the whole card as a block device over NBD,
+  for a mount on Linux, with sdcard.py's sectors), `tftpd.py` (the
+  TFTP server for BASIC's `LOAD` and `DIR`, with listings, #95, and
+  with `--write` for its `SAVE` and `BSAVE`, #155), and `tcppeer.py`
+  (a scripted peer on niceemu's frames, #111). The commands in `tools/`
+  are `hwtest.py`, `sdtest.py`, `bump.py`, `release.py`, `linktest.py`,
+  `tftptest.py`,
+  `tcptest.py` (the monitor's TCP, against `tcppeer.py`), `weathertest.py` (the weather
   display against it, #128),
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
   `monitor/INTERNALS.md` and `basic/README.md` and the demo's in
