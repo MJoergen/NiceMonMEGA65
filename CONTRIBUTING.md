@@ -266,7 +266,7 @@ The testbenches are these:
   a keyboard that answers late still gets the LED byte, that one that
   hangs after the LED byte, as the PIC24 does, gets ED again, that one
   that does not answer gets three tries a change, and that the commands wait
-  until no keys have come for 500 ms. It also tests the
+  until no keys have come for 100 ms. It also tests the
   debugger's Scroll Lock detector: one pulse for a held key, and none in
   Ctrl+Break.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as

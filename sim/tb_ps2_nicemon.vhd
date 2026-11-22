@@ -23,7 +23,7 @@
 -- milliseconds, so the clock is only 2 MHz, to keep the test short. The
 -- receiver's filter and timeout are given in time, through G_CLOCK_HZ, so
 -- they keep their real lengths at 2 MHz. The keyboard's LEDs wait for 1 ms
--- without keys, not 500 ms, so that they are sent within the test. The
+-- without keys, not 100 ms, so that they are sent within the test. The
 -- UART runs at a tenth of the clock.
 
 library ieee;

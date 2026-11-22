@@ -12,7 +12,7 @@
 -- set the LEDs, ED and the LED byte, at reset, after CAPS LOCK and Num Lock,
 -- after the keyboard's AA, with a keyboard that answers late, hangs after
 -- the LED byte, or does not answer, and that they wait until no keys have
--- come for 500 ms. p_rx
+-- come for 100 ms. p_rx
 -- takes the bytes and the detector's pulses, and p_cmds the commands. The
 -- system clock is 10 MHz, so that the filter and the timeout of the receiver
 -- have their real lengths.
@@ -392,7 +392,7 @@ begin
       tap(X"7A");                    -- the keypad's 3
       tap(X"77");                    -- Num Lock off again
       expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & C_ESC & "[H" & "793");
-      expect_cmds("");               -- no change after 500 ms
+      expect_cmds("");               -- no change after 100 ms
 
       report "tb_ps2: a key repeats as the keyboard repeats it";
       press(X"22");                  -- X
@@ -441,10 +441,10 @@ begin
       wait for 250 ms;               -- the wait for the last FA ends
       kbd_answer <= '1';
 
-      report "tb_ps2: the LEDs change only after 500 ms without keys";
+      report "tb_ps2: the LEDs change only after 100 ms without keys";
       tap(X"77");                    -- Num Lock on
       for i in 1 to 8 loop
-         wait for 100 ms;
+         wait for 50 ms;
          tap(X"1C");
       end loop;
       expect_cmds("");

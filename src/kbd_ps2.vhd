@@ -32,7 +32,7 @@
 -- go. A request starts only when both lines have been high for 100 us, so
 -- not within a frame from the keyboard, and the receiver ignores the lines
 -- while the host sends. A change of the LEDs starts only when they have
--- been high for G_STILL_MS, 500 ms on the board, so after the keys that
+-- been high for G_STILL_MS, 100 ms on the board, so after the keys that
 -- changed them, and seldom while the keyboard has a key to send. If the
 -- keyboard does not clock the byte in within 200 ms, the host lets the
 -- lines go and gives up.
@@ -83,7 +83,7 @@ library ieee;
 entity kbd_ps2 is
    generic (
       G_CLOCK_HZ : natural;
-      G_STILL_MS : natural := 500
+      G_STILL_MS : natural := 100
    );
    port (
       clk_i        : in  std_logic;
