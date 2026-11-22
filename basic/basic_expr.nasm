@@ -106,7 +106,6 @@ FPU_NEGATIVE    .EQU    0x10000         ; negative,
 FPU_FITS        .EQU    0x200000        ; and fits a word
 
 EXPR_ROOM       .EQU    0x100           ; the words of the stack that an expression may take
-STACK_ROOM      .EQU    0x400           ; the words of the stack below the variables
 RAM_MEGA65      .EQU    0x20000         ; the words of the RAM where RAM_WORDS reads 0
 
 V_TOK           .EQU    0xFFFFECB0      ; the tokens of the line, TOK_MAX words

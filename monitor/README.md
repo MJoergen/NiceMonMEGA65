@@ -201,7 +201,7 @@ program starts with none of the values that this one left there.
 | 30 | `3C` | `tcp_close` | R1 a handle, R2 0 to close, or 1 to abort. A close sends the bytes that wait, then the FIN, and the handle frees itself later; an abort sends a RST and frees it at once. → R1 0, or an error. Table 1.5. |
 | 31 | `3E` | `tcp_listen` | R1 the word address of a control block, R2 a local port, 1 to 65535 but 4510, R3 the sizes of the rings, as R4 of `tcp_open`. Makes a handle that waits for a peer to connect to the port. Sends nothing, and does not wait. → R1 a handle, 0 to 3, or an error. Table 1.5. |
 | 32 | `40` | `con_getline` | R1 the word address of a buffer, R2 a number of characters. Reads a line typed on the console into it, one character a word, up to that many and a 0 word after them, so the buffer has R2 + 1 words: BASIC's line, with its keys ([basic/README.md](../basic/README.md#the-statements)), the scrollback's before it, and TAB, which completes the name of a file of the card's folder. While it waits for the first key, it keeps the network going, as BASIC's line does. → R1 the number of characters. Table 1.6. |
-| 33 | `42` | `bin_line` | R1 the word address of a line, one character a word up to a 0 word, R2 the word address of 7 words, which the program clears before the first line of a load. Parses a line of a `.bin` file, `ADDR WORD` in hex, and writes the word, when the address is in a program's RAM, as `LOAD` does ([basic/README.md](../basic/README.md#loading-without-a-host)). The 7 words count: the words written, the lowest and the highest address written, the lines skipped, the number of the first, and the lines, and the last is the end of a program's RAM, which it writes. → R1 1 when the word was written, 0 for a line of blanks only, or -1 when the line was skipped. Table 1.6. |
+| 33 | `42` | `bin_line` | R1 the word address of a line, one character a word up to a 0 word, R2 the word address of 7 words, which the program clears before the first line of a load. Parses a line of a `.bin` file, `ADDR WORD` in hex, and writes the word, when the address is in a program's RAM, below the stack's first 1K words, as `LOAD` does ([basic/README.md](../basic/README.md#loading-without-a-host)). The 7 words count: the words written, the lowest and the highest address written, the lines skipped, the number of the first, and the lines, and the last is the end of a program's RAM, which it writes. → R1 1 when the word was written, 0 for a line of blanks only, or -1 when the line was skipped. Table 1.6. |
 | 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
 | 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
 | 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor, since V2.4.1. → R1 0. Table 1.6. |
@@ -668,9 +668,12 @@ Programs below.
   at most 32 words of the stack when a program calls them. The stack is
   in use before the program runs: `SYS` takes the top 2 words, from
   `0x1E7FF` or `0xE7FF` down, `LOAD` of typed lines reaches 8 words
-  below the top, and `LOAD` from a card 22. `LOAD` and
-  `nicemon.py load --monitor` take a word there, which is then overwritten, as
-  any word in the room the stack needs is.
+  below the top, and `LOAD` from a card 22. So a load, `LOAD` and
+  `bin_line`, writes no word in the stack's first 1K words, from
+  `0x1E400` or `0xE400` up, which is BASIC's default `HIMEM` too, and
+  skips such a line, as it skips one outside the RAM.
+  `nicemon.py load --monitor` writes there, and its word is then
+  overwritten, as any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
   after the trap report's line on the monitor's output; the on-board

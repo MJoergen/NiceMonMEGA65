@@ -281,15 +281,15 @@ DUMP_redo = -d 0xFFFFFF81:2
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
 # dropped, so it writes 134 at 9000. The RAM has 0x20000 words, as on the
-# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1E7FF takes a
-# word and 1E800, the alias of the variables, BASIC's first, does not. A line
+# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1E3FF takes a
+# word and 1E400, the stack's room below BASIC's variables, does not. A line
 # with TABs for blanks writes 7 at 9002, a line of blanks only is passed
 # over, and a second line for 9002 writes 8 over the 7. Six lines are
 # skipped: zz, an address in the ROM, one of the monitor's variables, a
-# third number, 1E800, and a line of 78 characters, 9003, 66 blanks, and
+# third number, 1E400, and a line of 78 characters, 9003, 66 blanks, and
 # 12345678, which is longer than the 76 of a line, so it writes nothing,
 # not 123456. Pasted lines after it: one of 100 blanks, which is passed
-# over; 1E7FF A and 90 blanks, which writes A over the 9, as the blanks
+# over; 1E3FF A and 90 blanks, which writes A over the 9, as the blanks
 # after the 76 characters are dropped; and 9001, 71 blanks, 3, and z,
 # whose z past the 76 is taken back by a DEL, so it writes 3 at 9001.
 # Then build/hello.bin,
@@ -301,8 +301,8 @@ BLANKS66  = $(shell printf '%66s' '')
 BLANKS71  = $(shell printf '%71s' '')
 BLANKS90  = $(shell printf '%90s' '')
 BLANKS100 = $(shell printf '%100s' '')
-LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1E7FF 9\r1E800 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1E7FF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
-LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\r
+LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1E3FF 9\r1E400 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1E3FF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
+LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E3FF, 1\rhalt\r
 # arr: the arrays and HIMEM of stage 3 (issue #114), test/arr.bas typed
 # line by line. An array that no DIM made, DIM of one and of two
 # dimensions, each element 0, assignments, and the Bad subscripts of an
@@ -445,9 +445,9 @@ TRAP_TAIL = \003? ER, EL\rCONT\r\003HALT\r
 # not.
 LOAD_EMU = load\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rdump 0x10000, 1\rhalt\r
 # load_64k: LOAD with 0x10000 words of RAM, as on the Nexys4DDR, which
-# build/ram64k.bin writes to 0xFFFFFF9E: E7FF takes a word, and E800, the
-# variables, BASIC's first, and 1EFFF, past the RAM, do not.
-LOAD_64K = load\rE7FF 1\rE800 2\r1EFFF 3\r\rdump 0xE7FF, 1\rhalt\r
+# build/ram64k.bin writes to 0xFFFFFF9E: E3FF takes a word, and E400, the
+# stack's room below BASIC's variables, and 1EFFF, past the RAM, do not.
+LOAD_64K = load\rE3FF 1\rE400 2\r1EFFF 3\r\rdump 0xE3FF, 1\rhalt\r
 # time: with --step-time, so the clock starts at 0, not set, and counts a
 # microsecond a step, and a copy of super.img in slot 0, each date and
 # time in quotes. time shows that

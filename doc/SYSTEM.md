@@ -142,7 +142,7 @@ BASIC the 2K below them (#152,
 | RAM words, MEGA65 | Nexys4DDR | Address | What |
 |---|---|---|---|
 | `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 90K words on the MEGA65, and 26K on the Nexys4DDR. |
-| below `0x1E800` | below `0xE800` | below `0xFFFFE800` | The stack of BASIC, the monitor, and the program, from SP = `0xFFFFE800` down. |
+| below `0x1E800` | below `0xE800` | below `0xFFFFE800` | The stack of BASIC, the monitor, and the program, from SP = `0xFFFFE800` down. A load (`LOAD`, `bin_line`) writes no word in its first 1K words, `0x1E400`–`0x1E7FF` and `0xE400`–`0xE7FF`, which BASIC's `HIMEM` leaves free too. |
 | `0x1E800`–`0x1EFFF` | `0xE800`–`0xEFFF` | `0xFFFFE800`–`EFFF` | BASIC's variables ([basic/basic.nasm](../basic/basic.nasm)). |
 | `0x1F000`–`0x1F3FF` | `0xF000`–`0xF3FF` | `0xFFFFF000`–`F3FF` | The monitor's variables. |
 | `0x1F400`–`0x1F70D` | `0xF400`–`0xF70D` | `0xFFFFF400`–`F70D` | The state of the loader of BASIC's image from a card, at the cold start ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-loader-of-basic)). |

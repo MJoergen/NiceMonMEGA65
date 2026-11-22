@@ -154,7 +154,7 @@ fails, TAB does nothing.
 | `TIME ["YYYY-MM-DD HH:MM:SS"]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, such as `TIME "2026-11-11 14:30:00"`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `TIME` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `TIME` prints `Clock not set`; a program, a host, `TIME`, or `NTP` sets it. A start of a program keeps it. Anything else is no time, and `TIME` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
 | `NTP ["SERVER"] [, "+HH:MM"]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `TIME` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `"pool.ntp.org"`, or an IP address. Without it, or with `""`, the server is the NTP server that `DHCP` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, `"+HH:MM"` or `"-HH:MM"` from `-12:00` to `+14:00`, such as `NTP "", "+01:00"` for Central European Time and `"+02:00"` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `DHCP`. Its errors are a line each: no IP address, no answer to ARP from the server or the gateway, no DNS server, no such name, an error of the DNS server, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted ([The network](../monitor/README.md#the-network)). |
 | `BAUD [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, such as `BAUD 921600`. Anything else is no rate, and `BAUD` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and `READY.` still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
-| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. A `LOAD` that writes a word below `HIMEM` (Programs below) may write over BASIC's program and its variables, so it ends with a `NEW`, and at `READY.`, also in a program. One that writes above `HIMEM` alone keeps them, and the line goes on. One that writes no word ends the line. |
+| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. A `LOAD` that writes a word below `HIMEM` (Programs below) may write over BASIC's program and its variables, so it ends with a `NEW`, and at `READY.`, also in a program. One that writes above `HIMEM` alone keeps them, and the line goes on, so that a program may load a routine of machine code there and call it with `SYS` (Machine code beside a program below). One that writes no word ends the line. |
 | `DIR [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system ([Files](../monitor/README.md#files)): `Directory of NICE in slot 0`, with the slot of the card mounted, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT`, it mounts the card in it first, and a slot that the board does not have is `File error 27`; without, it lists the card mounted, which the first `DIR` or `LOAD` after reset mounts. `LOAD`, `SAVE`, `BSAVE`, `DELETE`, and `RUN` of a file take a `SLOT` too, as their last argument, a number, and mount it the same way. The slot stays mounted for the statements after it, also when its card fails, until another `SLOT` or a reset. It reads the folder through a handle, as a program does, so after a program that left both handles open it is `File error 23`, as `LOAD` and `SAVE` are; `DIR 0` mounts again, which closes them. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `LOAD "NAME.BIN" [, SLOT]` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. A line with a byte that is not printable ASCII, a control code other than TAB, CR, or LF, DEL, or a byte from `0x80`, is skipped, as `niceemu` rejects it, so that no byte is dropped from the middle of a number. An error in the middle of the file, such as `File error 26, the FAT is damaged`, comes after the summary of the lines before it, whose words are in the RAM. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. Any other name is a BASIC program, `LOAD "NAME"` below. |
 | `LOAD "NAME" [, SLOT]` | Loads the BASIC program `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, such as `LOAD "CHESS"` or `LOAD "game.txt"`. It reads the lines as if they were typed, after a `NEW` at the first, so a program written on a PC loads too: CR LF, LF, and CR end a line, a TAB is a blank, the keywords are in either case, and a line of blanks is passed over. The first line that cannot be stored ends the load, with its error and the line itself, and the lines before it stay: `Line without a number`; `Line too long`, of more than 254 characters, or with more tokens than the 160 words of a line; `A byte that is no character`, a control code or a byte from `0x80`; and the tokenizer's `Syntax error`. A file that is not there, or that has no line, keeps the program, as the `NEW` comes only with the first line stored. It ends at `READY.`, also in a program. |
@@ -342,6 +342,46 @@ MEGA65's 128K words of RAM, and 58368 (`0xE400`) on the Nexys4DDR's
 above the default. An empty program writes
 no word at `0x8000`, so after `NEW` a `.bin` program there stays as it
 was.
+
+### Machine code beside a program
+
+A BASIC program may load a routine of machine code and call it, for
+what BASIC is too slow for, or for what only the hardware does. The
+routine lives above a lower `HIMEM`, where BASIC never writes:
+
+```
+10 HIMEM = 0x1C000
+20 LOAD "FAST.BIN"
+30 SYS 0x1C000
+40 PRINT "BACK"
+```
+
+`HIMEM = 0x1C000` comes first, as it clears the variables. It leaves
+the 9K words from `0x1C000` up to `0x1E3FF` to the routine on the
+MEGA65; on the Nexys4DDR, `HIMEM = 0xC000` leaves `0xC000` to
+`0xE3FF`. The routine is assembled for its place, with `.ORG 0x1C000`,
+and not for `0x8000`, where BASIC's program starts:
+
+```
+                .ORG    0x1C000
+                MOVE    R1, 42          ; the status that SYS prints
+                RET
+```
+
+`LOAD` of a `.bin` file in a program goes on with the next statement
+only when every word it wrote is at `HIMEM` or above. A word below
+`HIMEM` may be over the program or its variables, so the `LOAD` ends
+with `NEW`, and at `READY.`. A file that writes no word ends the
+program too. A word from `0x1E400` up is the stack's, and is skipped
+(Loading without a host below).
+
+`SYS` calls the routine on BASIC's stack, and prints `Returned` and the
+status in R1 when it returns with `RET`; the program then goes on.
+`mon_exit` goes back to `READY.` instead, and stops the program. The
+routine may call the monitor's entries ([monitor/README.md](../monitor/README.md#the-dispatch-table)),
+and keeps away from the RAM below `HIMEM`, which is BASIC's. It stays
+loaded until something writes over it, so a program that runs again
+can test for it with `PEEK` before it loads it.
 
 ## Errors in a program
 
@@ -633,10 +673,12 @@ drops the line it is in; a line of blanks only is passed over, as
 function keys do nothing. A line keeps 76 characters: blanks after them
 are dropped, as `niceemu` ignores them, and anything else after them
 skips the line. A line with anything else, or one with an address
-outside a program's RAM, `0x8000` to `0x1E7FF` on the MEGA65 and to
-`0xE7FF` on the Nexys4DDR ([Programs](../monitor/README.md#programs)), is skipped: the RAM repeats through the address space, so a
-larger address could reach the ROM, the variables, or the stack. The top of that range is the stack itself, which `SYS` uses, so a
-program's words stay below it. A second line for an address writes its
+outside a program's RAM, `0x8000` to `0x1E3FF` on the MEGA65 and to
+`0xE3FF` on the Nexys4DDR ([Programs](../monitor/README.md#programs)), is skipped: the RAM repeats through the address space, so a
+larger address could reach the ROM, the variables, or the stack. The
+1K words above that range, up to `0x1E7FF` or `0xE7FF`, are the
+stack's, which `LOAD` and `SYS` run on, so a load leaves them, as
+`HIMEM` does. A second line for an address writes its
 word over the first's, where `niceemu` rejects the file. In `niceemu`,
 where `0xFFFFFF9E` reads 0, the program's RAM goes up to the screen,
 `0xFFFEFFFF`. Its font RAM at `0xFFFE0000`–`0xFFFE1FFF` keeps
@@ -647,7 +689,7 @@ the lowest and the highest address, and the number of lines skipped,
 with the first of them and the last address that a line may have:
 
     Words loaded: 601, 00008000 to 00009000
-    Lines skipped: 4, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
+    Lines skipped: 4, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E3FF
 
 The lines are shown in one row of the screen, which each line clears,
 and not on the line, so the screen does not scroll, and a paste over the

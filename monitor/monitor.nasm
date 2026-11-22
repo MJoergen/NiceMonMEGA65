@@ -977,13 +977,16 @@ hist_rev
 ; line of a load; each may be in the word window, as net_waddr takes it,
 ; for C. ADDR WORD, two hex numbers of 1 to 8 digits with blanks
 ; between them and around them, writes WORD at ADDR, when ADDR is in a
-; program's RAM, from PROGRAM up to the monitor's variables. The RAM of
+; program's RAM, from PROGRAM up to the stack's room. The RAM of
 ; a board repeats every RAM_WORDS words, so an address past it could
 ; reach the ROM or the variables and the stacks, which are at
 ; RAM_WORDS - MON_VARS - BASIC's RAM and up of the RAM, the words of
 ; BASIC's header, 0x1E800 on the MEGA65 and 0xE800 on the Nexys4DDR with
-; 2K words of it (bas_ram); where RAM_WORDS reads 0, as in niceemu, the
-; RAM goes up to the screen. A line with anything else is skipped, and a
+; 2K words of it (bas_ram). The stack grows down from there, and its
+; first STACK_ROOM words, which BASIC's HIMEM leaves free, are the
+; caller's, so a load ends below them, at 0x1E400 and 0xE400; where
+; RAM_WORDS reads 0, as in niceemu, the RAM goes up to the screen, and
+; the stack is above it. A line with anything else is skipped, and a
 ; line of blanks only is passed over. A second line for an address writes
 ; its word over the first's. The counts: 0 the words written, 1 and 2 the
 ; lowest and the highest address written, from the first word, 3 the
@@ -1005,7 +1008,7 @@ bin_line
                 MOVE    R6, :+
                 JMP     bas_ram         ; R2 the words of BASIC's RAM
 :
-                ADD     R2, R2, MON_VARS  ; and the monitor's: the variables
+                ADD     R2, R2, MON_VARS+STACK_ROOM  ; the monitor's, and the stack's room
                 MOVE[M] R3, @RAM_WORDS
         ?Z      ADD     R3, R2, SCREEN  ; no limit
                 SUB     @6[R7], R3, R2

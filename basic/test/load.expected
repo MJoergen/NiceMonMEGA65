@@ -3,8 +3,8 @@ HELP lists the statements
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 808, 00008000 to 0001E7FF
-Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
+Words loaded: 808, 00008000 to 0001E3FF
+Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E3FF
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
@@ -19,22 +19,22 @@ READY.
 dump 0x9000, 4
 00009000 00000134 00000003 00000008 00000000
 READY.
-dump 0x1E7FF, 1
-0001E7FF 0000000A
+dump 0x1E3FF, 1
+0001E3FF 0000000A
 READY.
 halt
 Halted
 fffff000: 00000000 00000019 000fff00 00000003
 fffff005: 00008000 0000017d 00000000 00000000 00000000 00000000
-ffffe800: 0001e800 00008000 00000003 00000003 ffffee40
+ffffe800: 0001e400 00008000 00000003 00000003 ffffee40
 Screen:
 |NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 808, 00008000 to 0001E7FF
-|Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
+|Words loaded: 808, 00008000 to 0001E3FF
+|Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E3FF
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
@@ -48,8 +48,8 @@ Screen:
 |dump 0x9000, 4
 |00009000 00000134 00000003 00000008 00000000
 |READY.
-|dump 0x1E7FF, 1
-|0001E7FF 0000000A
+|dump 0x1E3FF, 1
+|0001E3FF 0000000A
 |READY.
 |halt
 |Halted
