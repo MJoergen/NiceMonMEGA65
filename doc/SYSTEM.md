@@ -405,7 +405,10 @@ leaves Num Lock as it is. Scroll Lock gives nothing, and toggles the on-board de
 and HELP do on the MEGA65. A held key repeats as the keyboard repeats it. The keyboard's CAPS LOCK
 and Num Lock LEDs show whether they are on, with no program: the board
 sends the keyboard the LEDs each time one of them changes, at reset, and
-when a keyboard is plugged in. The Scroll Lock LED stays off. A PS/2
+when a keyboard is plugged in, once no key has come for half a second.
+Now and then the PIC24 takes the LEDs and then hangs, with no keys, until
+it gets them again, so the board sends them again when the PIC24 does
+not answer, up to two times. The Scroll Lock LED stays off. A PS/2
 keyboard can't wait, so keys typed while the core's input is full are
 lost: the bytes of one key wait until there is room, and the keys typed
 meanwhile give nothing. The MEGA65's keyboard loses only the keys pressed

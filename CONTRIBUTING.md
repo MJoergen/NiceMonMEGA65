@@ -263,8 +263,10 @@ The testbenches are these:
   the same codes, which follow Num Lock, as the cursor keys of the
   Nexys4DDR's PIC24 do. It checks the commands that set the keyboard's
   LEDs, at reset, after CAPS LOCK, Num Lock, and the keyboard's AA, that
-  a keyboard that answers late still gets the LED byte, and that one that
-  does not answer gets one command a change. It also tests the
+  a keyboard that answers late still gets the LED byte, that one that
+  hangs after the LED byte, as the PIC24 does, gets ED again, that one
+  that does not answer gets three tries a change, and that the commands wait
+  until no keys have come for 500 ms. It also tests the
   debugger's Scroll Lock detector: one pulse for a held key, and none in
   Ctrl+Break.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as

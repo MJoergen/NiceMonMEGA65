@@ -25,6 +25,10 @@
 -- within 20 ms, and the Nexys4DDR's PIC24 may answer later. A byte with a wrong bit is
 -- counted in errs_o instead, and answered with FE, resend, while answer_i is
 -- '1'.
+--
+-- While hang_i is '1', the model hangs as the Nexys4DDR's PIC24 does now
+-- and then: it takes the byte after ED, the LED byte, and answers nothing
+-- until it takes ED again, which it answers.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -47,7 +51,8 @@ entity ps2_kbd_model is
 
       -- The bytes from the host
       answer_i    : in  std_logic;
-      delay_i     : in  time := 1 ms;
+      delay_i     : in  time      := 1 ms;
+      hang_i      : in  std_logic := '0';
       cmd_o       : out std_logic_vector(7 downto 0);
       cmds_o      : out natural;
       errs_o      : out natural
@@ -65,6 +70,8 @@ begin
       variable reply_v  : std_logic_vector(7 downto 0);
       variable answer_v : boolean;
       variable ok_v     : boolean;
+      variable prev_v   : std_logic_vector(7 downto 0) := X"00";
+      variable hung_v   : boolean := false;
 
       impure function host_holds return boolean is
       begin
@@ -105,12 +112,18 @@ begin
             cmd_o   <= bits_v(7 downto 0);
             cmds_o  <= cmds_v;
             reply_v := X"FA";
+            if hung_v and bits_v(7 downto 0) = X"ED" then
+               hung_v := false;
+            elsif hang_i = '1' and prev_v = X"ED" then
+               hung_v := true;
+            end if;
+            prev_v  := bits_v(7 downto 0);
          else
             errs_v  := errs_v + 1;
             errs_o  <= errs_v;
             reply_v := X"FE";
          end if;
-         answer_v := answer_i = '1';
+         answer_v := answer_i = '1' and not hung_v;
       end procedure take;
 
       -- Sends the first n bits of a frame of byte b, then a pause; ok_v is

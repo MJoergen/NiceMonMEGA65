@@ -22,8 +22,9 @@
 -- The sizes are those of tb_nicemon, without the ROM. A key takes a few
 -- milliseconds, so the clock is only 2 MHz, to keep the test short. The
 -- receiver's filter and timeout are given in time, through G_CLOCK_HZ, so
--- they keep their real lengths at 2 MHz. The UART runs at a tenth of the
--- clock.
+-- they keep their real lengths at 2 MHz. The keyboard's LEDs wait for 1 ms
+-- without keys, not 500 ms, so that they are sent within the test. The
+-- UART runs at a tenth of the clock.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -116,7 +117,8 @@ begin
 
    i_kbd_ps2 : entity work.kbd_ps2
       generic map (
-         G_CLOCK_HZ => C_CLOCK_HZ
+         G_CLOCK_HZ => C_CLOCK_HZ,
+         G_STILL_MS => 1
       )
       port map (
          clk_i        => clk,

@@ -10,8 +10,9 @@
 -- sends. It also sends frames with a wrong parity, start, or stop bit, and
 -- half a frame, which the receiver must drop. It checks the commands that
 -- set the LEDs, ED and the LED byte, at reset, after CAPS LOCK and Num Lock,
--- after the keyboard's AA, and with a keyboard that answers late or not at
--- all. p_rx
+-- after the keyboard's AA, with a keyboard that answers late, hangs after
+-- the LED byte, or does not answer, and that they wait until no keys have
+-- come for 500 ms. p_rx
 -- takes the bytes and the detector's pulses, and p_cmds the commands. The
 -- system clock is 10 MHz, so that the filter and the timeout of the receiver
 -- have their real lengths.
@@ -53,6 +54,7 @@ architecture simulation of tb_ps2 is
    signal kbd_sent   : std_logic;
    signal kbd_answer : std_logic := '1';
    signal kbd_delay  : time      := 1 ms;
+   signal kbd_hang   : std_logic := '0';
    signal kbd_cmd    : std_logic_vector(7 downto 0);
    signal kbd_cmds   : natural;
    signal kbd_errs   : natural;
@@ -130,6 +132,7 @@ begin
          sent_o      => kbd_sent,
          answer_i    => kbd_answer,
          delay_i     => kbd_delay,
+         hang_i      => kbd_hang,
          cmd_o       => kbd_cmd,
          cmds_o      => kbd_cmds,
          errs_o      => kbd_errs
@@ -210,14 +213,14 @@ begin
       end procedure lift;
 
       -- The commands that the keyboard took since the last check must be
-      -- the bytes of v, which come within 1 s, and no more within 25 ms.
+      -- the bytes of v, which come within 5 s, and no more within 25 ms.
       procedure expect_cmds(v : std_logic_vector) is
          constant C_N : natural := v'length / 8;
          variable v_v : std_logic_vector(v'length - 1 downto 0);
       begin
          v_v := v;
          if kbd_cmds < cmd_pos_v + C_N then
-            wait until kbd_cmds >= cmd_pos_v + C_N for 1 sec;
+            wait until kbd_cmds >= cmd_pos_v + C_N for 5 sec;
          end if;
          wait for 25 ms;
          assert kbd_cmds = cmd_pos_v + C_N and kbd_errs = 0
@@ -280,10 +283,11 @@ begin
       lift(X"58");
       tap(X"1C");                    -- A
       tap(X"26");                    -- 3
+      expect_cmds(X"ED04");          -- the CAPS LOCK LED on
       tap(X"58");
       tap(X"1C");
       expect("A3a");
-      expect_cmds(X"ED04ED00");      -- the CAPS LOCK LED on and off
+      expect_cmds(X"ED00");          -- and off
 
       report "tb_ps2: CTRL, left and right";
       press(X"14");
@@ -388,7 +392,7 @@ begin
       tap(X"7A");                    -- the keypad's 3
       tap(X"77");                    -- Num Lock off again
       expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & C_ESC & "[H" & "793");
-      expect_cmds(X"ED02ED00");
+      expect_cmds("");               -- no change after 500 ms
 
       report "tb_ps2: a key repeats as the keyboard repeats it";
       press(X"22");                  -- X
@@ -415,21 +419,39 @@ begin
       expect_cmds(X"ED00");
       kbd_delay <= 1 ms;
 
+      report "tb_ps2: a keyboard that hangs after the LED byte gets ED again";
+      kbd_hang <= '1';
+      tap(X"58");                    -- CAPS LOCK on
+      wait until kbd_cmds = cmd_pos_v + 2;
+      kbd_hang <= '0';
+      expect_cmds(X"ED04ED04");
+      tap(X"58");                    -- CAPS LOCK off
+      expect_cmds(X"ED00");
+
       report "tb_ps2: a keyboard that does not answer gets ED and the LED " &
-             "byte once a change";
+             "byte three times a change";
       kbd_answer <= '0';
       tap(X"58");                    -- CAPS LOCK on
       tap(X"1C");                    -- A
-      expect_cmds(X"ED04");
+      expect_cmds(X"ED04ED04ED04");
       tap(X"58");                    -- CAPS LOCK off
       tap(X"1C");
-      expect_cmds(X"ED00");
+      expect_cmds(X"ED00ED00ED00");
       expect("Aa");
       wait for 250 ms;               -- the wait for the last FA ends
       kbd_answer <= '1';
+
+      report "tb_ps2: the LEDs change only after 500 ms without keys";
       tap(X"77");                    -- Num Lock on
-      tap(X"77");                    -- and off, while the first change is sent
-      expect_cmds(X"ED02ED00");
+      for i in 1 to 8 loop
+         wait for 100 ms;
+         tap(X"1C");
+      end loop;
+      expect_cmds("");
+      expect("aaaaaaaa");
+      expect_cmds(X"ED02");
+      tap(X"77");                    -- Num Lock off
+      expect_cmds(X"ED00");
 
       report "tb_ps2: bad frames are dropped";
       send(X"1C", 11, "01");         -- start bit

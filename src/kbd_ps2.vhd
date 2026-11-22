@@ -31,8 +31,11 @@
 -- keyboard holds the data low, its acknowledge, and then lets both lines
 -- go. A request starts only when both lines have been high for 100 us, so
 -- not within a frame from the keyboard, and the receiver ignores the lines
--- while the host sends. If the keyboard does not clock the byte in within
--- 200 ms, the host lets the lines go and gives up.
+-- while the host sends. A change of the LEDs starts only when they have
+-- been high for G_STILL_MS, 500 ms on the board, so after the keys that
+-- changed them, and seldom while the keyboard has a key to send. If the
+-- keyboard does not clock the byte in within 200 ms, the host lets the
+-- lines go and gives up.
 --
 -- The LEDs are a command, ED, and a byte with Scroll Lock in bit 0, Num Lock
 -- in bit 1, and CAPS LOCK in bit 2. The keyboard answers each of the two
@@ -40,12 +43,15 @@
 -- sent, and the LED byte once FA has come, or 200 ms after ED without it:
 -- a keyboard that has taken ED waits for the LED byte and sends no keys
 -- until it comes, and the Nexys4DDR's PIC24, which passes the LEDs on over
--- USB, can answer late. FE, resend, in place of FA ends the change, and so
--- does the LED byte's FA or 200 ms without it. Other bytes, such as the
--- codes of a key, that come while the host waits for FA are passed on and
--- do not end the wait. A change that the keyboard did not take is not
--- tried again until leds_i change again: a keyboard that does not take the
--- command is then asked once per change, not again and again. The LEDs are
+-- USB, can answer late. The LED byte's FA, or FE, resend, in place of
+-- either FA, ends the change. Other bytes, such as the codes of a key,
+-- that come while the host waits for FA are passed on and do not end the
+-- wait. Without the LED byte's FA in 200 ms, the host sends ED and the LED
+-- byte again, up to C_TRIES times more: now and then the PIC24 takes the
+-- LED byte, never answers it, and sends no keys until it gets ED again.
+-- After that the change is not tried again until leds_i change again: a
+-- keyboard that does not take the command is then asked 1 + C_TRIES times
+-- per change, not again and again. The LEDs are
 -- sent at reset, and again when the keyboard says AA, which it does after
 -- its self-test, when it is plugged in. The answers, FA and AA, go to
 -- data_o as any byte does, and kbd_ps2_ascii.vhd ignores them.
@@ -76,7 +82,8 @@ library ieee;
 
 entity kbd_ps2 is
    generic (
-      G_CLOCK_HZ : natural
+      G_CLOCK_HZ : natural;
+      G_STILL_MS : natural := 500
    );
    port (
       clk_i        : in  std_logic;
@@ -103,10 +110,12 @@ architecture synthesis of kbd_ps2 is
 
    -- Clock cycles of the filter, 1 us, of the timeout of a frame, 200 us, of
    -- the quiet lines before a request and the clock held low in it, 100 us,
-   -- and of the wait for the keyboard, 200 ms
+   -- of the wait for the keyboard, 200 ms, and of the still lines before a
+   -- change of the LEDs, G_STILL_MS
    constant C_FILTER  : natural := G_CLOCK_HZ / 1_000_000 + 1;
    constant C_TIMEOUT : natural := G_CLOCK_HZ / 5_000;
    constant C_QUIET   : natural := G_CLOCK_HZ / 10_000;
+   constant C_STILL   : natural := G_CLOCK_HZ / 1000 * G_STILL_MS;
    constant C_WAIT    : natural := G_CLOCK_HZ / 5;
 
    -- The command, and the answers
@@ -114,6 +123,9 @@ architecture synthesis of kbd_ps2 is
    constant C_ACK      : std_logic_vector(7 downto 0) := X"FA";
    constant C_PASSED   : std_logic_vector(7 downto 0) := X"AA";
    constant C_RESEND   : std_logic_vector(7 downto 0) := X"FE";
+
+   -- The times that a change of the LEDs is sent again without an answer
+   constant C_TRIES : natural := 2;
 
    -- The pins, synchronized
    signal clk_sync  : std_logic_vector(1 downto 0) := "11";
@@ -131,8 +143,9 @@ architecture synthesis of kbd_ps2 is
    signal bits     : natural range 0 to 11 := 0;
    signal idle_cnt : natural range 0 to C_TIMEOUT := 0;
 
-   -- The cycles that both lines have been high, up to C_QUIET
+   -- The cycles that both lines have been high, up to C_QUIET and C_STILL
    signal quiet_cnt : natural range 0 to C_QUIET := 0;
+   signal still_cnt : natural range 0 to C_STILL := 0;
 
    -- The host's side. ST_IDLE receives; ST_HOLD holds the clock low, and
    -- then the data; ST_SEND puts the bits on the data; ST_DONE waits for
@@ -149,11 +162,13 @@ architecture synthesis of kbd_ps2 is
    signal tx_ack   : std_logic := '0';
 
    -- The LEDs last sent, those being sent, whether they are sent again,
-   -- and whether ED has been taken, so that the LED byte comes next
+   -- whether ED has been taken, so that the LED byte comes next, and the
+   -- times that the change has been sent again
    signal leds_sent : std_logic_vector(2 downto 0) := "000";
    signal leds_new  : std_logic_vector(2 downto 0) := "000";
    signal resend    : std_logic := '1';
    signal second    : std_logic := '0';
+   signal tries     : natural range 0 to C_TRIES := 0;
 
    -- The state machine's lines, and their copies in the I/O tiles
    signal clk_out  : std_logic := '1';
@@ -209,8 +224,12 @@ begin
             if quiet_cnt /= C_QUIET then
                quiet_cnt <= quiet_cnt + 1;
             end if;
+            if still_cnt /= C_STILL then
+               still_cnt <= still_cnt + 1;
+            end if;
          else
             quiet_cnt <= 0;
+            still_cnt <= 0;
          end if;
 
          if wait_cnt /= C_WAIT then
@@ -251,6 +270,7 @@ begin
                            state  <= ST_IDLE;
                         elsif frame_v(8 downto 1) = C_ACK or
                               frame_v(8 downto 1) = C_RESEND then
+                           tries <= 0;
                            finish;
                         end if;
                      end if;
@@ -269,9 +289,13 @@ begin
                if bits = 0 and quiet_cnt = C_QUIET then
                   if second = '1' then
                      start("00000" & leds_new);
-                  elsif resend = '1' or leds_i /= leds_sent then
+                  elsif still_cnt = C_STILL and
+                        (resend = '1' or leds_i /= leds_sent) then
                      leds_new <= leds_i;
                      resend   <= '0';
+                     if resend = '0' then
+                        tries <= 0;
+                     end if;
                      start(C_SET_LEDS);
                   end if;
                end if;
@@ -318,12 +342,17 @@ begin
                end if;
 
             when ST_ANSWER =>
-               -- Without FA, the LED byte still follows ED
+               -- Without FA, the LED byte still follows ED, and the change
+               -- is sent again after the LED byte
                if wait_cnt = C_WAIT then
                   if second = '0' then
                      second <= '1';
                      state  <= ST_IDLE;
                   else
+                     if tries /= C_TRIES then
+                        tries  <= tries + 1;
+                        resend <= '1';
+                     end if;
                      finish;
                   end if;
                end if;
@@ -341,6 +370,7 @@ begin
             leds_sent    <= "000";
             resend       <= '1';
             second       <= '0';
+            tries        <= 0;
             clk_out      <= '1';
             data_out     <= '1';
             clk_q        <= '1';
