@@ -1044,7 +1044,10 @@ it_ok
 ; or the element at R11, a number's or a string's, and R11 after it and
 ; its subscripts, and Z; or not Z, with nothing stored, when the variable
 ; takes a number and the item is none, or is in quotes. Keeps R5. Uses
-; R1-R12.
+; R1-R12. V_REDO is 0 while the element is found, so that an error of
+; its subscripts, which no other answer mends, is an error for INPUT
+; too, and no Redo from start; an error of the item itself, a number
+; too large, or one past a word for a variable with %, is still one.
 get_item
                 PUSH    R5
                 MOVE    R1, R6
@@ -1055,7 +1058,10 @@ get_item
         ?!Z     JMP     :+
                 CALL    s_text
                 MOVE    R8, R11
+                PUSH    @V_REDO
+                CLR     @V_REDO
                 CALL    lvalue_s
+                POP     @V_REDO
                 MOVE    R11, R8
                 CALL    store_str
                 JMP     gi_ok
@@ -1069,7 +1075,10 @@ get_item
                 CMP     R1, R7
         ?!Z     JMP     gi_drop         ; more than a number
                 MOVE    R8, R11
+                PUSH    @V_REDO
+                CLR     @V_REDO
                 CALL    lvalue
+                POP     @V_REDO
                 MOVE    R11, R8
                 CALL    store_var
 gi_ok

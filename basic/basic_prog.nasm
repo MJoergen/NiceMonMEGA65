@@ -961,9 +961,11 @@ to_whole
 ; or not, for a number's, and any text, or one in quotes, for a
 ; string's (basic_str.nasm, item and get_item). A line that has no number
 ; where one goes is Redo from start, and INPUT starts again, as it does
-; after an error of the tokenizer, which err sends here while V_REDO is
-; not 0. Too few items ask for the rest with ?? , and too many are Extra
-; ignored. CTRL-C is a break, after which CONT runs INPUT again.
+; after an error of the item, which err sends here while V_REDO is not
+; 0. An error of an element's subscripts is no Redo, as get_item finds
+; the element with V_REDO 0. Too few items ask for the rest with ?? ,
+; and too many are Extra ignored. CTRL-C is a break, after which CONT
+; runs INPUT again.
 st_input
                 MOVE    @V_REDO, R8
                 MOVE    R1, @R8

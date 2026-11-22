@@ -20,6 +20,10 @@ DIM F%(2)
 INPUT X%, F%(2)
 3.9, -4.2
 ? X%; F%(2)
+INPUT X%, F%(10)
+1E10, 1
+5, 1
+? X%
 GET F%(4): ? F%(4)
 X
 FOR I% = 1 TO 3: ? I%;: NEXT

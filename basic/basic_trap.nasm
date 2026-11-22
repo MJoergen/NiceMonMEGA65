@@ -136,15 +136,18 @@ st_trap
 
 ; RESUME: the statement of the error again; RESUME NEXT: on after it, or
 ; after the line of an IF; RESUME N: on at line N. Can't resume when no
-; error waits for its RESUME.
+; error waits for its RESUME. The error waits until RESUME has found its
+; place, so that a line N that is not there is an error of the handler,
+; which stops the program, and not one that the TRAP takes again.
 st_resume
                 MOVE[M] R9, @V_RTOK
         ?Z      JMP     err_resume
                 SHR     R2, @R8, 24
                 CMP     R2, K_LINE
         ?!Z     JMP     :+
+                CALL    st_goto         ; which checks the statement's end, and the line
                 CLR     @V_RTOK
-                JMP     st_goto         ; which checks the statement's end
+                RET
 :
                 AND     R10, @R8, 0xFFFFFF00
                 CMP     R10, K_KW*K+I_NEXT*0x100

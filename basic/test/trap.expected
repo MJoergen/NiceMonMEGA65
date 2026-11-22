@@ -255,6 +255,24 @@ LIST 10
 READY.
 NEW
 READY.
+10 TRAP 100: DIM B(2)
+20 INPUT B(3): PRINT "NEXT"
+30 A = 1 / 0: PRINT "NOT HERE"
+40 END
+100 PRINT ER, EL, ERR$(ER): IF EL = 20 THEN RESUME NEXT
+110 RESUME 9999
+RUN
+? 1
+18      20      Bad subscript
+NEXT
+20      30      Division by zero
+Undefined line in 110
+READY.
+? ER, EL
+17      110
+READY.
+NEW
+READY.
 5 N = 0
 10 TRAP 100
 20 N = N + 1: IF N > 3 THEN END

@@ -17,6 +17,8 @@ LET A(2) = A(1) * 2: ? A(2)
 INPUT A(3), B(0, 0)
 4, 6
 ? A(3); B(0, 0)
+INPUT A(4)
+1
 GET A(0): ? A(0)
 X
 10 DIM P(10): FOR I = 0 TO 10: P(I) = I * I: NEXT

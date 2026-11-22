@@ -64,6 +64,15 @@ READY.
 ? X%; F%(2)
 3-4
 READY.
+INPUT X%, F%(10)
+? 1E10, 1
+Redo from start
+? 5, 1
+Bad subscript
+READY.
+? X%
+5
+READY.
 GET F%(4): ? F%(4)
 88
 READY.

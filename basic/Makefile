@@ -309,7 +309,8 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # index outside, below 0, and of one too many and too few. A second DIM,
 # a variable of an array's name, a subscript of 1.5, which is 1, a
 # negative size, a size of a variable, LET, INPUT, and GET of an
-# element. A program with an array, which CLR drops and an edit keeps.
+# element, and INPUT of an element outside, a Bad subscript and no Redo
+# from start. A program with an array, which CLR drops and an edit keeps.
 # HIMEM, read in expressions and set, which does a CLR, and too low,
 # too high, and the arrays that fit below it. The layout of an entry of
 # an array, its data, and a variable after it. Last, LOAD of lines above
@@ -322,7 +323,9 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # and a procedure's name, and $ after %, Syntax errors; an array with %
 # before DIM; arrays with % of one and of two dimensions, a value
 # rounded, -1 from hex, a value past a word, a subscript outside and of
-# 1.5, and a second DIM; INPUT, GET, FOR with a step of -1.5, and
+# 1.5, and a second DIM; INPUT, with a value past a word, a Redo from
+# start, and then a subscript outside, a Bad subscript after the
+# variable before it took its value, GET, FOR with a step of -1.5, and
 # RCURSOR into them. A program with % in a function's and a procedure's
 # parameters, LOCAL, READ, and three variables of one name, LIST and RUN,
 # CLR. Last the layout: an array of doubles and one with %, whose data
@@ -423,9 +426,12 @@ MACH_TAIL = \003CONT\rNEW\r10 A = TI: SLEEP 0.25: B = TI: PRINT B - A >= 250000,
 # the .BIN that BSAVE adds to a name without a dot leaves the tokens
 # after it; a failure with no TRAP, which stops the program with DS$ and
 # the line; and LOAD of a program's text, which a TRAP does not take,
-# and which keeps the program. A handler that goes on with GOTO and
-# traps again with TRAP; and the break key, which a TRAP does not take,
-# and CONT after it.
+# and which keeps the program. A program whose TRAP takes the Bad
+# subscript of INPUT's element, which is no Redo from start, and whose
+# handler's RESUME to a line that is not there stops it, with ER and EL
+# of that RESUME. A handler that goes on with GOTO and traps again with
+# TRAP; and the break key, which a TRAP does not take, and CONT after
+# it.
 TRAP_TAIL = \003? ER, EL\rCONT\r\003HALT\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does

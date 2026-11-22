@@ -54,6 +54,10 @@ READY.
 ? A(3); B(0, 0)
 46
 READY.
+INPUT A(4)
+? 1
+Bad subscript
+READY.
 GET A(0): ? A(0)
 88
 READY.

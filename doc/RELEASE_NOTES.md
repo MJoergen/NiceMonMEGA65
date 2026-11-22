@@ -78,6 +78,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `nicemon.py mon --help` has the same form as the other subcommands'
   help, with `mon` in its usage line
   ([nice_cpu#202](https://github.com/MJoergen/nice_cpu/issues/202)).
+- `INPUT` of an array's element with a subscript outside, such as
+  `INPUT A(99)`, is a `Bad subscript`, as in any statement. It was
+  `Redo from start`, again and again, until CTRL-C. A number that the
+  variable cannot take is `Redo from start` as before.
 
 ## V2.4.1 (2026-11-21)
 

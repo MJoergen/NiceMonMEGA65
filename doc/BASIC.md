@@ -428,9 +428,11 @@ these do not say otherwise.
 - **`INPUT`** prints `? `, or a prompt in quotes first, and reads
   numbers, with commas between them, and from stage 5 strings
   ([Strings](#strings)). A line that is no number is
-  `Redo from start`, and the line is read again. Too few numbers ask
-  for the rest with `?? `, and too many print `Extra ignored`. CTRL-C
-  there is a break.
+  `Redo from start`, and the line is read again, and so is one with a
+  number that the variable cannot take. An error in the subscripts of
+  an element is an error as in any statement, as no other answer
+  mends it. Too few numbers ask for the rest with `?? `, and too many
+  print `Extra ignored`. CTRL-C there is a break.
 - **`STOP` and the break key** print `Break in 20`, and `END` nothing.
   `CONT` goes on after either, and after `END`, unless the program was
   edited or an error came since: then it is `Can't continue`.
@@ -869,8 +871,10 @@ Stage 9 (#120) is written, in `basic/basic_trap.nasm` (decided on
   keeps the token and the pointer of the statement that called it, and
   a trapped error goes back to that of the outermost `FN`.
 - An error before the handler's `RESUME` is not trapped, as in
-  GW-BASIC, so a handler that fails stops the program. `TRAP` ends
-  the handler too, for the handlers of the C64 that go on with `GOTO`.
+  GW-BASIC, so a handler that fails stops the program. `RESUME N` to
+  a line that is not there is such an error: the handler ends when
+  `RESUME` has found its place. `TRAP` ends the handler too, for the
+  handlers of the C64 that go on with `GOTO`.
 - The break key is no error, unlike BASIC 7.0's `TRAP`, so a program
   can always be stopped.
 - The failures of the card, the files, and the network are errors
