@@ -14,8 +14,8 @@ Usage:
     tools/nicemon.py run (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                          | --tcp [HOST:]PORT | --cosim PORT) [--input FILE] [--dump ADDR:N]...
                          [--screen] [--ide2004]
-                         [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
-                         FILE.bin
+                         [--symbols FILE] [--timeout SEC]
+                         [(--monitor | --bas) [--rom FILE]] FILE
 
     One of --eth, --port, --tcp, and --cosim must be given. --eth HOST
     runs it on the board over its Ethernet port, and --port DEVICE on its
@@ -53,6 +53,20 @@ Under the monitor:
     status that the program returns. The monitor reads on at the end of
     the input, so the run ends when the input ends with BASIC's HALT,
     which halts the core, or at the time limit.
+
+    --bas runs FILE, the text of a BASIC program, in the ROM's BASIC, as
+    nicemon.py load --bas types it: the ROM stays visible, the monitor
+    boots cold, and the program's lines, each ended by CR, and RUN and CR
+    go to the console before the input. --rom FILE is as for --monitor.
+    BASIC reads on when the program ends, so the program, or the input
+    after it, ends with HALT. niceemu runs the same with the ROM, and the
+    lines and RUN in its input; for a file whose lines end with LF, with
+    no TAB and no blank line, tr makes them:
+
+        diff <(niceemu -i <(tr '\\n' '\\r' < prog.bas; printf 'RUN\\r'; \\
+                            cat in.txt) rom.bin) \\
+             <(tools/nicemon.py run --bas --rom rom.bin --input in.txt \\
+                   prog.bas)
 
 Output:
     After a halt, the lines of niceemu: the reason and the step count, the
@@ -110,8 +124,8 @@ import sys
 import time
 from typing import Any, NoReturn, Sequence
 
-from lib.load import (MAX_RAM_WORDS, RAM_SIZE, RUN_COMMAND,
-                      add_monitor_arguments, load_words, program_words, start)
+from lib.load import (MAX_RAM_WORDS, RAM_SIZE, add_monitor_arguments,
+                      load_words, program_words, start)
 from lib.boardlink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
                            Link, LinkError, add_arguments, fail, open_link,
                            read_words)
@@ -398,7 +412,8 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         "(default %(default)s, 0 for none)")
     add_monitor_arguments(parser)
     parser.add_argument("file",
-                        help="a .bin file: one 'address word' hex pair per line")
+                        help="a .bin file: one 'address word' hex pair per "
+                        "line, or with --bas a BASIC program's text")
 
 
 def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
@@ -416,18 +431,18 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
 def run_program(parser: argparse.ArgumentParser,
                 args: argparse.Namespace) -> None:
     """Loads and runs args.file, and exits with its status."""
-    words = program_words(parser, args)
-    in_rom = args.monitor and not args.rom
+    words, typed = program_words(parser, args)
+    under = args.monitor or args.bas
+    in_rom = under and not args.rom
     symbols = Symbols(args.symbols) if args.symbols else None
     infd = 0 if args.input == "-" else open_input(args.input)
     screen_base = SCREEN_2004 if args.ide2004 else SCREEN
     link = open_link(args)
     try:
-        load_words(link, words, rom=in_rom, monitor=args.monitor)
+        load_words(link, words, rom=in_rom, monitor=under)
         start(link, rom=in_rom)
         try:
-            halted = run(link, infd, args.timeout,
-                         RUN_COMMAND if args.monitor else b"")
+            halted = run(link, infd, args.timeout, typed)
         except KeyboardInterrupt:
             link.control(HOLD | (0 if in_rom else RAM))
             print(file=sys.stderr)

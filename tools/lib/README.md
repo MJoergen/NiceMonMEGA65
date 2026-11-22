@@ -12,8 +12,8 @@ commands are described in [tools/README.md](../README.md).
 |---|---|
 | `boardlink.py` | The debug link, which the other tools use: nice_cpu's `debugger/nicelink.py`, over TCP to `niceemu --link` and on the UART, with the board's own links over TCP to its Ethernet port and to `make cosim`. It puts nice_cpu's `debugger/` on the path, so the tools import it first. |
 | `cli.py` | The messages, the exit codes, and the `--listen` option that the subcommands share. |
-| `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
-| `run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
+| `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM, and with `--bas` it types a BASIC program's text into the ROM's BASIC and runs it. |
+| `run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`, and a BASIC program's text with `--bas`. |
 | `mon.py` | `nicemon.py mon`: an interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
 | `sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot, and makes the folder. `hwtest.py` reads the card with it. |
 | `sdnbd.py` | `nicemon.py nbd`: serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |

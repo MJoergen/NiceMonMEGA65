@@ -7,7 +7,8 @@ the writes of the registers, and the FPU on it, and mon.py's checks of
 the board's memory, which it adds to nice_cpu's debugger, its help, and
 its console in a pseudo-terminal, where the Enter key must run the
 monitor's line. Then it runs
-the programs of hwtest.py's comparison, and nice_cpu's benchmark when
+the programs of hwtest.py's comparison, a BASIC program's text with
+run.py --bas and load.py --bas, and nice_cpu's benchmark when
 examples/build/bench.bin and bench_win.bin are built, with run.py --tcp
 on that port and with niceemu alone. Each must print the same and exit
 with the same status. The demo's self-test, F11, must pass. Last,
@@ -37,7 +38,8 @@ import time
 import hwtest
 from hwtest import (NICEEMU, NICEMON, REPO, assemble, assemble_labels,
                     comparisons, results, test_bench, test_framing,
-                    test_pause, test_run, test_monitor, test_selftest,
+                    test_pause, test_run, test_monitor, test_bas,
+                    test_selftest,
                     test_step, test_break, test_watch, test_write_regs,
                     test_fpu, check, start_emu)
 from lib.boardlink import HOLD, RAM, open_link
@@ -284,6 +286,7 @@ def main() -> None:
             test_console(port)
             test_run(tcp, comparisons(tmp))
             test_monitor(tcp, tmp)
+            test_bas(tcp, tmp)
             test_selftest(tcp, tmp)
         for name in ("bench.bin", "bench_win.bin"):
             bench = f"{REPO}/examples/build/{name}"

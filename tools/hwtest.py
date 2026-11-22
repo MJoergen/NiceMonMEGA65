@@ -163,6 +163,12 @@ Checks, in this order:
       has one, which must return its status; and BASIC's LOAD, with the
       600 lines of hello.bin pasted at the UART's full rate, then
       SYS 0x8000
+    - a BASIC program's text, with CR LF, a TAB, and blank lines, with
+      run.py --bas and the monitor of the tests from --rom, against
+      niceemu on that monitor with the lines and RUN typed, and under the
+      ROM's BASIC in the board's ROM, if it has one; load.py --bas types
+      one that BASIC reads to its end, and refuses a line without its
+      number
     - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
       the monitor and without it
     And the demo's self-test, F11, runs with nicemon.py run, and its four
@@ -250,8 +256,9 @@ from lib.sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
                         SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
                         FolderError, Volume, read_buffer, sd_command, to_bytes)
 import basic_rom
-from lib.load import (MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE, basic_image,
-                      load_basic, load_words, read_bin, read_part, start)
+from lib.load import (BAS_RUN, MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE,
+                      basic_image, load_basic, load_words, read_bas, read_bin,
+                      read_part, start)
 from lib.boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL,
                            DEFAULT_BAUD, ETH_PORT,
                            FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
@@ -2580,6 +2587,86 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
           f"{board.stderr!r}")
 
 
+# A BASIC program for test_bas(), with CR LF and LF, a TAB, and lines of
+# nothing and of blanks, which read_bas() passes over, and what it
+# prints, in part
+BAS_PROGRAM = (b'10 A$ = "NICE"\r\n20\tFOR I = 1 TO 3\r\n\r\n   \r\n'
+               b'30 PRINT A$; I * 7\n40 NEXT I\n50 HALT\n')
+BAS_PRINTS = b"NICE21"
+
+
+def test_bas(link_args: list[str], tmp: str, in_rom: bool = False,
+             via: str = "") -> None:
+    """Runs a BASIC program's text with run.py --bas and the monitor of
+    the tests from --rom, and with niceemu on that monitor, with the
+    program's lines and RUN as read_bas() types them in its input. The two
+    must print the same and exit with the same status, but for the steps,
+    as BASIC waits for input in a loop. load.py --bas must type it, and
+    wait until BASIC has read it all, and refuse a line without its
+    number. With in_rom, both run under the board's ROM, unless the
+    bitstream has none. link_args are run.py's options for the link, and
+    via names it in the checks, as for test_run. The port must be closed
+    meanwhile."""
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    monitor = f"{REPO}/build/rom_test.bin"
+    prog = os.path.join(tmp, "prog.bas")
+    with open(prog, "wb") as f:
+        f.write(BAS_PROGRAM)
+    bad = os.path.join(tmp, "bad.bas")
+    with open(bad, "wb") as f:
+        f.write(b"10 PRINT 1\nPRINT 2\n")
+    refused = subprocess.run([*NICEMON, "load"] + link_args + ["--bas", bad],
+                             stdin=subprocess.DEVNULL, capture_output=True,
+                             text=True)
+    ok = (refused.returncode == 1 and
+          "bad.bas:2: the line does not start" in refused.stderr)
+    check("load.py --bas refuses a line without its number", ok,
+          "" if ok else f"exit {refused.returncode}: {refused.stderr!r}")
+    run_py = [*NICEMON, "run"] + link_args + [
+        "--timeout", f"{RUN_TIMEOUT:g}", "--bas"]
+    if os.path.exists(NICEEMU):
+        emu_in = os.path.join(tmp, "bas_in.txt")
+        with open(emu_in, "wb") as f:
+            f.write(read_bas(prog) + BAS_RUN)
+        emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", monitor],
+                             stdin=subprocess.DEVNULL, capture_output=True)
+        board = subprocess.run(run_py + ["--rom", monitor, "--screen", prog],
+                               stdin=subprocess.DEVNULL, capture_output=True)
+        for r in (emu, board):
+            r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
+        board.stdout = BG_DHCP.sub(b"", board.stdout)
+        same = (emu.stdout == board.stdout and
+                emu.returncode == board.returncode == 0 and
+                BAS_PRINTS in board.stdout)
+        check(f"run.py --bas --rom rom_test.bin prog.bas as niceemu{via}",
+              same, "" if same else
+              f"\n  niceemu (exit {emu.returncode}): "
+              f"{emu.stdout[-400:]!r}\n  run.py (exit {board.returncode}): "
+              f"{board.stdout[-400:]!r} {board.stderr!r}")
+    else:
+        skipped.append("run.py --bas as niceemu")
+    rom = [] if in_rom else ["--rom", monitor]
+    loaded = subprocess.run([*NICEMON, "load"] + link_args + rom +
+                            ["--bas", prog], stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True)
+    if in_rom and "no ROM" in loaded.stderr:
+        uncovered.append("run.py and load.py --bas under the ROM's BASIC, as "
+                         "the bitstream has no ROM")
+        return
+    ok = loaded.returncode == 0 and "typed the 5 lines" in loaded.stderr
+    where = " under the ROM's BASIC" if in_rom else " --rom rom_test.bin"
+    check(f"load.py --bas{where} types prog.bas{via}", ok,
+          "" if ok else f"exit {loaded.returncode}: {loaded.stderr!r}")
+    if not in_rom:
+        return
+    board = subprocess.run(run_py + [prog], stdin=subprocess.DEVNULL,
+                           capture_output=True)
+    ok = board.returncode == 0 and BAS_PRINTS in board.stdout
+    check(f"run.py --bas prog.bas under the ROM's BASIC{via}", ok,
+          "" if ok else f"exit {board.returncode}: {board.stdout!r} "
+          f"{board.stderr!r}")
+
+
 def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
     """load.py refuses a word beyond the RAM of ram words, which it reads
     at 0xFFFFFF9E with the core held (load.py, check_fit): under the
@@ -3121,6 +3208,7 @@ def test_eth(port: str, baud: int, eth: str,
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
         test_monitor(["--eth", eth], tmp, True, " over Ethernet", long=True)
+        test_bas(["--eth", eth], tmp, True, " over Ethernet")
         test_eth_tcp(eth, ip, tmp)
         test_eth_tcp(eth, ip, tmp, listen=True)
         test_eth_dhcp(port, baud, rom)
@@ -3249,6 +3337,7 @@ def main() -> None:
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
             test_monitor(serial, tmp, in_rom=True, long=True)
+            test_bas(serial, tmp, in_rom=True)
             test_fit(serial, tmp, RAM_WORDS[board])
             for bench in benches:
                 test_bench(serial, bench)

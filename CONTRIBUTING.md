@@ -1006,8 +1006,12 @@ bitstream has one. Then it hides the ROM and uses the link:
   pastes the 600 lines of `hello.bin` into BASIC's `LOAD` at the
   UART's full rate and runs them with `SYS 0x8000`, and runs `hello.nasm` with
   `nicemon.py run --monitor` under the monitor in the board's ROM, which must
-  return its status, 42. `nicemon.py load` must refuse a word beyond the RAM
-  that `0xFFFFFF9E` gives, under the monitor and without it.
+  return its status, 42. It runs a BASIC program's text with
+  `nicemon.py run --bas --rom build/rom_test.bin` against `niceemu` with
+  the lines and `RUN` in its input, and with `nicemon.py run --bas` and
+  `load --bas` under the board's ROM. `nicemon.py load` must refuse a
+  word beyond the RAM that `0xFFFFFF9E` gives, under the monitor and
+  without it.
 - Then it runs the demo's self-test, F11, with `nicemon.py run`, and checks that
   its four tests pass. The timer's test and the counters' test check
   counts of the core's pipeline, not of the ISA, so a core whose timing
@@ -1204,7 +1208,8 @@ takes about 40 seconds, and CI runs it.
 
 `make linktest` runs `nicemon.py run --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
-the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
+the monitor's with `--monitor --rom`, a BASIC program's text with
+`--bas --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
 built `examples/build/bench.bin` and `bench_win.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, of the breakpoints,
 of the writes of the registers, and of the FPU on `niceemu --link` first, and then

@@ -586,7 +586,10 @@ into `.bin` files, with the tools of this repository (see
 [PROGRAMMING.md](doc/PROGRAMMING.md) has how to write, build, and run
 both, the C library, and the memory limits, and
 [tools/README.md](tools/README.md#running-a-program-under-the-monitor)
-has `nicemon.py load --monitor`.
+has `nicemon.py load --monitor`. A BASIC program is no `.bin` file but
+its text, which BASIC's `LOAD "NAME"` reads from the card, and
+`tools/nicemon.py load --bas prog.bas` types into BASIC from the PC and
+runs ([tools/README.md](tools/README.md#running-a-basic-program)).
 
 ### Building your own ROM
 

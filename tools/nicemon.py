@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One front end for the board's host tools, with a subcommand for each.
 
-    tools/nicemon.py load  (link) [--hold] [--monitor [--rom FILE] | --basic] FILE
+    tools/nicemon.py load  (link) [--hold] [(--monitor | --bas) [--rom FILE] | --basic] FILE
     tools/nicemon.py run   (link) [--input FILE] [--dump ADDR:N]... [--screen] ... FILE
     tools/nicemon.py mon   (link) [--symbols FILE] [FILE]
     tools/nicemon.py sd    (link) [--slot N] ... (ls | get | put | del | mkdir | format)

@@ -280,7 +280,10 @@ entered, so a `Syntax error` of a constant or a name comes then, with
 no line kept, and the other errors when the line runs, as `Syntax
 error in 20`, with the number of the line, after which the program
 stops. A program pasted into the line is entered line by line. An edit
-keeps the variables, but `CONT` cannot go on after it.
+keeps the variables, but `CONT` cannot go on after it. From a PC,
+`tools/nicemon.py load --eth 192.168.1.65 --bas prog.bas` types a
+program's text into BASIC and runs it, with no card
+([tools/](../tools/README.md#running-a-basic-program)).
 
 | Statement | What it does |
 |---|---|

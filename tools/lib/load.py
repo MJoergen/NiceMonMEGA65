@@ -34,6 +34,19 @@ A ROM image loaded at 0 gets BASIC's flag "keep" set, with its checksum
 again, so that the monitor runs that BASIC and does not replace it with
 a card's BASIC*.ROM, which would also zero the RAM from 0x8000.
 
+With --bas, FILE is the text of a BASIC program, as BASIC's LOAD "NAME"
+reads a file: the memory is cleared as for --monitor, the monitor boots
+cold with the ROM visible, and its BASIC gets the lines typed on the
+console, then RUN and CR, as if they were typed on the keyboard. The
+typing waits for BASIC's first READY., and each part of it for room in
+the core's input buffer, so that no byte is lost. A line ends with CR LF,
+LF, or CR, a TAB is a blank, and a line of blanks is passed over. A line
+that does not start with its number, one longer than BASIC's 254
+characters, and a byte that is no printable ASCII are refused before
+the link opens, as LOAD would stop there, and so is a file with no line.
+--rom FILE loads FILE at 0 in place of the ROM, as for --monitor
+(issue #167).
+
 With --basic, FILE is an image of BASIC, such as basic/build/basic.rom
 or a release's BASIC-V2.4.ROM, which goes into BASIC's part of the ROM,
 0x3000-0x7FFF, with "keep" set and every word of the part that it does
@@ -46,7 +59,7 @@ Nexys4DDR's, is refused, as is no ROM.
 
 Usage: tools/nicemon.py load (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                              | --tcp [HOST:]PORT | --cosim PORT) [--hold]
-                             [--monitor [--rom FILE] | --basic] FILE
+                             [(--monitor | --bas) [--rom FILE] | --basic] FILE
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
 serial device of the board's debug UART, such as /dev/ttyUSB1. --eth HOST talks to the board over TCP on its Ethernet port, at
@@ -60,6 +73,7 @@ and nice_cpu's debugger/nicebin.py reads the files and writes the words.
 """
 
 import argparse
+import time
 
 from lib.boardlink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
                            add_arguments, fail, open_link)
@@ -89,6 +103,16 @@ SCREEN_WORDS = 0x2000
 PROGRAM = 0x8000
 MON_VARS = 0x1000
 RUN_COMMAND = b"SYS 0x8000\r"
+
+# A BASIC program typed (read_bas): the statement that runs it, the most
+# characters of a line that BASIC's line input takes, what BASIC prints
+# when it waits for a line, and how long load waits for it after the
+# start, which is longer than the monitor's cold start takes even in the
+# simulation of make cosim
+BAS_RUN = b"RUN\r"
+BAS_LINE = 254
+READY = b"READY."
+READY_WAIT = 60.0
 
 
 def in_screen(addr: int) -> bool:
@@ -182,12 +206,71 @@ def monitor_words(path: str, rom: str | None) -> Words:
              f"program under the monitor writes the screen itself")
     if rom is None:
         return words
-    rom_words = read_bin(rom)
-    high = [a for a, _ in rom_words if a >= PROGRAM]
-    if high:
-        fail(f"{rom}: address {high[0]:08x} is not in the ROM, below "
-             f"{PROGRAM:08x}")
-    return rom_words + words
+    return rom_words(rom) + words
+
+
+def read_bas(path: str) -> bytes:
+    """The lines of the BASIC program in the file, each ended by CR, as
+    they are typed. A line ends with CR LF, LF, or CR, a TAB is a blank,
+    and a line of blanks is passed over, as BASIC's LOAD "NAME" reads a
+    file. A line that LOAD would stop at is refused: one that does not
+    start with its number, one longer than BAS_LINE, and one with a
+    byte that is not printable ASCII. So is a file without a line."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as e:
+        fail(f"cannot read {path}: {e.strerror}")
+    lines = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n").split(b"\n")
+    typed = []
+    for line_no, line in enumerate(lines, 1):
+        line = line.replace(b"\t", b" ")
+        if not line.strip(b" "):
+            continue
+        bad = [b for b in line if not 0x20 <= b < 0x7F]
+        if bad:
+            fail(f"{path}:{line_no}: the byte {bad[0]:#04x} is no "
+                 f"printable ASCII character, which BASIC does not take")
+        if len(line) > BAS_LINE:
+            fail(f"{path}:{line_no}: the line has {len(line)} characters, "
+                 f"more than the {BAS_LINE} of a line of BASIC")
+        if not line.lstrip(b" ")[:1].isdigit():
+            fail(f"{path}:{line_no}: the line does not start with its "
+                 f"number; a program has only numbered lines")
+        typed.append(line + b"\r")
+    if not typed:
+        fail(f"{path}: no line of a program")
+    return b"".join(typed)
+
+
+def wait_ready(link: Link, timeout: float = READY_WAIT) -> None:
+    """Waits for the READY. that BASIC prints after the cold start, which
+    start() has begun. Until then the monitor does not read the console,
+    and a paced send would give up on the full input buffer."""
+    text = b""
+    end = time.monotonic() + timeout
+    while READY not in text:
+        if time.monotonic() >= end:
+            fail(f"BASIC did not print {READY.decode()} within "
+                 f"{timeout:g} s of the start")
+        link.poll(0.1)
+        text += link.take_console()
+
+
+def type_bas(link: Link, typed: bytes, timeout: float = READY_WAIT) -> None:
+    """Types the lines of read_bas() and RUN for BASIC, after its READY.,
+    each part when the core's input buffer has room for it, and waits
+    until BASIC has read them all: the close of the link is a break over
+    TCP, after which the board drops the line's bytes."""
+    wait_ready(link, timeout)
+    empty = link.free()
+    link.send_console(typed)
+    end = time.monotonic() + timeout
+    while link.free() < empty:
+        if time.monotonic() >= end:
+            fail(f"BASIC did not read the lines typed within {timeout:g} s")
+        link.poll(0.05)
+        link.take_console()
 
 
 def load_words(link: Link, words: Words, rom: bool = False,
@@ -264,23 +347,43 @@ def start(link: Link, rom: bool = False) -> None:
 
 
 def add_monitor_arguments(parser: argparse.ArgumentParser) -> None:
-    """--monitor and --rom, which load.py and run.py share."""
+    """--monitor, --bas, and --rom, which load.py and run.py share."""
     parser.add_argument("--monitor", action="store_true",
                         help="run the program, at 0x8000, under the monitor "
                         "in the ROM, which boots and gets SYS 0x8000 and CR")
+    parser.add_argument("--bas", action="store_true",
+                        help="the file is a BASIC program's text: type it "
+                        "into the ROM's BASIC, which boots, then RUN and CR")
     parser.add_argument("--rom", metavar="FILE",
-                        help="with --monitor, load FILE at 0 in place of the "
-                        "ROM, such as build/rom.bin")
+                        help="with --monitor or --bas, load FILE at 0 in "
+                        "place of the ROM, such as build/rom.bin")
+
+
+def rom_words(path: str) -> Words:
+    """The words of a ROM image for --rom, which must be below PROGRAM, as
+    a ROM's are."""
+    words = read_bin(path)
+    high = [a for a, _ in words if a >= PROGRAM]
+    if high:
+        fail(f"{path}: address {high[0]:08x} is not in the ROM, below "
+             f"{PROGRAM:08x}")
+    return words
 
 
 def program_words(parser: argparse.ArgumentParser,
-                  args: argparse.Namespace) -> Words:
-    """The words to load for args.file, with --monitor and --rom."""
-    if args.rom and not args.monitor:
-        parser.error("--rom needs --monitor")
+                  args: argparse.Namespace) -> tuple[Words, bytes]:
+    """The words to load for args.file, with --monitor, --bas, and --rom,
+    and what to type on the console after the start."""
+    if args.monitor and args.bas:
+        parser.error("--monitor and --bas do not go together")
+    if args.rom and not (args.monitor or args.bas):
+        parser.error("--rom needs --monitor or --bas")
     if args.monitor:
-        return monitor_words(args.file, args.rom)
-    return read_bin(args.file)
+        return monitor_words(args.file, args.rom), RUN_COMMAND
+    if args.bas:
+        typed = read_bas(args.file) + BAS_RUN
+        return (rom_words(args.rom) if args.rom else []), typed
+    return read_bin(args.file), b""
 
 
 DESCRIPTION = __doc__.splitlines()[0]
@@ -296,14 +399,15 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="the file is an image of BASIC, for BASIC's "
                         "part of the ROM, with \"keep\" set")
     parser.add_argument("file",
-                        help="a .bin file: one 'address word' hex pair per line")
+                        help="a .bin file: one 'address word' hex pair per "
+                        "line, or with --bas a BASIC program's text")
 
 
 def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """nicemon.py load, on the options of add_options."""
     if args.basic:
-        if args.monitor:
-            parser.error("--basic and --monitor do not go together")
+        if args.monitor or args.bas:
+            parser.error("--basic does not go with --monitor or --bas")
         image = read_basic(args.file)
         link = open_link(args)
         try:
@@ -318,19 +422,32 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
             fail(str(e))
         link.close()
         return
-    words = program_words(parser, args)
-    in_rom = args.monitor and not args.rom
+    if args.hold and args.bas:
+        parser.error("--hold and --bas do not go together, as a held core "
+                     "cannot take the lines")
+    words, typed = program_words(parser, args)
+    under = args.monitor or args.bas
+    in_rom = under and not args.rom
     link = open_link(args)
     try:
-        load_words(link, words, rom=in_rom, monitor=args.monitor)
-        cli.note(f"loaded {len(words)} words from {args.file}"
-                 + (f" and {args.rom}" if args.rom else ""))
+        load_words(link, words, rom=in_rom, monitor=under)
+        if args.bas:
+            cli.note("cleared the memory"
+                     + (f", and loaded {args.rom} at 0" if args.rom else ""))
+        else:
+            cli.note(f"loaded {len(words)} words from {args.file}"
+                     + (f" and {args.rom}" if args.rom else ""))
         if not args.hold:
             start(link, rom=in_rom)
             cli.note("started the core")
             if args.monitor:
-                link.send_console(RUN_COMMAND)
+                link.send_console(typed)
                 cli.note("typed SYS 0x8000 for the monitor")
+            elif args.bas:
+                type_bas(link, typed)
+                lines = typed.count(b"\r") - 1
+                cli.note(f"typed the {lines} lines of {args.file} and RUN "
+                         f"for BASIC")
     except LinkError as e:
         fail(str(e))
     link.close()

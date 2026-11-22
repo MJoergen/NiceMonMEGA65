@@ -10,6 +10,7 @@ They use only the Python standard library, and run on Linux and macOS, but
 each tool, which has a section of its own below, in this order:
 
     tools/nicemon.py load  --eth 192.168.1.65 [--monitor] prog.bin
+    tools/nicemon.py load  --eth 192.168.1.65 --bas prog.bas
     tools/nicemon.py run   --eth 192.168.1.65 prog.bin
     tools/nicemon.py mon   --eth 192.168.1.65 [prog.bin]
     tools/nicemon.py sd    --eth 192.168.1.65 ls
@@ -263,7 +264,7 @@ the core, hides the ROM if there is one, clears the memory, writes the
 words with `W` packets, and then starts the core. It holds the core
 first, so it also works while a program runs.
 
-    tools/nicemon.py load (link) [--hold] [--monitor [--rom FILE] | --basic] FILE
+    tools/nicemon.py load (link) [--hold] [(--monitor | --bas) [--rom FILE] | --basic] FILE
 
 - `FILE` is a `.bin` file, one line per word, the address and the word
   in hex.
@@ -271,11 +272,14 @@ first, so it also works while a program runs.
 - `--monitor` runs a program at `0x8000` under the monitor in the ROM,
   and `--rom FILE` loads FILE at 0 in place of the ROM (see
   [Running a program under the monitor](#running-a-program-under-the-monitor)).
+- `--bas` takes FILE as the text of a BASIC program, types it into the
+  ROM's BASIC, and runs it, with `--rom FILE` as for `--monitor` (see
+  [Running a BASIC program](#running-a-basic-program)).
 - `--basic` loads an image of BASIC into the ROM (see
   [Loading BASIC into the ROM](#loading-basic-into-the-rom)).
 
 `make load FILE=prog.bin (ETH=IP | PORT=DEVICE)` runs it, with
-`ARGS=--hold`, `ARGS=--monitor`, or `ARGS=--basic`. Ctrl-C during a load
+`ARGS=--hold`, `ARGS=--monitor`, `ARGS=--bas`, or `ARGS=--basic`. Ctrl-C during a load
 leaves the core held.
 
 ### Running a program
@@ -319,7 +323,7 @@ when it runs.
 
 ### Running a program under the monitor
 
-`nicemon.py load` runs a program in one of two ways, and the program
+`nicemon.py load` runs a `.bin` file in one of two ways, and the program
 decides which. It is built for one of them, and does not run in the
 other.
 
@@ -429,6 +433,69 @@ the program joined in one file, and `SYS 0x8000` in its input:
 with `monitor/test/hello.nasm`, and `make hwtest` also runs it under the
 monitor in the board's ROM, over the UART and Ethernet.
 
+### Running a BASIC program
+
+A BASIC program is a third kind of program. It is no `.bin` file of
+words, but its text, such as
+
+    10 FOR I = 1 TO 3
+    20 PRINT "HELLO"; I
+    30 NEXT I
+
+On the board, BASIC's `LOAD "NAME"` reads such a file from the SD card,
+or from a TFTP server, as if its lines were typed, and `RUN` runs it.
+`--bas` does the same from the PC, with no card, and so is to a BASIC
+program what `--monitor` is to a program at `0x8000`
+([#167](https://github.com/MJoergen/NiceMonMEGA65/issues/167)):
+
+    tools/nicemon.py load --eth 192.168.1.65 --bas prog.bas
+    make load FILE=prog.bas ETH=192.168.1.65 ARGS=--bas
+
+Step by step, `nicemon.py load`:
+
+1. reads the file and checks each line, before it opens the link.
+2. holds the core, clears the memory, and keeps the ROM visible.
+3. starts the core. The monitor boots cold, and BASIC prints `READY.`
+   on the line.
+4. waits for that `READY.`, then types the lines, each ended by CR, and
+   `RUN` and CR, as you would on the keyboard. BASIC stores the lines,
+   and runs the program.
+5. waits until BASIC has read all it typed, and closes the link.
+
+So the program runs with BASIC's memory as after the board's cold start,
+and a program that was there before is gone.
+
+The file is read as `LOAD "NAME"` reads one: a line ends with CR LF,
+LF, or CR, a TAB is a blank, and a line of blanks is passed over. A
+line that `LOAD` would stop at is refused before the link opens: one
+that does not start with its number, one longer than 254 characters,
+and one with a byte that is no printable ASCII, such as a letter with
+an accent. A line that the board cannot store anyway, such as one with
+a `Syntax error`, is shown with its error on the screen and the line,
+and the lines after it are still typed.
+
+The typing goes as fast as BASIC reads, which `nicemon.py load` learns
+from the free space of the core's input buffer, so no byte is lost, even
+over the serial port.
+
+`--rom FILE` loads FILE at 0 in place of the ROM, as for `--monitor`,
+and types the program into its BASIC. `--hold` does not go with `--bas`,
+as a held core cannot take the lines.
+
+`nicemon.py run --bas` runs the program so too, and prints what
+`niceemu` prints. It sends the lines and `RUN` before the input. When
+the program ends, BASIC reads on, so the program, or the input after it,
+ends with `HALT`, which halts the core. `niceemu` gets the ROM and, in
+its input, the lines and `RUN`. For a file whose lines end with LF, with
+no TAB and no blank line, `tr` makes them:
+
+    printf '10 PRINT "HELLO"\n20 HALT\n' > prog.bas
+    tools/nicemon.py run --tcp PORT --bas --rom build/rom.bin prog.bas
+    (tr '\n' '\r' < prog.bas; printf 'RUN\r') > in.txt
+    niceemu -i in.txt build/rom.bin
+
+`make hwtest` and `make linktest` compare the two so.
+
 ### Loading BASIC into the ROM
 
 BASIC's part of the ROM, `0x3000`–`0x7FFF`, takes the link's writes.
@@ -456,7 +523,7 @@ steps the program halted, and the registers.
 
     tools/nicemon.py run (link) [--input FILE] [--dump ADDR:N]... [--screen]
                          [--ide2004] [--symbols FILE] [--timeout SEC]
-                         [--monitor [--rom FILE]] FILE
+                         [(--monitor | --bas) [--rom FILE]] FILE
 
 - `--input FILE` is the program's input, stdin by default (see
   [Input](#input)).
@@ -468,6 +535,8 @@ steps the program halted, and the registers.
 - `--monitor` and `--rom FILE` run a program under the monitor, as for
   `load` (see
   [Running a program under the monitor](#running-a-program-under-the-monitor)).
+- `--bas` runs the text of a BASIC program, as for `load` (see
+  [Running a BASIC program](#running-a-basic-program)).
 - `--no-cycle-counter` is accepted and ignored, as the cycle counter
   always runs.
 

@@ -72,7 +72,7 @@ header is the authoritative address map.
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the ROM (build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make r6 ROMPATCH=f.bin # the ROM alone into the last build's checkpoint, about a minute (synth/rompatch.tcl, #122); r3, nexys4ddr, and cor likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
-    make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor, ARGS=--basic for an image of BASIC into the ROM (#153)
+    make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor, ARGS=--bas for a BASIC program's text, typed and RUN (#167), ARGS=--basic for an image of BASIC into the ROM (#153)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
     make bump TAG=V1.0    # nice_cpu to the tag, R6 and Nexys4DDR bitstreams, badge-mega65.json, badge-nexys4ddr.json, and verified.json, committed (--push with ARGS)
