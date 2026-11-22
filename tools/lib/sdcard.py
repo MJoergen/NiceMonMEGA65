@@ -8,11 +8,11 @@ FAT32 boot sector, or the first partition of type 0x0B or 0x0C of an
 MBR, and in it only the folder NICE, the monitor's (#91), or the one
 that --folder names:
 
-    tools/nicemon.py sd --eth 192.168.1.65 ls
+    tools/nicemon.py sd --eth 192.168.1.65 ls [PATH]
     tools/nicemon.py sd --eth 192.168.1.65 get HELLO.BIN [DEST]
     tools/nicemon.py sd --eth 192.168.1.65 put prog.bas [NAME]
     tools/nicemon.py sd --eth 192.168.1.65 del NAME
-    tools/nicemon.py sd --eth 192.168.1.65 mkdir
+    tools/nicemon.py sd --eth 192.168.1.65 mkdir [PATH]
     tools/nicemon.py sd --eth 192.168.1.65 --slot 0 format
 
 ls prints the rows of BASIC's DIR, which shows a file's long name
@@ -32,6 +32,17 @@ long-name entries. mkdir makes the folder in the root of a card that
 has FAT32 but not the folder, which the monitor never makes, and says
 so when it is there already; the folder's name must be an 8.3 name with
 no extension, as NICE is.
+
+A NAME of get, put, and del may be a path of the folders inside the
+folder, GAMES/CHESS.BIN, as the monitor takes it (#168): each part
+before a / is a directory, by its long name or its 8.3 name, a leading /
+is the folder itself, and a part that is empty, . or .. is error 20, so
+that a path never leaves the folder. A NAME of put that ends in /, such
+as GAMES/, gets SRC's name. ls PATH lists a folder inside the folder, as
+BASIC's DIR "PATH" does, and mkdir PATH makes one, GAMES or GAMES/OLD,
+whose folders before the last must be there, as mkdir makes the folder:
+its cluster, its zeros, and its entries . and .. first, then its entry,
+with long-name entries when its name needs them.
 
 format erases the whole card in the slot of --slot, which it needs,
 and writes a new FAT32, as cards are sold: an MBR with one partition
@@ -94,8 +105,8 @@ library is used, so this runs on Linux and macOS.
 Usage: tools/nicemon.py sd (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                            | --tcp [HOST:]PORT | --cosim PORT)
                            [--slot N] [--folder NAME] [--hold]
-                           (ls | get NAME [DEST] | put SRC [NAME] | del NAME
-                            | mkdir | format [--label L] [--force]
+                           (ls [PATH] | get NAME [DEST] | put SRC [NAME]
+                            | del NAME | mkdir [PATH] | format [--label L] [--force]
                               [--system] [--yes])
 """
 
@@ -153,7 +164,7 @@ FS_ERRORS = {
     19: "exFAT, which is not supported",
     20: "not a valid name",
     21: "no such file",
-    22: "a directory",
+    22: "a directory, or a file used as one",
     26: "the FAT is damaged",
     27: "no such slot",
     29: "no folder {folder} on the card",
@@ -837,37 +848,81 @@ class Volume:
                             lba, at, where, e[12])
                 parts, where = [], []
 
-    def listing(self) -> list[Entry]:
-        """The files and directories of the folder."""
-        return list(self.entries(self.dir))
+    def listing(self, clus: int = 0) -> list[Entry]:
+        """The files and directories of the folder, or of the directory
+        from cluster clus."""
+        return list(self.entries(clus or self.dir))
 
-    def rows(self, listed: list[Entry] | None = None) -> list[str]:
+    def rows(self, listed: list[Entry] | None = None,
+             path: str = "") -> list[str]:
         """The rows of BASIC's DIR, of the listing given or of the
-        folder."""
+        folder, with the path of a folder inside it in the first, as DIR
+        "PATH" shows it: without a leading /."""
         if listed is None:
             listed = self.listing()
         files = sum(not e.is_dir for e in listed)
-        return ([f"Directory of {self.folder.upper()}"] +
+        path = path[1:] if path.startswith("/") else path
+        head = self.folder.upper() + ("/" + path if path else "")
+        return ([f"Directory of {head}"] +
                 [r for e in listed for r in e.rows()] +
                 [f"Files: {files}, directories: {len(listed) - files}"])
 
-    def find(self, name: str) -> Entry:
-        """The entry of the folder whose long name or 8.3 name is name, in
-        either case."""
-        e = self.lookup(name)
+    def walk(self, path: str, folder: bool = False) -> tuple[int, str]:
+        """The path of a file of the folder, SUB/SUB/NAME, walked as
+        monitor_fat.nasm's path walks it (#168): the first cluster of the
+        directory of its last part, and that part. Each part before a /
+        is a directory, found as a file is, and a leading / is the folder
+        itself. With folder, the last part is a directory too, whose
+        cluster comes with an empty part, and an empty last part, as in
+        "", "/", or "GAMES/", is the directory before it. A path longer
+        than NAME_MAX, or with a part that is empty, . or .., is error
+        20, so it never leaves the folder; a directory that is not there
+        is 21, and a file where one is due 22."""
+        if len(path) > NAME_MAX:
+            raise FileError(E_NAME)
+        parts = (path[1:] if path.startswith("/") else path).split("/")
+        clus = self.dir
+        for i, part in enumerate(parts):
+            last = i == len(parts) - 1
+            if part in (".", "..") or (not part and not (last and folder)):
+                raise FileError(E_NAME)
+            if last and not folder:
+                return clus, part
+            if not part:
+                break
+            e = self.lookup(part, clus)
+            if e is None:
+                raise FileError(E_NOFILE)
+            if not e.is_dir:
+                raise FileError(E_ISDIR)
+            if e.first < 2 or e.first >= self.top:
+                raise FileError(E_BADFAT)
+            clus = e.first
+        return clus, ""
+
+    def find(self, name: str, clus: int = 0) -> Entry:
+        """The entry of the folder, or of the directory from cluster
+        clus, whose long name or 8.3 name is name, in either case."""
+        e = self.lookup(name, clus)
         if e is None:
             raise FileError(E_NOFILE)
         return e
 
-    def lookup(self, name: str) -> Entry | None:
-        """The entry of the folder whose long name or 8.3 name is name, in
-        either case, or None."""
+    def lookup(self, name: str, clus: int = 0) -> Entry | None:
+        """The entry of the folder, or of the directory from cluster
+        clus, whose long name or 8.3 name is name, in either case, or
+        None."""
         want = name.casefold()
-        for e in self.listing():
+        for e in self.listing(clus):
             if (e.long is not None and e.long.casefold() == want
                     or e.short.casefold() == want):
                 return e
         return None
+
+    def find_path(self, path: str) -> Entry:
+        """The entry of the file at path, walked with walk."""
+        clus, name = self.walk(path)
+        return self.find(name, clus)
 
     def contents(self, e: Entry) -> bytes:
         """The bytes of the file of the entry e."""
@@ -1027,13 +1082,14 @@ class Volume:
                 self.wr(lba, bytes(sector))
         return run[-1]
 
-    def new_name(self, name: str) -> tuple[bytes, int, list[bytes]]:
+    def new_name(self, name: str,
+                 clus: int = 0) -> tuple[bytes, int, list[bytes]]:
         """The 8.3 name of a new file name, the flags of its byte 12, and
         its long-name entries, as monitor_fat.nasm's newname makes them: name
         itself when it is an 8.3 name in upper case, or in lower case in a
         part, with no long-name entries; or else its basis, with the first
-        tail ~1, ~2, and on that no entry of the folder has, when it needs
-        one."""
+        tail ~1, ~2, and on that no entry of the folder, or of the
+        directory from cluster clus, has, when it needs one."""
         got = name83(name)
         if got is not None and got[1] >= 0:
             return got[0], got[1], []
@@ -1041,7 +1097,7 @@ class Volume:
             raise FileError(E_NAME)
         raw, lossy = basis(name)
         if lossy:
-            taken = {e.raw for e in self.listing()}
+            taken = {e.raw for e in self.listing(clus)}
             t = 1
             while with_tail(raw, t) in taken:
                 t += 1
@@ -1054,12 +1110,13 @@ class Volume:
         if e.attr & 0x01:
             raise FileError(E_RDONLY)
 
-    def put(self, name: str, data: bytes) -> int:
-        """Writes data as the file name of the folder, its long name or
+    def put(self, path: str, data: bytes) -> int:
+        """Writes data as the file of the folder at path, its long name or
         its 8.3 name, made, or truncated when it is there, and returns its
         size. When the card fills up, the file keeps what fitted, and
         FileError 30 follows."""
-        e = self.lookup(name)
+        clus, name = self.walk(path)
+        e = self.lookup(name, clus)
         if e is not None:
             # Truncated: the entry emptied, then its clusters freed
             self.writable(e)
@@ -1072,7 +1129,7 @@ class Volume:
             self.infodone()
             elba, eoff = e.lba, e.off
         else:
-            elba, eoff = self.make(*self.new_name(name))
+            elba, eoff = self.make(*self.new_name(name, clus), parent=clus)
             self.infodone()
         first = clus = 0
         done = 0
@@ -1139,11 +1196,36 @@ class Volume:
         self.dir = c
         return True
 
-    def delete(self, name: str) -> Entry:
-        """Deletes the file of the folder whose long or 8.3 name is name:
-        its long-name entries marked free, then its entry, each sector
-        written as it changes, then its clusters freed, then FSInfo."""
-        e = self.find(name)
+    def mkdir_in(self, path: str) -> bool:
+        """Makes the directory at path inside the folder, as mkdir makes
+        the folder, unless it is there, and returns whether it made it.
+        Its name is a long name or an 8.3 name, as a file's, and its ..
+        is the directory before it."""
+        parent, name = self.walk(path)
+        e = self.lookup(name, parent)
+        if e is not None:
+            if not e.is_dir:
+                raise FolderError(f"a file has the name {name}; delete or "
+                                  "rename it first")
+            return False
+        raw, lower, lfn = self.new_name(name, parent)
+        c = self.search()
+        first = dot_entries(c, parent, self.now).ljust(512, b"\0")
+        lba = self.first_sector(c)
+        self.wr(lba, first)
+        for k in range(1, self.spc):
+            self.wr(lba + k, bytes(512))
+        self.take(0, c)
+        self.make(raw, lower, lfn, parent=parent, attr=0x10, first=c)
+        self.infodone()
+        return True
+
+    def delete(self, path: str) -> Entry:
+        """Deletes the file of the folder at path, by its long or 8.3
+        name: its long-name entries marked free, then its entry, each
+        sector written as it changes, then its clusters freed, then
+        FSInfo."""
+        e = self.find_path(path)
         self.writable(e)
         s = lfn_sum(e.raw if e.raw[0] != 0xE5 else b"\x05" + e.raw[1:])
         for lba, at in e.lfn:
@@ -1159,11 +1241,11 @@ class Volume:
         return e
 
 
-def do_ls(vol: Volume) -> None:
-    """The rows of BASIC's DIR, with the 8.3 name after those of a
-    file whose name is a long name."""
-    listed = vol.listing()
-    rows = vol.rows(listed)
+def do_ls(vol: Volume, path: str = "") -> None:
+    """The rows of BASIC's DIR, or of DIR "PATH", with the 8.3 name after
+    those of a file whose name is a long name."""
+    listed = vol.listing(vol.walk(path, folder=True)[0])
+    rows = vol.rows(listed, path)
     print(rows[0])
     for e in listed:
         *first, last = e.rows()
@@ -1186,7 +1268,7 @@ def host_name(e: Entry) -> str:
 
 
 def do_get(vol: Volume, name: str, dest: str | None) -> None:
-    e = vol.find(name)
+    e = vol.find_path(name)
     data = vol.contents(e)
     if dest == "-":
         sys.stdout.buffer.write(data)
@@ -1203,12 +1285,16 @@ def do_get(vol: Volume, name: str, dest: str | None) -> None:
 
 def put_name(src: str, name: str | None) -> str:
     """The name that put writes src as, checked before the link opens: an
-    8.3 name, or a long name that monitor_fat.nasm's longok takes."""
-    if name is None:
+    8.3 name, or a long name that monitor_fat.nasm's longok takes, after
+    the path of a folder inside the folder, if it has one; a name that
+    ends in / gets SRC's name."""
+    base = os.path.basename(src)
+    if name is None or name.endswith("/"):
         if src == "-":
             raise FileError(E_NAME)
-        name = os.path.basename(src)
-    if name83(name) is None and not long_ok(name):
+        name = (name or "") + base
+    last = name.rsplit("/", 1)[-1]
+    if name83(last) is None and not long_ok(last):
         raise FileError(E_NAME)
     return name
 
@@ -1560,10 +1646,16 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         "(default %(default)s, the monitor's)")
     cmds = parser.add_subparsers(dest="cmd", required=True, metavar="COMMAND",
                                  title="commands")
-    cmds.add_parser("ls", help="list the folder, as BASIC's DIR does, "
-                    "with the 8.3 names of the long names")
+    ls = cmds.add_parser("ls", help="list the folder, or a folder inside "
+                         "it, as BASIC's DIR does, with the 8.3 names of "
+                         "the long names")
+    ls.add_argument("path", nargs="?", default="",
+                    help="the path of a folder inside the folder, such as "
+                    "GAMES/OLD (default: the folder)")
     get = cmds.add_parser("get", help="copy a file of the folder to the host")
-    get.add_argument("name", help="its 8.3 name or its long name")
+    get.add_argument("name", help="its 8.3 name or its long name, after the "
+                     "path of a folder inside the folder, such as "
+                     "GAMES/CHESS.BIN")
     get.add_argument("dest", nargs="?",
                      help="the file or the directory to write it to, or - "
                      "for stdout (default: its name, here)")
@@ -1572,13 +1664,20 @@ def add_options(parser: argparse.ArgumentParser) -> None:
     put.add_argument("src", help="the host's file, or - for stdin")
     put.add_argument("name", nargs="?",
                      help="the name on the card, a long name or an 8.3 "
-                     "name (default: SRC's name)")
+                     "name, after a path, such as GAMES/prog.bas; one "
+                     "that ends in /, such as GAMES/, gets SRC's name "
+                     "(default: SRC's name)")
     rm = cmds.add_parser("del", help="delete a file of the folder; holds "
                          "the core, and starts it again")
-    rm.add_argument("name", help="its 8.3 name or its long name")
-    cmds.add_parser("mkdir", help="make the folder in the root of the "
-                    "card, unless it is there; holds the core, and starts "
-                    "it again")
+    rm.add_argument("name", help="its 8.3 name or its long name, after a "
+                    "path, such as GAMES/CHESS.BIN")
+    md = cmds.add_parser("mkdir", help="make the folder in the root of the "
+                         "card, or with PATH a folder inside it, unless it "
+                         "is there; holds the core, and starts it again")
+    md.add_argument("path", nargs="?", default="",
+                    help="the path of a new folder inside the folder, such "
+                    "as GAMES or GAMES/OLD, whose folders before the last "
+                    "must be there")
     fmt = cmds.add_parser("format", help="erase the whole card of --slot, "
                           "and write a new FAT32 with the folder; holds the "
                           "core, and starts it again")
@@ -1627,15 +1726,21 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                 return
             vol = Volume(card.read, args.folder,
                          card.write if writes else None,
-                         need=args.cmd != "mkdir")
-            if args.cmd == "mkdir":
+                         need=args.cmd != "mkdir" or bool(args.path))
+            if args.cmd == "mkdir" and args.path:
+                where = f"{args.folder.upper()}/{args.path.lstrip('/')}"
+                if vol.mkdir_in(args.path):
+                    cli.note(f"made the folder {where}")
+                else:
+                    cli.note(f"the folder {where} is there already")
+            elif args.cmd == "mkdir":
                 folder = args.folder.upper()
                 if vol.mkdir():
                     cli.note(f"made the folder {folder}")
                 else:
                     cli.note(f"the folder {folder} is there already")
             elif args.cmd == "ls":
-                do_ls(vol)
+                do_ls(vol, args.path)
             elif args.cmd == "get":
                 do_get(vol, args.name, args.dest)
             elif args.cmd == "put":

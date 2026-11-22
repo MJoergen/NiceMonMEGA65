@@ -122,8 +122,11 @@ Checks, in this order:
       TAB after LOAD, a quote, and the start of a name that no other name
       has, completes it with the closing quote and a blank (issue #147);
       on a card with NICE, sdcard.py's mkdir finds the folder there
-      already, and writes nothing. A card without NICE, and one with no
-      name of a start of its own, are named after NOT COVERED
+      already, and writes nothing; and when NICE has a folder inside it,
+      the host walks to it by its path, reads a file in it, and DIR
+      "NAME" lists it as the host does (issue #168). A card without NICE,
+      one with no name of a start of its own, and one with no folder
+      inside NICE are named after NOT COVERED
     - BASIC's part of the ROM (doc/BASIC_ROM.md, "The tools"): it takes a
       link's write, and the monitor's part does not. When the monitor
       loaded a card's BASIC*.ROM at the configuration, its line names it,
@@ -254,7 +257,8 @@ from lib.jtag import check_board, wait_port
 # monitor reads it, as lib/sdcard.py has them
 from lib.sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
                         SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
-                        FolderError, Volume, read_buffer, sd_command, to_bytes)
+                        Entry, FolderError, Volume, read_buffer, sd_command,
+                        to_bytes)
 import basic_rom
 from lib.load import (BAS_RUN, MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE,
                       basic_image, load_basic, load_words, read_bas, read_bin,
@@ -1878,9 +1882,38 @@ class Unread(Exception):
 class Folder(NamedTuple):
     """What the host reads of a card's folder FOLDER: the rows of BASIC's
     DIR, and the names of its files that TAB completes, those without a
-    ?, as DIR shows them."""
+    ?, as DIR shows them, and for its first folder inside it, if any, its
+    name and the rows of DIR "NAME" (issue #168)."""
     rows: list[str]
     names: list[str]
+    sub: tuple[str, list[str]] | None = None
+
+
+def inner_folder(vol: Volume, listed: list[Entry],
+                 name: str) -> tuple[str, list[str]] | None:
+    """The first folder inside FOLDER that DIR "NAME" can list, by a name
+    with no ?, and not an IP address, which DIR takes as a TFTP server's,
+    and the rows of DIR "NAME", which the host walks to as the monitor's
+    path does; the first file in it is read, as a check of a path to a
+    file. None when the card has no such folder, which is not covered."""
+    for e in listed:
+        if (e.is_dir and "?" not in e.name and
+                not re.match(r"\s*\d+\.\d+\.\d+\.\d+(:|\s*$)", e.name)):
+            break
+    else:
+        uncovered.append(f"{name}: a path to a folder inside {FOLDER}, as "
+                         "the card has none")
+        return None
+    clus, _ = vol.walk(e.name, folder=True)
+    inner = vol.listing(clus)
+    for f in inner:
+        if not f.is_dir:
+            path = f"{e.name}/{f.short}"
+            data = vol.contents(vol.find_path(path))
+            check(f"{name}: {FOLDER}/{path} reads through its path, "
+                  f"{f.size} bytes", len(data) == f.size)
+            break
+    return e.name, vol.rows(inner, e.name)
 
 
 def fat32_dir(link: Link, name: str) -> Folder | None:
@@ -1926,7 +1959,14 @@ def fat32_dir(link: Link, name: str) -> Folder | None:
         check(f"{name}: sdcard.py mkdir finds the folder {FOLDER} there "
               "already", False, str(e))
     files = [e.name for e in listed if not e.is_dir and "?" not in e.name]
-    return Folder(vol.rows(listed), files)
+    try:
+        sub = inner_folder(vol, listed, name)
+    except Unread:
+        sub = None
+    except FileError as e:
+        check(f"{name}: a folder inside {FOLDER} reads", False, str(e))
+        sub = None
+    return Folder(vol.rows(listed), files, sub)
 
 
 def boot_load() -> tuple[str, int] | None:
@@ -2159,6 +2199,19 @@ def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
                  f"{want[bad[0]]!r}" if bad else ""))
         if len(want) > 1:
             test_tab(link, slot, folder.names)
+        if folder.sub is not None:
+            # DIR "NAME" of the slot that DIR SLOT mounted (issue #168)
+            sub, srows = folder.sub
+            want = [f"{srows[0]} in slot {slot}"] + srows[1:]
+            cmd = f'DIR "{sub}"\r'.encode("latin-1")
+            link.send_console(cmd)
+            text = console_until(link, lambda t: READY in t.partition(cmd)[2],
+                                 30.0)
+            said = text.partition(cmd)[2].decode("latin-1").removeprefix("\n")
+            rows = said.partition("READY.\r\n")[0].split("\r\n")[:-1]
+            check(f"SD slot {slot}: BASIC's DIR \"{sub}\" lists the folder "
+                  "inside as the host walks to it", rows == want,
+                  f"got {rows[:3]}, want {want[:3]}")
     link.send_console(b"HALT\r")
     console(link, 1.0)
 

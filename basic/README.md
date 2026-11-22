@@ -178,7 +178,7 @@ may be a path of the folders inside `NICE`, such as
 `.BIN` that they add goes on its last part, when that part has no dot:
 `SAVE "V2.0/PROG"` writes `PROG.BAS` in the folder `V2.0`. TAB completes
 a path a folder at a time, with a `/` after a directory. The ROM makes
-no folder: one is made on a PC.
+no folder: one is made on a PC, or with `make sdcard CMD="mkdir GAMES"`.
 
 The debugger has pause, step, and inspect, so BASIC adds only `LOAD`
 with no name, which loads a program with no host's tools and no

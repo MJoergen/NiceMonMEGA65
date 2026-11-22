@@ -1040,7 +1040,10 @@ then completes a name of it: the script types `LOAD "`, the shortest
 start of a name that no other name has, and TAB, and the monitor must
 type the rest of the name, the closing quote, and a blank, before
 Ctrl-C ends the line. A folder with no name of a start of its own is
-NOT COVERED. On such a card, `nicemon.py sd mkdir` must also say that
+NOT COVERED. When `NICE` has a folder inside it, the host walks to it
+by its path and reads a file in it, as the monitor's paths do (issue
+#168), and `DIR "NAME"` must list it as the host does; a card with none
+is NOT COVERED there. On a card with `NICE`, `nicemon.py sd mkdir` must also say that
 the folder is there already, and write nothing, which a write function
 that only counts shows. A card without `NICE` is NOT COVERED there, as
 `mkdir` would write to it; that write is a check by hand of a release

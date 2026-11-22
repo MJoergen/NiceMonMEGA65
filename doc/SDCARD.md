@@ -328,7 +328,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   name, and gives the cluster that the name's last part is looked up
   in. A part that is empty, `.`, or `..` is an error, so a path never
   leaves the folder, and cores that share a card stay apart. The ROM
-  makes and deletes no folder.
+  makes and deletes no folder; `nicemon.py sd` takes the same paths,
+  and its `mkdir PATH` makes one over the link.
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is

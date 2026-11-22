@@ -15,7 +15,7 @@ commands are described in [tools/README.md](../README.md).
 | `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM, and with `--bas` it types a BASIC program's text into the ROM's BASIC and runs it. |
 | `run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`, and a BASIC program's text with `--bas`. |
 | `mon.py` | `nicemon.py mon`: an interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
-| `sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot, and makes the folder. `hwtest.py` reads the card with it. |
+| `sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, and of the folders inside it by their paths, with no PC slot, and makes the folder and those inside it. `hwtest.py` reads the card with it. |
 | `sdnbd.py` | `nicemon.py nbd`: serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |
 | `flash.py` | `nicemon.py flash`: writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `tftpd.py` | `nicemon.py tftpd`: a TFTP server for BASIC's `LOAD` and `DIR`, which also lists the files of its folder for a name with `*` or `?`, and with `--write` for its `SAVE` and `BSAVE`. |

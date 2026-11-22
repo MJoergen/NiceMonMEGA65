@@ -52,7 +52,8 @@ its subtasks, of which the controller, the slots, the ROM's sector
 routines, FAT32's
 reading with `DIR` and `LOAD`, and its writing with `SAVE` and `DELETE`
 (#55, #56, #57, #58, and #59) are written, and paths to the folders
-inside `NICE`, `LOAD "GAMES/CHESS.BIN"`, in the ROM (#168).
+inside `NICE`, `LOAD "GAMES/CHESS.BIN"`, in the ROM and the tools
+(#168).
 `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
@@ -87,7 +88,7 @@ header is the authoritative address map.
     make tftptest         # nicemon.py tftpd, and BASIC's TFTP in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/lib/tcppeer.py, and its timers with --step-time, no board
     make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/lib/tcppeer.py, and examples/sieve.bas in niceemu, no board
-    make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir, --slot N format (ETH= or PORT=)
+    make sdcard CMD=ls    # the board's SD card over the link: ls [PATH], get NAME [DEST], put SRC [NAME], del NAME, mkdir [PATH], --slot N format (ETH= or PORT=); a NAME may be a path, GAMES/CHESS.BIN (#168)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # nicemon.py sd and nbd on niceemu --link with images that mtools made, no board
     make ecma55           # the ECMA-55 suite (bas55 2.0's programs, fetched once) on BASIC in niceemu, against basic/test/ecma55.expected

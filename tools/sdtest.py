@@ -20,7 +20,8 @@ is checked against them:
 - evil.img: super.img with the long name of ALONGF~1.DAT rewritten as
   ../evil.dat, a path, as a card from elsewhere may spell one: get must
   write the file under its 8.3 name, here or in the directory given,
-  and nowhere else.
+  and nowhere else; by the long name, a path with .., it is error 20,
+  as the monitor has it (#168).
 
 On a held core, ls must list what is in NICE as BASIC's DIR does,
 with its long names and sizes, the 8.3 names after them, and the
@@ -79,6 +80,16 @@ tests, build/rom_test.bin, lists the card with dir, the
 tool puts a .bin file with a long name, my prog.bin, and the monitor,
 started again, lists it and loads it by that name; then the tool
 deletes it, and dir no longer lists it.
+
+Paths to the folders inside NICE (#168), on a copy of super.img with
+NICE/SUB/INNER.TXT: ls of a folder, get through paths in either case,
+and the errors 20, 21, and 22 of each kind of bad path; mkdir of
+folders inside NICE, one with a long name, and of one that is there or
+is a file; put into them, with SRC's name for a path that ends in /,
+and del through a path, which fsck.fat, mdir, and mtype check. Then the
+ROM of the tests lists the folder that the tool made, loads the file
+that the tool put, and saves one into the folder of a long name, which
+the tool reads back.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built first, with make -C
@@ -424,11 +435,16 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
               r.returncode == 0 and os.path.exists(safe) and
               not os.path.exists(evil), text(r))
         os.remove(safe)
-        r = emu.tool("get", "../evil.dat", here)
-        check("evil.img: get by the long name to a directory, as "
-              "ALONGF~1.DAT there",
+        r = emu.tool("get", "ALONGF~1.DAT", here)
+        check("evil.img: get to a directory, as ALONGF~1.DAT there",
               r.returncode == 0 and os.path.exists(safe) and
               not os.path.exists(evil), text(r))
+        os.remove(safe)
+        r = emu.tool("get", "../evil.dat", here)
+        check("evil.img: get by the long name, a path with .., is error "
+              "20 (#168)", r.returncode == 1 and
+              "File error 20," in r.stderr.decode() and
+              not os.path.exists(safe) and not os.path.exists(evil), text(r))
     finally:
         emu.close()
 
@@ -1303,6 +1319,121 @@ def console(emu_link: Link, line: str, wait: float = 2.0) -> str:
     return out.decode(errors="replace")
 
 
+def mdir(img: str, folder: str) -> list[str]:
+    """The names that mdir -b lists in the folder of img, without it."""
+    r = subprocess.run(["mdir", "-b", "-i", img, f"::{folder}"],
+                       capture_output=True, text=True)
+    return [n.replace(f"::/{folder}/", "") for n in r.stdout.split()]
+
+
+def test_paths(imgs: dict[str, str], tmp: str) -> None:
+    """Paths to the folders inside NICE (#168): the tool's ls, get, put,
+    del, and mkdir on a held core, and a card that the ROM wrote, read by
+    the tool, and the reverse."""
+    print("paths to the folders inside NICE, a copy of super.img")
+    img = copy(imgs["super"], os.path.join(tmp, "p.img"))
+    put(img, b"inner\n", "NICE/SUB/INNER.TXT", tmp)
+    src = os.path.join(tmp, "x.bin")
+    with open(src, "w") as f:
+        f.write("8000 12345678\n8001 9ABCDEF0\n")
+    emu = Emu(img)
+    try:
+        r = emu.tool("ls", "SUB")
+        check("ls SUB", r.returncode == 0 and
+              "Directory of NICE/SUB" in r.stdout.decode() and
+              row("INNER.TXT", 6) in r.stdout.decode(), text(r))
+        r = emu.tool("ls", "/sub/")
+        check("ls /sub/, in either case and with a / at each end",
+              r.returncode == 0 and row("INNER.TXT", 6) in r.stdout.decode(),
+              text(r))
+        for name in ("SUB/INNER.TXT", "/sub/inner.txt"):
+            r = emu.tool("get", name, "-")
+            check(f"get {name}", r.returncode == 0 and r.stdout == b"inner\n",
+                  text(r))
+        for args, code in ((("get", "SUB/../HELLO.TXT"), 20),
+                           (("get", "./HELLO.TXT"), 20),
+                           (("get", "SUB//INNER.TXT"), 20),
+                           (("get", "SUB/"), 20),
+                           (("get", "NOPE/X"), 21),
+                           (("ls", "NOPE"), 21),
+                           (("get", "HELLO.TXT/X"), 22),
+                           (("ls", "HELLO.TXT"), 22),
+                           (("get", "SUB"), 22),
+                           (("mkdir", "NOPE/X"), 21),
+                           (("del", "SUB/NOPE"), 21)):
+            r = emu.tool(*args)
+            check(f"{' '.join(args)}: File error {code}", r.returncode == 1
+                  and f"File error {code}," in r.stderr.decode(), text(r))
+        r = emu.tool("mkdir", "HELLO.TXT")
+        check("mkdir of a file's name is refused", r.returncode == 1 and
+              "a file has the name HELLO.TXT" in r.stderr.decode(), text(r))
+        r = emu.tool("mkdir", "SUB/DEEP")
+        check("mkdir SUB/DEEP", r.returncode == 0 and
+              "made the folder NICE/SUB/DEEP" in r.stderr.decode(), text(r))
+        r = emu.tool("mkdir", "sub/deep")
+        check("mkdir sub/deep: there already", r.returncode == 0 and
+              "is there already" in r.stderr.decode(), text(r))
+        r = emu.tool("mkdir", "SUB/A long folder")
+        check("mkdir of a long name", r.returncode == 0, text(r))
+        r = emu.tool("put", src, "SUB/DEEP/")
+        check("put SRC SUB/DEEP/ takes SRC's name", r.returncode == 0 and
+              "SUB/DEEP/x.bin: 28 bytes written" in r.stderr.decode(), text(r))
+        r = emu.tool("put", src, "sub/a long folder/a long new name.bin")
+        check("put of a long name into a folder of a long name",
+              r.returncode == 0, text(r))
+        r = emu.tool("put", src, "SUB/NEW.TXT")
+        check("put SUB/NEW.TXT", r.returncode == 0, text(r))
+        r = emu.tool("del", "sub/new.txt")
+        check("del sub/new.txt", r.returncode == 0 and
+              "deleted NEW.TXT" in r.stderr.decode(), text(r))
+        r = emu.tool("ls", "SUB")
+        out = r.stdout.decode()
+        check("ls SUB lists the folders and no NEW.TXT", r.returncode == 0 and
+              row("DEEP", "<DIR>") in out and
+              row("A long folder", "<DIR>") in out and "NEW.TXT" not in out
+              and "Files: 1, directories: 2" in out, text(r))
+    finally:
+        emu.close()
+    check_card(img, "after the writes through paths")
+    check("mdir sees NICE/SUB/DEEP/X.BIN",
+          mdir(img, "NICE/SUB/DEEP") == ["x.bin"],
+          " ".join(mdir(img, "NICE/SUB/DEEP")))
+    r = subprocess.run(["mtype", "-i", img,
+                        "::NICE/SUB/A long folder/a long new name.bin"],
+                       capture_output=True)
+    check("mtype reads the long name in the long folder",
+          r.returncode == 0 and r.stdout.startswith(b"8000 12345678"))
+    if not os.path.exists(MONITOR):
+        check(f"{MONITOR} is built", False, "make build/rom_test.bin")
+        return
+    print("the monitor through paths, on the same card")
+    emu = Emu(img, prog=MONITOR)
+    try:
+        link = emu.link()
+        try:
+            link.control(RAM)
+            prompt(link)
+            out = console(link, 'DIR "SUB/DEEP"')
+            check("BASIC's DIR of the folder that the tool made",
+                  "Directory of NICE/SUB/DEEP" in out and
+                  row("x.bin", 28) in out, repr(out))
+            out = console(link, 'LOAD "sub/deep/x.bin"')
+            check("LOAD of the file that the tool put",
+                  "Words loaded: 2, 00008000 to 00008001" in out, repr(out))
+            out = console(link, 'BSAVE "SUB/A LONG FOLDER/R", 0x8000, 2')
+            check("BSAVE into the folder of a long name",
+                  "Words saved: 2" in out, repr(out))
+        finally:
+            link.close()
+        r = emu.tool("get", "SUB/A long folder/R.BIN", "-")
+        check("the tool reads the file that the ROM wrote",
+              r.returncode == 0 and
+              r.stdout.upper().startswith(b"00008000 12345678"), text(r))
+    finally:
+        emu.close()
+    check_card(img, "after the monitor's writes through paths")
+
+
 def test_monitor(imgs: dict[str, str], tmp: str) -> None:
     print("the monitor of the tests, and put and del")
     if not os.path.exists(MONITOR):
@@ -1376,6 +1507,7 @@ def main() -> None:
         test_format(imgs, tmp)
         test_write_running(imgs, tmp)
         test_monitor(imgs, tmp)
+        test_paths(imgs, tmp)
         test_nbd(imgs, tmp)
     print(f"{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

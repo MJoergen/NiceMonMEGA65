@@ -699,8 +699,9 @@ monitor's folder `NICE` (see
 
     tools/nicemon.py sd (link) [--slot N] [--hold] [--folder NAME] COMMAND
 
-- `ls` lists the folder as BASIC's `DIR` does, by the long names, with
-  the 8.3 name after the row of a file that has a long name.
+- `ls [PATH]` lists the folder as BASIC's `DIR` does, by the long
+  names, with the 8.3 name after the row of a file that has a long
+  name, or with `PATH` a folder inside it, as `DIR "PATH"` does.
 - `get NAME [DEST]` copies a file to `DEST`, by default its name in the
   current directory, or with `-` to stdout. The name it writes is the
   long name when that is a plain file name, or else the 8.3 name, so a
@@ -709,9 +710,10 @@ monitor's folder `NICE` (see
   file `NAME`, by default `SRC`'s own name. It makes the file, or
   truncates it when it is there, as BASIC's `SAVE` does.
 - `del NAME` deletes a file, with its long name, if it has one.
-- `mkdir` makes the folder in the root of a card that has FAT32 but not
-  the folder, which the monitor never makes, or says that it is there
-  already.
+- `mkdir [PATH]` makes the folder in the root of a card that has FAT32
+  but not the folder, which the monitor never makes, or with `PATH` a
+  folder inside it, such as `GAMES` or `GAMES/OLD`, or says that it is
+  there already.
 - `format [--label L] [--force] [--system] [--yes]` erases the whole
   card in the slot of `--slot` and writes a new FAT32 with the folder
   (see [Formatting a card](#formatting-a-card)).
@@ -727,6 +729,8 @@ tools/nicemon.py sd --eth 192.168.1.65 get HELLO.BIN
 tools/nicemon.py sd --eth 192.168.1.65 put prog.bas
 make sdcard ETH=192.168.1.65 CMD="del PROG.BAS"
 make sdcard ETH=192.168.1.65 CMD=mkdir
+make sdcard ETH=192.168.1.65 CMD="mkdir GAMES"
+make sdcard ETH=192.168.1.65 CMD="put chess.bin GAMES/"
 make sdcard ETH=192.168.1.65 CMD="--slot 0 format"
 ```
 
@@ -740,6 +744,16 @@ an 8.3 alias, as the monitor does, so a host file such as
 `my program.bas` keeps its name. The folder of `mkdir` must be an 8.3
 name with no extension, as `NICE` is.
 
+A `NAME` may be a path of the folders inside `NICE`, such as
+`GAMES/CHESS.BIN`, as the monitor takes it (issue #168): each part
+before a `/` is a folder, by its long name or its 8.3 name, a leading
+`/` is `NICE` itself, and a part that is empty, `.`, or `..` is error 20,
+so a path never leaves `NICE`. A folder that is not there is error 21,
+and a file used as one is error 22. `put SRC GAMES/` writes `SRC`'s own
+name into `GAMES`. `mkdir PATH` makes a folder inside `NICE`, whose
+folders before the last must be there, with a long name or an 8.3
+name, as a file gets.
+
 A card with no FAT32 file system, or with FAT16 or exFAT, must be
 formatted as FAT32 first, with `format` or on a PC; the tool says so. A
 card with FAT32 but no folder gets the hint of `mkdir`.
@@ -747,7 +761,7 @@ card with FAT32 but no folder gets the hint of `mkdir`.
 The writes keep to the order of the monitor's FAT32 code, so that a
 reset at any point leaves the card no worse than with lost clusters,
 which `fsck.fat` frees. `mkdir` writes the folder's cluster before the
-root's entry of it. A new entry has the host's date and time. When
+entry of it in the folder before it. A new entry has the host's date and time. When
 the card fills up, the file keeps what fitted, and `put` says error 30.
 
 ### Formatting a card

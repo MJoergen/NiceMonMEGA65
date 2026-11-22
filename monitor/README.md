@@ -310,7 +310,8 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   there is error -21, and a file where a directory is due is -22. Mode
   2 of `fs_open` opens a folder by its path, `GAMES`, `/GAMES`, or
   `GAMES/`; modes 0 and 1 take no `/` at the end. The ROM makes no
-  folder and deletes none: one is made on a PC.
+  folder and deletes none: one is made on a PC, or with `make sdcard
+  CMD="mkdir GAMES"` over the link.
 - **Names** are long names (VFAT) of up to 255 characters, or 8.3
   names, matched in either case: `mandelbrot.bin` and `MANDEL~1.BIN`
   are the same file. A long name is read from the long-name entries
