@@ -319,32 +319,104 @@ when it runs.
 
 ### Running a program under the monitor
 
-A program for the monitor of the ROM is assembled at `0x8000`, with
-nice_cpu's `start_mon.nasm`, or built with `nicebuild.py --monitor`
-([monitor/](../monitor/README.md#programs)). `--monitor` loads it so:
+`nicemon.py load` runs a program in one of two ways, and the program
+decides which. It is built for one of them, and does not run in the
+other.
+
+**A bare program**, as in [Running a program](#running-a-program), has
+the whole machine to itself. It starts at address 0, so `nicemon.py
+load` hides the ROM, and there is no monitor and no BASIC. The program
+has only the hardware: it prints by writing the console register, which
+sends a byte on the line, and it shows something on the screen only if it
+writes the screen's memory itself. When it ends, it halts the core. This
+is how `niceemu` runs a program of its own, so a bare program runs on the
+board and in the emulator alike. Use it for the tests of the hardware,
+for programs that compare the board with `niceemu`, and for programs that
+want no ROM in their way.
+
+**A program under the monitor** runs as a guest of the ROM. It starts at
+`0x8000`, above the ROM, and the monitor and BASIC stay where they are.
+The monitor calls the program as a subroutine, and the program calls the
+monitor's routines through its dispatch table: `mon_putc` prints on the
+screen and the line at once, and others read the keyboard, move the
+cursor, set the colors, and reach the SD card, the clock, and the
+network ([monitor/](../monitor/README.md#programs)). When the program
+returns, the monitor prints the status that it returned, and BASIC waits
+for the next statement, as after any other statement. This is the kind of
+program that you put on an SD card and start with BASIC's `LOAD` and
+`SYS 0x8000`, such as the releases' `demo.bin` and `weather.bin`, and
+the kind that `nicebuild.py --monitor` builds from C. A program for the
+monitor is assembled at `0x8000` with nice_cpu's `start_mon.nasm` in
+place of the start-up file at 0.
+
+`--monitor` runs the second kind. It does over the link what the card
+and BASIC would do, and so saves the trip of the card from the PC to the
+board while you work on such a program:
 
     tools/nicemon.py load --eth 192.168.1.65 --monitor prog.bin
     make load FILE=prog.bin ETH=192.168.1.65 ARGS=--monitor
 
-`nicemon.py load` holds the core and clears the memory with the ROM visible,
-writes the program, and starts the core. The monitor boots cold, which
-leaves the RAM from `0x8000` alone, and `nicemon.py load` types `SYS 0x8000`
-and CR, BASIC's statement that runs the program. The program then prints through the
-monitor's `mon_putc`, on the screen and the line, and returns to the
-monitor, which prints its status. A program with a word below `0x8000`
-is refused, and so is one with a word at the variables or above,
-BASIC's and the monitor's, `0x1E800` on the MEGA65 and `0xE800` on the
-Nexys4DDR, and a
-bitstream without a ROM. `--rom FILE` loads
-FILE at 0 in place of the ROM, with the ROM hidden, such as
-`build/rom.bin`, the monitor and BASIC: for `niceemu --link`, `make
-cosim`, a bitstream without a ROM, or another build of the ROM.
+Step by step, `nicemon.py load`:
 
-`nicemon.py run --monitor` does the same, with `SYS 0x8000` and CR before the
-input, and `--rom FILE` too, and prints what `niceemu` prints for the
-monitor and the program joined. The monitor reads on at the end of the
-input, so the input ends with BASIC's `HALT`, which halts the core, as
-in the monitor's tests:
+1. holds the core, and keeps the ROM visible.
+2. clears the memory, and writes the program from `0x8000`.
+3. starts the core. The monitor boots cold, and leaves the RAM from
+   `0x8000` alone.
+4. types `SYS 0x8000` and CR on the line, as you would on the keyboard,
+   and BASIC calls the program.
+
+Without `--monitor`, the same program would start at address 0, which
+holds no code of it. A bare program loaded with `--monitor` is refused,
+as it has words below `0x8000`.
+
+#### What `--monitor` refuses
+
+The checks catch a program that would not survive the monitor's boot:
+
+- A word below `0x8000`, where the ROM is.
+- A word in the screen, as the monitor clears the screen when it boots.
+  A program under the monitor writes the screen itself when it runs.
+- A word at the variables or above, the top of the RAM that the monitor
+  and BASIC keep for themselves: from `0x1E800` on the MEGA65 and from
+  `0xE800` on the Nexys4DDR. The variables are the monitor's 4K words, and
+  BASIC's RAM below them, as many words as the header of BASIC's image
+  says.
+- A bitstream without a ROM, which has no monitor to run the program.
+
+The top words below the variables are the stack that the monitor and the
+program share. The monitor uses it before the program runs, so a word of
+the program there is overwritten; a program leaves room for the stack
+anyway.
+
+#### With another ROM
+
+`--rom FILE` loads FILE at 0 in place of the ROM, hidden from the core
+as for a bare program, and runs the program under that monitor. FILE is
+usually `build/rom.bin`, the monitor and BASIC joined. Use it where there
+is no ROM, as in `niceemu --link`, `make cosim`, or a bitstream without
+one, or to try a new build of the ROM without a new bitstream. The
+program's RAM then ends below the variables of the BASIC in FILE.
+
+`nicemon.py load` and `nicemon.py run` set BASIC's flag "keep" in a ROM
+image that they load at 0, so that the monitor runs that BASIC and does not load a card's
+`BASIC*.ROM` in its place, which would also clear the program
+([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
+
+A MEGA65 loads a card's `BASIC*.ROM` when it is switched on, which
+takes a few seconds. A program that `--monitor` loads before that has
+ended stays, and the core's own BASIC runs it. The card's BASIC is
+then not loaded until the board is switched off and on again.
+
+#### Comparing with the emulator
+
+`nicemon.py run --monitor` runs the program so as well, and prints what
+`niceemu` prints, so that the board's output can be compared with the
+emulator's. It sends `SYS 0x8000` and CR before the input, and takes
+`--rom FILE` too. Unlike a bare program, a program under the monitor
+does not halt the core when it ends: it returns to BASIC, which reads on.
+So the input ends with BASIC's `HALT`, which halts the core, as in the
+monitor's tests. `niceemu` has no ROM of its own, so it gets the ROM and
+the program joined in one file, and `SYS 0x8000` in its input:
 
     printf 'HALT\r' > h.txt
     tools/nicemon.py run --tcp PORT --monitor --rom build/rom_test.bin \
@@ -356,19 +428,6 @@ in the monitor's tests:
 `make hwtest`, `make linktest`, and `make cosimtest` compare the two so
 with `monitor/test/hello.nasm`, and `make hwtest` also runs it under the
 monitor in the board's ROM, over the UART and Ethernet.
-
-The end of a program's RAM is below the monitor's variables, 4K words,
-and BASIC's RAM below them, as many words as the header of its image
-says: that of the BASIC of `--rom FILE`, or else of the ROM's. A ROM
-image that `nicemon.py load` or `nicemon.py run` loads at 0, such as `build/rom.bin`,
-gets BASIC's flag "keep", so that its monitor runs that BASIC and does
-not load a card's `BASIC*.ROM` in its place
-([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
-
-A MEGA65 loads a card's `BASIC*.ROM` when it is switched on, which
-takes a few seconds. A program that `--monitor` loads before that has
-ended stays, and the core's own BASIC runs it. The card's BASIC is
-then not loaded until the board is switched off and on again.
 
 ### Loading BASIC into the ROM
 
