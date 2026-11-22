@@ -114,8 +114,9 @@ as `(link)` in their usage, one of:
   [The serial port](#the-serial-port)), such as `--port /dev/ttyUSB1`.
 - `--tcp [HOST:]PORT` for `niceemu --link` (see
   [Without a board](#without-a-board)).
-- `--cosim PORT` for the simulated system of `make cosim`, at about 250
-  UART bytes a second.
+- `--cosim PORT` for the simulated system of `make cosim` (see
+  [On the simulated board](#on-the-simulated-board)), at about 250 UART
+  bytes a second.
 
 `flash` and `hwtest.py` take `--port` alone, and `hwtest.py`'s `--eth`
 tests the Ethernet port beside it.
@@ -207,6 +208,53 @@ trusted network. Elsewhere, forward the port over SSH instead:
 
 With `--tcp`, the end of the input half-closes the connection, and `--dump`
 cannot reach `0xFFFFFFD0`–`FF`, which are the emulator's memory.
+
+### On the simulated board
+
+`--cosim PORT` drives the RTL itself, which `make cosim` runs in GHDL
+with its debug UART on a TCP port of 127.0.0.1. It needs GHDL and gcc,
+but no board and no Vivado:
+
+    make cosim COSIM_PORT=4000 &
+    tools/nicemon.py run --cosim 4000 prog.bin
+
+`make cosim` prints `cosim: port N`, and without `COSIM_PORT` it takes
+any free port. `ROM=file.bin` gives the system a ROM, and `NICE=multi`
+the multi-cycle core. It runs until Ctrl-C.
+
+The connection is the UART line, as a USB serial adapter is: it sends
+no `b` notice, and a half-close is a break, which ends the line's
+input. One host is served at a time.
+
+The simulation is far slower than real time, about 250 bytes a second
+on the UART. A clear of the memory takes about 4 s, and a load of 1000
+words about 40 s, so only small programs are practical. The tools wait
+longer for an answer there, 20 s and 20 ms more for each byte of the
+request (`COSIM_WAIT` and `COSIM_BYTE` in `lib/boardlink.py`).
+
+`make cosimtest`, `tools/cosimtest.py`, uses it to check the RTL with
+the tools as `make hwtest` checks the board. It starts `make cosim` on
+a free port, and runs on it:
+
+- hwtest's checks of bad packets, but for the gap between two bytes,
+  which is far shorter in simulated time;
+- its checks of the pause, the step, the breakpoints, the writes of
+  the registers, and the FPU;
+- the programs that `make hwtest` compares, with `nicemon.py run
+  --cosim` and with `niceemu`, whose output and exit status must be the
+  same, and the monitor's test program with `--monitor --rom` and with
+  BASIC's `LOAD`;
+- the clock from the model of the R6's real-time clock at the
+  monitor's cold start, and BASIC's `TIME`, which writes it (#105);
+- and `nicemon.py load`'s refusal of a word beyond the simulated
+  system's 64K words of RAM.
+
+It leaves out nice_cpu's benchmark and the demo's self-test, which would
+take too long. It prints a line for each check, and last how many
+passed, and exits with status 1 when one fails. `NICE=multi` in the
+environment picks the multi-cycle core. CI runs it on both cores, two
+to four hours on each
+([CONTRIBUTING.md](../CONTRIBUTING.md#the-simulated-board)).
 
 ## nicemon.py load
 
