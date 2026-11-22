@@ -33,30 +33,18 @@ each tool, which has a section of its own below, in this order:
 
 [hwtest.py](#hwtestpy) tests the board, and [the other
 tools](#the-other-tools) test the tools and build releases. The modules
-that are not commands of their own are in `tools/lib/`: the link, the
-messages, the JTAG cable, the MEGA65's flash, the TCP peer of the
-tests, and the modules of the subcommands.
+that are not commands of their own, those of the subcommands among
+them, are in `tools/lib/`, which [lib/README.md](lib/README.md)
+describes.
 
 | Tool | What it does |
 |---|---|
 | `nicemon.py` | The front end, with the subcommands below. |
-| `lib/cli.py` | The messages and exit codes that the subcommands share. |
-| `lib/boardlink.py` | The debug link, which the other tools use: nice_cpu's `debugger/nicelink.py`, over TCP to `niceemu --link` and on the UART, with the board's own links over TCP to its Ethernet port and to `make cosim`. |
-| `lib/load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
-| `lib/run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
-| `lib/mon.py` | `nicemon.py mon`: an interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
-| `lib/sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot, and makes the folder. |
-| `lib/sdnbd.py` | `nicemon.py nbd`: serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |
-| `lib/flash.py` | `nicemon.py flash`: writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
-| `lib/tftpd.py` | `nicemon.py tftpd`: a TFTP server for BASIC's `LOAD` and `DIR`, which also lists the files of its folder for a name with `*` or `?`, and with `--write` for its `SAVE` and `BSAVE`. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
-| `lib/jtag.py` | The JTAG cable of the board's UART, and the check that the board is the one a bitstream or core file was built for, which `hwtest.py` and `flash.py` use. |
-| `lib/spiflash.py` | The MEGA65's flash through openFPGALoader's bridge, which `flash.py` uses to clear the protection of its sectors. |
 | `linktest.py` | Checks `nicemon.py run` and `mon`, the old names, and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `sdtest.py` | Checks `nicemon.py sd` and `nbd` on `niceemu --link` with images of a card, without a board. |
 | `tftptest.py` | Checks `nicemon.py tftpd`, and BASIC's TFTP in `niceemu` against it, without a board. |
 | `tcptest.py` | Checks the monitor's TCP in `niceemu` against `tcppeer.py`, and its timers with `--step-time`, without a board. |
-| `lib/tcppeer.py` | A TCP peer of its own on `niceemu`'s frames, with a script for each port, and for each connection it opens to a port where the board listens, for `tcptest.py`. |
 | `weathertest.py` | Checks the weather display, `examples/weather.c`, in `niceemu` against `tcppeer.py`, without a board. |
 | `cosimtest.py` | Checks `nicemon.py run` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `romsize.py` | Measures the words of the ROM and of the demo, and writes or checks their tables in `monitor/INTERNALS.md`, `basic/README.md`, and `demo/README.md`. |

@@ -170,7 +170,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `flash`, and `tftpd`, each a module of `tools/lib/` that it imports
   when it runs (#156; the old names, `load.py` and the others, are
   stubs in `tools/` that call it until V3.1). `tools/lib/` is a package
-  of the modules that are not commands (#166), imported as
+  of the modules that are not commands (#166), which its `README.md`
+  lists, imported as
   `from lib.boardlink import ...` and `from lib import cli`: `cli.py`
   (the messages on stderr and the exit codes that the subcommands
   share), `boardlink.py` (the link: nice_cpu's
