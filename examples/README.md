@@ -1,6 +1,6 @@
 # The examples
 
-Programs in C for the NICE CPU. `make examples` at the top builds them to
+Programs in C for the NICE CPU, and one in BASIC with machine code. `make examples` at the top builds them to
 `examples/build/`. It needs clang with the wasm32 target, `wasm-ld`, and
 `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and `llvm`
 packages). [doc/PROGRAMMING.md](../doc/PROGRAMMING.md) says how C
@@ -11,6 +11,7 @@ reaches the board.
 | `primes.bin` | Asks for a limit, counts the primes up to it, and prints how many cycles and instructions that took, until it reads 0. It runs on its own, from address 0, loaded by `tools/nicemon.py load`. |
 | `bench.bin`, `bench_win.bin` | nice_cpu's benchmark, which `make hwtest` runs (CONTRIBUTING.md, "The examples"). |
 | `weather.bin` | A weather display on the screen, below. It runs under the monitor. |
+| `sieve.bas`, `sieve.bin` | A BASIC program that counts primes in BASIC, and then again with a routine of machine code that it loads beside it, and compares the times (BASIC with machine code, below). |
 
 ## The weather display
 
@@ -107,3 +108,56 @@ the answer, which `make -C examples test` checks on the host with the
 answers in `test/`. `make weathertest` at the top runs that, and then
 the whole program in the emulator against a server of the test
 (CONTRIBUTING.md, "The examples").
+
+## BASIC with machine code
+
+`sieve.bas` is a BASIC program that calls a routine of machine code,
+`sieve.bin`, for the part where BASIC is slow. Both count the primes
+with the sieve of Eratosthenes, as BYTE's benchmark does, and the
+program prints how long each took:
+
+    Words loaded: 48, 0000C000 to 0000C02F
+    BASIC:
+    1899 PRIMES IN 14022 MS
+    MACHINE CODE:
+    Returned 00000000
+    1899 PRIMES IN 154 MS
+    MACHINE CODE IS 90 TIMES AS FAST
+
+Those times are from `niceemu`'s test, which counts a microsecond for
+each instruction, so the ratio is that of the instructions. The board
+runs both faster, and prints its own times.
+
+### Running it
+
+1. Copy `sieve.bas` and `sieve.bin` to the folder `NICE` of the SD card.
+   The examples' zip of each release has both, and `make examples`
+   builds them in `examples/build/`.
+2. On the board, at BASIC's `READY.`, type `RUN "SIEVE"`.
+
+`make load FILE=examples/sieve.bas ETH=IP ARGS=--bas` types the program
+from the PC instead (tools/README.md), but it still loads `SIEVE.BIN`
+from the card.
+
+### How it works
+
+BASIC keeps its program, its variables, and its arrays below `HIMEM`,
+and never writes above it. Line 30, `HIMEM = 0xC000`, makes room above
+`0xC000`, and comes first, as it clears the variables. Line 40 loads
+`SIEVE.BIN`, which `sieve.nasm` assembles for `0xC000` with `.ORG`.
+All of its words are at `HIMEM` or above, so the `LOAD` leaves the
+program alone, and it goes on with the next line. A `.bin` file built
+for `0x8000`, where BASIC's program starts, would end it instead
+([basic/README.md](../basic/README.md#machine-code-beside-a-program)).
+
+The routine and BASIC share two words: the program `POKE`s the size to
+`0xC000`, calls `SYS 0xC002`, and reads the count with
+`PEEK(0xC001)`. The routine keeps its flags, a word each, from `0xC100`
+up to `0xE3FF`, below the stack's room, so the same file runs on both
+the MEGA65 and the Nexys4DDR. It returns with `RET`, which `SYS`
+reports with `Returned 00000000`, and keeps the registers R7 to R13,
+which BASIC uses.
+
+`make -C examples test` runs the program in `niceemu` with a card that
+holds both files, and compares what it prints with
+`test/sieve.expected`.

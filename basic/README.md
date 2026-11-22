@@ -382,6 +382,8 @@ routine may call the monitor's entries ([monitor/README.md](../monitor/README.md
 and keeps away from the RAM below `HIMEM`, which is BASIC's. It stays
 loaded until something writes over it, so a program that runs again
 can test for it with `PEEK` before it loads it.
+[examples/README.md](../examples/README.md#basic-with-machine-code)
+has a whole example, `sieve.bas`, which compares the two.
 
 ## Errors in a program
 

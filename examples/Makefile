@@ -28,14 +28,24 @@
 # answers of test/*.http, and the whole program in niceemu by
 # tools/weathertest.py (make weathertest at the top).
 #
-# make          builds build/primes.bin, build/weather.bin, and
-#               build/bench.bin and build/bench_win.bin from nice_cpu's
+# sieve.bin is no C: it is a routine of machine code at 0xC000, which the
+# BASIC program sieve.bas loads above its HIMEM and calls with SYS. niceasm
+# assembles it, and sieve.bas is copied beside it, so that the release's
+# zip of build/ has both. The test runs sieve.bas in niceemu with the
+# monitor of the tests, ../build/rom_test.bin, and a card in slot 0 with
+# both in its folder NICE, with --step-time, so that TI counts a
+# microsecond a step, and compares the output with test/sieve.expected.
+#
+# make          builds build/primes.bin, build/weather.bin, build/sieve.bin,
+#               and build/bench.bin and build/bench_win.bin from nice_cpu's
 #               benchmark, bench/bench.c, which tools/hwtest.py runs
-# make test     checks weather_parse.c on the host, with cc
+# make test     checks weather_parse.c on the host, with cc, and sieve.bas
+#               with sieve.bin in niceemu
 # make clean    removes build/ and test/build/
 #
 # Needs clang with the wasm32 target, wasm-ld and llvm-ar (the lld and llvm
-# packages), and Python 3.
+# packages), and Python 3. The test needs niceemu, built with make -C
+# ../nice_cpu/emulator build, mkfs.fat, and mtools.
 
 CLANG  ?= clang
 CC     ?= cc
@@ -43,6 +53,8 @@ PYTHON ?= python3
 NICE_CPU = ../nice_cpu
 LIBC    = $(NICE_CPU)/runtime/libc
 BUILD   = build
+EMU     = $(NICE_CPU)/emulator/zig-out/bin/niceemu
+ROM_TEST = ../build/rom_test.bin
 
 CFLAGS  = --target=wasm32 -mbulk-memory -O2 -ffreestanding -nostdlibinc \
           -isystem $(LIBC)/include -Wall -Wextra
@@ -63,7 +75,7 @@ WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
 # The programs that call scanf, and so need float_fpu.nasm.
 FLOAT_PROGRAMS = primes
 
-all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin
+all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin $(BUILD)/sieve.bin $(BUILD)/sieve.bas
 
 MON      = ../monitor
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
@@ -80,8 +92,33 @@ test/build/weather_test: test/weather_test.c weather_parse.c weather_parse.h
 	mkdir -p test/build
 	$(CC) -std=c11 -O2 -Wall -Wextra -Werror -o $@ test/weather_test.c weather_parse.c
 
-test: test/build/weather_test
+test: test/build/weather_test test/build/sieve.img $(ROM_TEST)
 	test/build/weather_test test
+	printf 'RUN "SIEVE"\rHALT\r' > test/build/sieve.in
+	$(EMU) -s -n 100000000 --step-time --sd0 test/build/sieve.img -i test/build/sieve.in \
+	  $(ROM_TEST) | sed -e '/^Halted/,$$d' > test/build/sieve.out
+	@if cmp -s test/sieve.expected test/build/sieve.out; then echo "PASS sieve"; \
+	else echo "FAIL sieve"; diff test/sieve.expected test/build/sieve.out; exit 1; fi
+
+# sieve.bin, the routine, and sieve.bas, the program that calls it
+$(BUILD)/sieve.bin: sieve.nasm $(NICEASM) | $(BUILD)
+	$(PYTHON) $(NICE_CPU)/assembler/niceasm.py -o $@ sieve.nasm
+
+$(BUILD)/sieve.bas: sieve.bas | $(BUILD)
+	cp sieve.bas $@
+
+# The card of the test: FAT32 on the whole card, with both in NICE
+test/build/sieve.img: $(BUILD)/sieve.bin sieve.bas
+	mkdir -p test/build
+	rm -f $@
+	truncate -s 40M $@
+	mkfs.fat -F 32 -i 4E494345 $@ > /dev/null
+	mmd -i $@ ::NICE
+	mcopy -i $@ $(BUILD)/sieve.bin ::NICE/SIEVE.BIN
+	mcopy -i $@ sieve.bas ::NICE/SIEVE.BAS
+
+$(ROM_TEST): FORCE
+	$(MAKE) -C .. build/rom_test.bin
 
 # The library is built in the submodule, which ignores its build files.
 $(LIBC)/libc.a: FORCE

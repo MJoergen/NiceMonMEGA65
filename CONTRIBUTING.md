@@ -87,8 +87,8 @@ or, in an existing clone:
 - `make tcptest` checks the monitor's TCP, and its timers, without a
   board (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make weathertest` checks the weather display, `examples/weather.c`,
-  on the host and in `niceemu`, without a board (see [The
-  examples](#the-examples)).
+  on the host and in `niceemu`, and `examples/sieve.bas` in `niceemu`,
+  without a board (see [The examples](#the-examples)).
 - `make sdtest` checks `tools/nicemon.py sd` and `tools/nicemon.py nbd` on
   `niceemu --link` with images of a card, without a board (see [The
   tools and niceemu](#the-tools-and-niceemu)).
@@ -1285,6 +1285,9 @@ network's entries from C. `make weathertest` checks it in two parts:
   a redirect, lines that end in LF alone, a body shorter than its
   `Content-Length`, no end of the headers, and a text that is not the
   weather. It checks the settings, the request, and the UTF-8 too.
+  Then it runs `examples/sieve.bas`, which loads `sieve.bin` above its
+  `HIMEM`, under the monitor of the tests in `niceemu`, with a card that
+  holds both, and compares its output with `examples/test/sieve.expected`.
 - `tools/weathertest.py` checks first that the program ends 1K words
   below `0xE800`, the variables of the Nexys4DDR, so that it fits in the Nexys4DDR's memory with its
   page of wasm memory. Then it runs the program under the monitor of the
