@@ -120,10 +120,13 @@ Checks, in this order:
       monitor of the tests, with dir SLOT, lists the folder NICE as the
       host lists it from the sectors read over the link (issue #58), and
       TAB after LOAD, a quote, and the start of a name that no other name
-      has, completes it with the closing quote and a blank (issue #147);
+      has, of a file or of a directory, completes a file's with the
+      closing quote and a blank (issue #147), and a directory's with a /
+      (issue #168);
       on a card with NICE, sdcard.py's mkdir finds the folder there
       already, and writes nothing; and when NICE has a folder inside it,
-      the host walks to it by its path, reads a file in it, and DIR
+      the host walks to it by its path, reads the smallest file in it,
+      of at most 1 MiB, and DIR
       "NAME" lists it as the host does (issue #168). A card without NICE,
       one with no name of a start of its own, and one with no folder
       inside NICE are named after NOT COVERED
@@ -331,6 +334,9 @@ T = TypeVar("T")
 QUIET = 0.5
 RUN_TIMEOUT = 10.0
 I2C_WAIT = 1.0
+# The most bytes of a file that inner_folder reads through its path: a
+# larger file takes minutes over the link, sector by sector
+PATH_FILE_MAX = 1 << 20
 
 results: list[bool] = []
 # The checks that could not run, which the summary names
@@ -1881,11 +1887,13 @@ class Unread(Exception):
 
 class Folder(NamedTuple):
     """What the host reads of a card's folder FOLDER: the rows of BASIC's
-    DIR, and the names of its files that TAB completes, those without a
-    ?, as DIR shows them, and for its first folder inside it, if any, its
-    name and the rows of DIR "NAME" (issue #168)."""
+    DIR, the names of its files that TAB completes, those without a ?, as
+    DIR shows them, and those of its directories, which TAB completes
+    too, and for its first folder inside it, if any, its name and the
+    rows of DIR "NAME" (issue #168)."""
     rows: list[str]
     names: list[str]
+    dirs: list[str]
     sub: tuple[str, list[str]] | None = None
 
 
@@ -1894,8 +1902,10 @@ def inner_folder(vol: Volume, listed: list[Entry],
     """The first folder inside FOLDER that DIR "NAME" can list, by a name
     with no ?, and not an IP address, which DIR takes as a TFTP server's,
     and the rows of DIR "NAME", which the host walks to as the monitor's
-    path does; the first file in it is read, as a check of a path to a
-    file. None when the card has no such folder, which is not covered."""
+    path does; the smallest file in it that is not empty, or else an
+    empty one, is read, as a check of a path to a file, unless it has
+    more than PATH_FILE_MAX bytes, which take too long over the link.
+    None when the card has no such folder, which is not covered."""
     for e in listed:
         if (e.is_dir and "?" not in e.name and
                 not re.match(r"\s*\d+\.\d+\.\d+\.\d+(:|\s*$)", e.name)):
@@ -1906,13 +1916,18 @@ def inner_folder(vol: Volume, listed: list[Entry],
         return None
     clus, _ = vol.walk(e.name, folder=True)
     inner = vol.listing(clus)
-    for f in inner:
-        if not f.is_dir:
-            path = f"{e.name}/{f.short}"
+    files = [f for f in inner if not f.is_dir]
+    if files:
+        f = min(files, key=lambda f: (f.size == 0, f.size))
+        path = f"{e.name}/{f.short}"
+        if f.size > PATH_FILE_MAX:
+            uncovered.append(f"{name}: a read of a file through its path, "
+                             f"as the smallest in {FOLDER}/{e.name} has "
+                             f"{f.size} bytes")
+        else:
             data = vol.contents(vol.find_path(path))
             check(f"{name}: {FOLDER}/{path} reads through its path, "
                   f"{f.size} bytes", len(data) == f.size)
-            break
     return e.name, vol.rows(inner, e.name)
 
 
@@ -1942,7 +1957,7 @@ def fat32_dir(link: Link, name: str) -> Folder | None:
         if e.code == E_NOFOLDER:
             uncovered.append(f"{name}: sdcard.py mkdir, as the card has no "
                              f"folder {FOLDER}, and it would write one")
-            return Folder([str(e)], [])
+            return Folder([str(e)], [], [])
         uncovered.append(f"{name}'s files, as BASIC's DIR gives {e}")
         return None
     writes: list[int] = []
@@ -1959,6 +1974,7 @@ def fat32_dir(link: Link, name: str) -> Folder | None:
         check(f"{name}: sdcard.py mkdir finds the folder {FOLDER} there "
               "already", False, str(e))
     files = [e.name for e in listed if not e.is_dir and "?" not in e.name]
+    dirs = [e.name for e in listed if e.is_dir and "?" not in e.name]
     try:
         sub = inner_folder(vol, listed, name)
     except Unread:
@@ -1966,7 +1982,7 @@ def fat32_dir(link: Link, name: str) -> Folder | None:
     except FileError as e:
         check(f"{name}: a folder inside {FOLDER} reads", False, str(e))
         sub = None
-    return Folder(vol.rows(listed), files, sub)
+    return Folder(vol.rows(listed), files, dirs, sub)
 
 
 def boot_load() -> tuple[str, int] | None:
@@ -2099,13 +2115,16 @@ def counter(link: Link, lo: int) -> int:
     return high << 32 | low
 
 
-def tab_pick(names: list[str]) -> tuple[str, str] | None:
-    """A name for TAB to complete and the start to type, the shortest that
-    no other name shares, in either case, and shorter than the name, so
-    that TAB has something to add; or None. The line must hold LOAD,
-    the name in quotes, and a blank."""
+def tab_pick(names: list[str],
+             others: list[str]) -> tuple[str, str] | None:
+    """A name of names for TAB to complete and the start to type, the
+    shortest that no other name shares, of names or of others, in either
+    case, and shorter than the name, so that TAB has something to add;
+    or None. TAB matches the files and the directories of a folder alike
+    (issue #168), so each kind is the others of the other. The line must
+    hold LOAD, the name in quotes, and a blank."""
     best: tuple[str, str] | None = None
-    folded = [n.casefold() for n in names]
+    folded = [n.casefold() for n in names + others]
     for name in names:
         if len(name) > 60:
             continue
@@ -2144,28 +2163,33 @@ def console_until(link: Link, until: Callable[[bytes], bool],
     return text
 
 
-def test_tab(link: Link, slot: int, names: list[str]) -> None:
+def test_tab(link: Link, slot: int, names: list[str],
+             dirs: list[str]) -> None:
     """TAB on BASIC's line (issue #137) completes a name of the card that
     DIR SLOT has just mounted: after LOAD, a quote, and a start that no
-    other name has, the monitor types the rest of the name, the closing
-    quote, and a blank. Ctrl-C ends the line, so that nothing loads. It
-    only reads the card. A folder with no name of a start of its own is
-    not covered."""
-    pick = tab_pick(names)
-    if pick is None:
-        uncovered.append(f"SD slot {slot}: TAB, as no name of {FOLDER} has "
-                         "a start of its own")
-        return
-    name, start = pick
-    typed = f'LOAD "{start}'
-    want = f'LOAD "{name}" '
-    link.send_console(typed.encode() + b"\t")
-    text = console_until(link, lambda t: edited(t).endswith(want), 10.0)
-    got = edited(text.rpartition(b"\n")[2])
-    check(f"SD slot {slot}: TAB completes {typed} to {want}", got == want,
-          f"got {got!r}")
-    link.send_console(b"\x03")
-    console(link, 1.0)
+    other name has, of a file or of a directory, the monitor types the
+    rest of a file's name, the closing quote, and a blank, and the rest
+    of a directory's and a / (issue #168). Ctrl-C ends the line, so that
+    nothing loads. It only reads the card. A folder with no file, or
+    with directories and none, of a start of its own is not covered."""
+    for kind, mine, others, end in (("file", names, dirs, '" '),
+                                    ("directory", dirs, names, "/")):
+        pick = tab_pick(mine, others)
+        if pick is None:
+            if mine or kind == "file":
+                uncovered.append(f"SD slot {slot}: TAB of a {kind}, as no "
+                                 f"{kind} of {FOLDER} has a start of its own")
+            continue
+        name, start = pick
+        typed = f'LOAD "{start}'
+        want = f'LOAD "{name}{end}'
+        link.send_console(typed.encode() + b"\t")
+        text = console_until(link, lambda t: edited(t).endswith(want), 10.0)
+        got = edited(text.rpartition(b"\n")[2])
+        check(f"SD slot {slot}: TAB completes {typed} to {want}",
+              got == want, f"got {got!r}")
+        link.send_console(b"\x03")
+        console(link, 1.0)
 
 
 def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
@@ -2198,7 +2222,7 @@ def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
               + (f"; first difference {rows[bad[0]]!r}, want "
                  f"{want[bad[0]]!r}" if bad else ""))
         if len(want) > 1:
-            test_tab(link, slot, folder.names)
+            test_tab(link, slot, folder.names, folder.dirs)
         if folder.sub is not None:
             # DIR "NAME" of the slot that DIR SLOT mounted (issue #168)
             sub, srows = folder.sub

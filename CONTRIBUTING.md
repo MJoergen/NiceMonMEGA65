@@ -1037,12 +1037,15 @@ that the root has none, and, after the primes, loads the monitor of the
 tests and types `DIR SLOT`, whose rows, or error 29, must be the same;
 a card with no FAT32 is NOT COVERED there. On a card with `NICE`, TAB
 then completes a name of it: the script types `LOAD "`, the shortest
-start of a name that no other name has, and TAB, and the monitor must
-type the rest of the name, the closing quote, and a blank, before
-Ctrl-C ends the line. A folder with no name of a start of its own is
+start of a file's name that no other name has, of a file or of a
+directory, and TAB, and the monitor must type the rest of the name, the
+closing quote, and a blank, before Ctrl-C ends the line. It does the
+same with a directory's name, which the monitor must end with a `/`
+(issue #168). A folder with no name of a start of its own is
 NOT COVERED. When `NICE` has a folder inside it, the host walks to it
-by its path and reads a file in it, as the monitor's paths do (issue
-#168), and `DIR "NAME"` must list it as the host does; a card with none
+by its path and reads the smallest file in it, as the monitor's paths
+do (issue #168), unless that file has more than 1 MiB, which is NOT
+COVERED, and `DIR "NAME"` must list it as the host does; a card with none
 is NOT COVERED there. On a card with `NICE`, `nicemon.py sd mkdir` must also say that
 the folder is there already, and write nothing, which a write function
 that only counts shows. A card without `NICE` is NOT COVERED there, as
