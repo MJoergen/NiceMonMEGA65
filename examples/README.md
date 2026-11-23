@@ -201,16 +201,18 @@ such as `CHR$(252)`, ü, goes to the server in UTF-8. `SAVE "WEATHER"`
 keeps the changes on the card.
 
 The screen is that of `weather.bin`. R fetches now, and Q goes back to
-BASIC. CTRL-C stops the program too, but then the font stays the
-program's, until `POKE 0xFFFFFF86, 0`.
+BASIC. CTRL-C stops the program too. On a core before V2.6, the font
+then stays the program's, until `POKE 0xFFFFFF86, 0`.
 
 ### How it works
 
 Line 50 sets `HIMEM = 0xD000`, and line 60 loads `WFETCH.BIN`, which
 `wfetch.nasm` assembles for `0xD000`, as `sieve.bas` loads its routine.
 The program writes the screen with `POKE`, a word for each character
-with its color, and draws the glyphs of the clock and the arrows into
-the font RAM, as `weather.c` does.
+with its color. The clock's blocks and the wind's arrows are the
+character ROM's, at `0x80`–`0x99`. On a core before V2.6, whose ROM
+has them blank, `PEEK(0xFFFE3000)` reads 0, and the program draws them
+into the font RAM, as `weather.c` does.
 
 The routine and BASIC share these words:
 

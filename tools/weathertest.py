@@ -312,7 +312,7 @@ def basic_cases(tmp: str) -> None:
     check("weather.bas, ok.http: the condition", r.row(ROW_COND) == "Patchy rain nearby",
           r.row(ROW_COND))
     want = "Temperature +8°C    Wind →5m/s    Humidity 77%"
-    check("weather.bas, ok.http: the values, with the degree sign and the arrow of the font RAM",
+    check("weather.bas, ok.http: the values, with the degree sign and the arrow of the ROM",
           r.row(ROW_VALUES) == want, r.row(ROW_VALUES))
     check("weather.bas, ok.http: the status",
           r.row(ROW_STATUS) == "Fetched less than a minute ago", r.row(ROW_STATUS))
