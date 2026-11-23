@@ -12,7 +12,7 @@ reaches the board.
 | `bench.bin`, `bench_win.bin` | nice_cpu's benchmark, which `make hwtest` runs (CONTRIBUTING.md, "The examples"). |
 | `weather.bin` | A weather display on the screen, below. It runs under the monitor. |
 | `sieve.bas`, `sieve.bin` | A BASIC program that counts primes in BASIC, and then again with a routine of machine code that it loads beside it, and compares the times (BASIC with machine code, below). |
-| `weather.bas`, `wfetch.bin` | The weather display again, in BASIC, with a routine of machine code for the network (The weather display in BASIC, below). |
+| `weather.bas` | The weather display again, in BASIC, which fetches with `HTTP$` (The weather display in BASIC, below). |
 
 ## The weather display
 
@@ -175,16 +175,15 @@ holds both files, and compares what it prints with
 ## The weather display in BASIC
 
 `weather.bas` is the weather display of `weather.bin` rewritten in
-BASIC. The screen, the keys, the request, and the parse of the answer
-are BASIC. BASIC has no statements for DNS and TCP, so a routine of
-machine code, `wfetch.bin`, does the fetch, as `sieve.bin` does the
-sieve.
+BASIC: the screen, the keys, the fetch, and the text of the answer. It
+needs a BASIC with `HTTP$`, that of V2.6 or later
+([basic/README.md](../basic/README.md#http)).
 
 ### Running it
 
-1. Copy `weather.bas` and `wfetch.bin` to the folder `NICE` of the SD
-   card. The examples' zip of each release has both, and `make
-   examples` builds them in `examples/build/`.
+1. Copy `weather.bas` to the folder `NICE` of the SD card. The
+   examples' zip of each release has it, and `make examples` copies it
+   to `examples/build/`.
 2. On the board, at BASIC's `READY.`, type `LOAD "WEATHER"`.
 3. Change the settings in lines 90 to 110, if needed, and type `RUN`.
 
@@ -200,46 +199,36 @@ read a file's text:
 such as `CHR$(252)`, ü, goes to the server in UTF-8. `SAVE "WEATHER"`
 keeps the changes on the card.
 
-The screen is that of `weather.bin`. R fetches now, and Q goes back to
-BASIC. CTRL-C stops the program too. On a core before V2.6, the font
-then stays the program's, until `POKE 0xFFFFFF86, 0`.
+The screen is that of `weather.bin`, but for the texts of the errors,
+which are BASIC's `DS$`, such as `The server refused the connection`.
+R fetches now, and Q goes back to BASIC. CTRL-C stops the program too.
+On a core before V2.6, the font then stays the program's, until
+`POKE 0xFFFFFF86, 0`.
 
 ### How it works
 
-Line 50 sets `HIMEM = 0xD000`, and line 60 loads `WFETCH.BIN`, which
-`wfetch.nasm` assembles for `0xD000`, as `sieve.bas` loads its routine.
+`PROCFETCH` builds the path with `URL$`, and fetches it with `HTTP$`:
+
+    P$ = "/" + URL$(PLACE$) + "?format=%l|%C|%t|%w|%h"
+    ...
+    IF FAILED = 0 THEN B$ = HTTP$(H$, P$)
+
+Before it, `TRAP` points to a handler, which sets `FAILED`, keeps
+`DS$` as the text of the error, or `ERR$(ER)` for an error of BASIC,
+such as `String too long`, and goes on with `RESUME NEXT`. When the
+board has no IP address, the program types `DHCP` first. `HTTP$` has
+decoded the text from UTF-8 already, with the wind's arrows as the
+codes of their glyphs, so `FNPARSE` only splits the first line at its
+`|`s with `INSTR`, into the five fields.
+
 The program writes the screen with `POKE`, a word for each character
 with its color. The clock's blocks and the wind's arrows are the
 character ROM's, at `0x80`–`0x99`. On a core before V2.6, whose ROM
 has them blank, `PEEK(0xFFFE3000)` reads 0, and the program draws them
 into the font RAM, as `weather.c` does.
 
-The routine and BASIC share these words:
-
-| Address | What |
-|---|---|
-| `0xD000` | The bytes of the answer, or an error of the monitor, below 0 |
-| `0xD001` | The server's port |
-| `0xD002` | The routine, which `SYS 0xD002` calls |
-| `0xD100` | The server's name, a character a word, and a 0 |
-| `0xD140` | The request, a character a word, and a 0 |
-| `0xD400` | The answer, up to 2048 bytes, a byte a word |
-
-The routine packs the name and the request into bytes. It gets an IP
-address by DHCP when the board has none, looks the name up, opens the
-connection, sends the request, and reads the answer until the server
-closes, or for 20 seconds at most. Then it unpacks the answer, a byte
-to a word, for `PEEK`.
-
-One fetch is one `SYS`, from the lookup to the close. A `SYS` ends with
-`mon_restore`, which closes the network
-([monitor/README.md](../monitor/README.md#the-dispatch-table), entry
-36), so no connection can stay open between two calls. So the clock
-stops while a fetch waits, for a second or so, where `weather.bin`
-fetches while it runs. `mon_restore` also sets the font back to
-Spleen's and shows the cursor, so the program sets both again after
-each `SYS`. `SYS` prints `Returned 00000000`, at row 25, which the
-program then clears.
+The clock stops while a fetch waits, for a second or so, where
+`weather.bin` fetches while it runs.
 
 `make weathertest` runs it in `niceemu` against the same server of the
 test as `weather.bin`, with the same answers, and checks its screen

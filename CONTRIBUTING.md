@@ -1315,13 +1315,13 @@ network's entries from C. `make weathertest` checks it in two parts:
   line of the settings not understood, a settings file of more than
   1024 bytes, and one of 1024, the place typed when there is
   no file, and ESC and Q back to the monitor. Then it runs
-  `examples/weather.bas` the same way, with `WEATHER.BAS` and
-  `WFETCH.BIN` on the card, under the monitor of the tests alone: the
-  keys load the program, type its line of the server, and `RUN` it. It
-  checks that `wfetch.bin` lies between `HIMEM`, `0xD000`, and its
-  buffers, and the same screens and requests as for `weather.bin`, the
-  answers cut short and not HTTP too, a place in UTF-8 with the units
-  `u`, another port, and Q back to BASIC with Spleen's font. It takes
+  `examples/weather.bas` the same way, with `WEATHER.BAS` on the
+  card, under the monitor of the tests alone: the keys load the
+  program, type its line of the server, and `RUN` it. It checks the
+  same screens as for `weather.bin`, with `DS$` as the error's text,
+  and `HTTP$`'s request, the answers cut short and not HTTP too, a body
+  too long for a string, a place in UTF-8 with the units `u`, another
+  port, and Q back to BASIC with Spleen's font. It takes
   about 100 seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's

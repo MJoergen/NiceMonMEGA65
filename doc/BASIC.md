@@ -630,21 +630,23 @@ BASIC uses the FPU's.
   settled: no names are reserved).
   `ON` is the statement's keyword, read again after `CURSOR`.
 
-### HTTP (proposed)
+### HTTP
 
-Proposed on 2026-11-23 in #170, and not written. A review of the same
+Proposed on 2026-11-23 in #170, and written in V2.6 the same day, in
+`basic/basic_net.nasm`, as below, in 972 words, where the review
+guessed 600 to 700 (measured 2026-11-23). A review of the same
 day, against the monitor's code and wttr.in's answers, moved the
 control block, changed `URL$`'s blank and the body's line end, and
 settled the three questions below, and nice_cpu#204 then decided the
 codes of the glyphs, which the decode follows. It is the first of stage
 11's "statements for the network", cut to what a program that reads
 a web service needs. `examples/weather.bas`, the weather display of
-#128 in BASIC, shows the need. It is 375 lines, of which about 180
-are no weather: they build the request, call a routine of machine
+#128 in BASIC, showed the need. It was 375 lines, of which about 180
+were no weather: they built the request, called a routine of machine
 code, `wfetch.nasm`, with `SYS`, set the font and the cursor again
-after it, and parse the answer with `PEEK`, the status line, the
+after it, and parsed the answer with `PEEK`, the status line, the
 headers, `Content-Length`, and UTF-8, a byte at a time. Every
-program that reads a web service would have them again.
+program that reads a web service would have had them again.
 
 - **`HTTP$(HOST$, PATH$)`** is a function. It fetches
   `http://HOST$PATH$` with `GET` and HTTP/1.0, and gives the body as a
@@ -744,7 +746,7 @@ program that reads a web service would have them again.
   frees the handle at once: a close with 0 leaves the block the ROM's
   until the peer has answered.
 
-The weather's fetch becomes
+The weather's fetch became
 
 ```
 TRAP 900
@@ -753,11 +755,11 @@ B$ = HTTP$(SERVER$, "/" + URL$(PLACE$) + "?format=%l|%C|%t|%w|%h&m&M")
 
 and `INSTR` on its `|`s, with `DS$` in the handler at line 900.
 `wfetch.nasm`, the request, the parse, and the table of the errors
-go, and the program drops to about 190 lines. With the glyphs, whose
-font code goes too, and with `CURSOR` and `PRINT` in place of its
-`POKE`s, to about 120, for a core that has the glyphs alone. With
-the font code kept for an older core, behind the probe of
-`0xFFFE3000`, it is about 35 lines more.
+went, and the program dropped to 248 lines, with its screen by `POKE`
+and its font code for an older core kept, behind the probe of
+`0xFFFE3000` (measured 2026-11-23). For a core that has the glyphs
+alone, without the font code, and with `CURSOR` and `PRINT` in place
+of its `POKE`s, it would be about 120.
 
 The glyphs are a change of nice_cpu first,
 [nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204), as
@@ -1472,8 +1474,8 @@ Each has an issue, under #54.
     [The machine](#the-machine), in 438 words (measured 2026-11-21).
     The display offset has no statement.
 11. Later, in no order: statements for the network, after #111,
-    the first of which, `HTTP$` and `URL$`, #170, are proposed in
-    [HTTP (proposed)](#http-proposed);
+    the first of which, `HTTP$` and `URL$`, #170, are written in
+    V2.6, as [HTTP](#http) has them;
     virtual screens, #163, `FIND` and `CHANGE`, #162; and graphics,
     sprites, and sound, with their hardware.
 

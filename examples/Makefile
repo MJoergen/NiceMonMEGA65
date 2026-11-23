@@ -36,14 +36,12 @@
 # both in its folder NICE, with --step-time, so that TI counts a
 # microsecond a step, and compares the output with test/sieve.expected.
 #
-# weather.bas is the weather display in BASIC, and wfetch.bin its routine
-# of machine code at 0xD000, which does the fetch over HTTP, as BASIC has
-# no statements for DNS and TCP. niceasm assembles it, and weather.bas is
-# copied beside it, as for the sieve. tools/weathertest.py runs it in
+# weather.bas is the weather display in BASIC, which fetches with BASIC's
+# HTTP$, and is copied as sieve.bas is. tools/weathertest.py runs it in
 # niceemu against its server of HTTP (make weathertest at the top).
 #
 # make          builds build/primes.bin, build/weather.bin, build/sieve.bin,
-#               build/wfetch.bin, and build/bench.bin and build/bench_win.bin
+#               and build/bench.bin and build/bench_win.bin
 #               from nice_cpu's benchmark, bench/bench.c, which
 #               tools/hwtest.py runs, and copies sieve.bas and weather.bas
 # make test     checks weather_parse.c on the host, with cc, and sieve.bas
@@ -83,7 +81,7 @@ WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
 FLOAT_PROGRAMS = primes
 
 all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin $(BUILD)/sieve.bin $(BUILD)/sieve.bas \
-     $(BUILD)/wfetch.bin $(BUILD)/weather.bas
+     $(BUILD)/weather.bas
 
 MON      = ../monitor
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
@@ -114,10 +112,6 @@ $(BUILD)/sieve.bin: sieve.nasm $(NICEASM) | $(BUILD)
 
 $(BUILD)/sieve.bas: sieve.bas | $(BUILD)
 	cp sieve.bas $@
-
-# wfetch.bin, the fetch, and weather.bas, the program that calls it
-$(BUILD)/wfetch.bin: wfetch.nasm $(NICEASM) | $(BUILD)
-	$(PYTHON) $(NICE_CPU)/assembler/niceasm.py -o $@ wfetch.nasm
 
 $(BUILD)/weather.bas: weather.bas | $(BUILD)
 	cp weather.bas $@

@@ -13,16 +13,17 @@ words with --dump, as --screen shows no code above 0x7E, and checks its
 rows, and the request that the peer got. It checks first that the program fits
 in the Nexys4DDR's memory.
 
-Then it runs weather.bas the same way, with WEATHER.BAS and WFETCH.BIN
-on the card instead, and the monitor of the tests alone: the keys load
-the program, type its line of the server, 10.0.0.2, and RUN it. The
-screen and the requests are those of weather.c, but for the row of the
-keys and the settings, which the program's lines hold.
+Then it runs weather.bas the same way, with WEATHER.BAS on the card
+instead, and the monitor of the tests alone: the keys load the program,
+type its line of the server, 10.0.0.2, and RUN it. The screen is that
+of weather.c, but for the row of the keys and the settings, which the
+program's lines hold, and the texts of the errors, which are BASIC's
+DS$. The request is HTTP$'s, with BASIC's User-Agent.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
 nice_cpu/emulator build, and so must the program, with make -C examples,
-with examples/build/wfetch.bin, and the ROM of the tests, with make
+and the ROM of the tests, with make
 build/rom_test.bin.
 mkfs.fat and mtools make the card. Only the Python standard library is
 used.
@@ -44,7 +45,6 @@ NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu"
 MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 PROGRAM = os.path.join(REPO, "examples", "build", "weather.bin")
 BASIC = os.path.join(REPO, "examples", "weather.bas")
-WFETCH = os.path.join(REPO, "examples", "build", "wfetch.bin")
 ANSWERS = os.path.join(REPO, "examples", "test")
 SCREEN = 0xFFFF0000
 ROWS = 28  # the screen's, as nice.h's NICE_SCREEN_ROWS
@@ -87,7 +87,7 @@ class Http(Script):
 
 def card(tmp: str, cfg: Optional[str], basic: bool = False) -> str:
     """A card of FAT32 with the folder NICE, and WEATHER.CFG in it when cfg
-    is not None, and WEATHER.BAS and WFETCH.BIN when basic is set."""
+    is not None, and WEATHER.BAS when basic is set."""
     img = os.path.join(tmp, "card.img")
     if os.path.exists(img):
         os.remove(img)
@@ -103,9 +103,8 @@ def card(tmp: str, cfg: Optional[str], basic: bool = False) -> str:
         subprocess.run(["mcopy", "-i", img, src, "::NICE/WEATHER.CFG"],
                        **quiet)  # type: ignore[call-overload]
     if basic:
-        for src, name in ((BASIC, "WEATHER.BAS"), (WFETCH, "WFETCH.BIN")):
-            subprocess.run(["mcopy", "-i", img, src, "::NICE/" + name],
-                           **quiet)  # type: ignore[call-overload]
+        subprocess.run(["mcopy", "-i", img, BASIC, "::NICE/WEATHER.BAS"],
+                       **quiet)  # type: ignore[call-overload]
     return img
 
 
@@ -113,7 +112,7 @@ class Run:
     """A run of the program: the screen's rows as text, where the glyphs of
     weather_parse.h are the arrows and the blocks, the
     output of niceemu, and the peer. With basic, the monitor of the tests
-    runs alone, with weather.bas and wfetch.bin on the card."""
+    runs alone, with weather.bas on the card."""
 
     def __init__(self, tmp: str, keys: str, cfg: Optional[str], answer: Optional[bytes],
                  steps: int = STEPS, basic: bool = False) -> None:
@@ -288,24 +287,16 @@ def cases(tmp: str) -> None:
 # of the settings for the place, and those of the server and the units
 BAS_KEYS = 'IP "10.0.0.9"\rLOAD "WEATHER"\r100 SERVER$ = "10.0.0.2": PORT = 80\r'
 BAS_RUN = BAS_KEYS + "RUN\r"
-
-
-def basic_size() -> None:
-    """WFETCH.BIN must be above weather.bas's HIMEM, 0xD000, so that its
-    LOAD keeps the program, and below 0xE400, the stack's room on both
-    boards, with the buffers that it uses up to 0xDF80."""
-    addrs = [int(line.split()[0], 16) for line in open(WFETCH) if line.strip()]
-    check(f"wfetch.bin is at {min(addrs):#06x} to {max(addrs):#06x}, above HIMEM 0xD000"
-          " and below its buffers at 0xD100",
-          min(addrs) >= 0xD000 and max(addrs) < 0xD100)
+# HTTP$'s request, with the version of the ROM of the tests
+BAS_REQUEST = REQUEST.replace(b"curl/8", b"NiceMon-BASIC/V9.9")
 
 
 def basic_cases(tmp: str) -> None:
     r = Run(tmp, BAS_RUN, None, answer("ok.http"), basic=True)
     script = r.script
     assert script is not None
-    check("weather.bas, ok.http: the request, as weather.c's",
-          script.request == REQUEST, repr(script.request))
+    check("weather.bas, ok.http: the request of HTTP$, as weather.c's but for its User-Agent",
+          script.request == BAS_REQUEST, repr(script.request))
     check("weather.bas, ok.http: the bar shows the IP address",
           r.rows[0].endswith("IP 10.0.0.9"), r.rows[0])
     check("weather.bas, ok.http: the place", r.row(ROW_PLACE) == "Copenhagen", r.row(ROW_PLACE))
@@ -319,8 +310,6 @@ def basic_cases(tmp: str) -> None:
     check("weather.bas, ok.http: no error", r.row(ROW_ERROR) == "", r.row(ROW_ERROR))
     check("weather.bas, ok.http: the keys",
           r.row(ROW_KEYS) == "R fetch now    Q back to BASIC", r.row(ROW_KEYS))
-    check("weather.bas, ok.http: no Returned of SYS left on the screen",
-          not any("Returned" in row for row in r.rows), "\n".join(r.rows))
     clock = r.rows[ROW_CLOCK:ROW_CLOCK + 4]
     check("weather.bas, ok.http: the large clock is drawn in blocks",
           all(any(ch in row for ch in "▀▄█") for row in clock), "\n".join(clock))
@@ -329,20 +318,27 @@ def basic_cases(tmp: str) -> None:
         r.row(ROW_DATE)) is not None, r.row(ROW_DATE))
 
     for name, want in (
-            ("redirect.http", "HTTP status 301 https://wttr.in/Copenhagen?format=%l|%C"),
-            ("unknown.http", "HTTP status 500 location not found: location not found"),
+            ("redirect.http",
+             "HTTP status 301, https://wttr.in/Copenhagen?format=%l|%C|%t|%w|%h"),
+            ("unknown.http", "HTTP status 500, location not found: location not found"),
             ("fields.http", "Not the weather: Sorry, we are running out of queries"),
-            ("short.http", "Error -100, the answer was cut short"),
-            ("cut.http", "Error -100, the answer was cut short"),
-            ("nohttp.http", "Error -101, the answer is not HTTP")):
+            ("short.http", "The answer of the server was cut short"),
+            ("cut.http", "The answer of the server was cut short"),
+            ("nohttp.http", "Not an HTTP server")):
         r = Run(tmp, BAS_RUN, None, answer(name), basic=True)
         check(f"weather.bas, {name}: the error, in red, and no weather",
               again(r, want) and r.color(ROW_ERROR, want[:4]) == C_ERR
               and r.row(ROW_STATUS) == "No weather yet",
               f"{r.row(ROW_ERROR)!r} {r.row(ROW_STATUS)!r}")
 
+    # A body past a string's 255 characters is BASIC's String too long,
+    # whose text comes from ERR$, not DS$
+    r = Run(tmp, BAS_RUN, None, b"HTTP/1.0 200 OK\r\n\r\n" + b"x" * 300, basic=True)
+    check("weather.bas, a body of 300 characters: String too long",
+          again(r, "String too long"), r.row(ROW_ERROR))
+
     r = Run(tmp, BAS_RUN, None, None, basic=True)
-    want = "Error -53, the server refused the connection"
+    want = "The server refused the connection"
     check("weather.bas, no server on port 80: the refusal", again(r, want), r.row(ROW_ERROR))
 
     for name, place, values in (
@@ -359,13 +355,14 @@ def basic_cases(tmp: str) -> None:
     r2 = Run(tmp, keys.replace("8080", "80"), None, answer("ok.http"), basic=True)
     script = r2.script
     assert script is not None
-    want_req = ("GET /St.+Z%C3%BCrich%2Fa~b%09c?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\n"
-                "Host: 10.0.0.2\r\nUser-Agent: curl/8\r\nConnection: close\r\n\r\n").encode()
+    want_req = ("GET /St.%20Z%C3%BCrich%2Fa~b%09c?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\n"
+                "Host: 10.0.0.2\r\nUser-Agent: NiceMon-BASIC/V9.9\r\n"
+                "Connection: close\r\n\r\n").encode()
     check("weather.bas: a place with a blank, a slash, a u with umlaut, in UTF-8, and a "
           "TAB, as %09, and the units u, without &M", script.request == want_req,
           repr(script.request))
     check("weather.bas: the port 8080, where the peer, on 80, refuses",
-          again(r, "Error -53, the server refused the connection"), r.row(ROW_ERROR))
+          again(r, "The server refused the connection"), r.row(ROW_ERROR))
 
     r = Run(tmp, BAS_RUN + "qPRINT PEEK(0xFFFFFF86)\rHALT\r", None, answer("ok.http"),
             basic=True)
@@ -376,12 +373,10 @@ def basic_cases(tmp: str) -> None:
 def main() -> None:
     for path, how in ((NICEEMU, "make -C nice_cpu/emulator build"),
                       (MONITOR, "make build/rom_test.bin"),
-                      (PROGRAM, "make -C examples"),
-                      (WFETCH, "make -C examples")):
+                      (PROGRAM, "make -C examples")):
         if not os.path.exists(path):
             sys.exit(f"weathertest.py: no {path}; {how} builds it")
     size()
-    basic_size()
     with tempfile.TemporaryDirectory() as tmp:
         cases(tmp)
         basic_cases(tmp)

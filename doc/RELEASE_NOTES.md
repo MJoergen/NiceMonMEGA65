@@ -55,6 +55,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `TRAP` takes. It is plain HTTP alone, and the text has 255
   characters at most. `PRINT HTTP$("wttr.in",
   "/Copenhagen?format=3")` shows the weather.
+- `examples/weather.bas` is the weather display rewritten in BASIC,
+  which fetches with `HTTP$`. The examples' zip has it
+  (`examples/README.md`, "The weather display in BASIC").
 - BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
   arrows ([basic/README.md](../basic/README.md)).
 - The weather display, `weather.bin`, shows the ROM's blocks and
@@ -111,10 +114,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The Nexys4DDR's USB keyboard shows CAPS LOCK and Num Lock on its
   LEDs, set by the board with no program
   ([#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
-- `examples/weather.bas` is the weather display rewritten in BASIC,
-  with a routine of machine code, `wfetch.bin`, for the fetch over
-  HTTP. The examples' zip has both (`examples/README.md`, "The weather
-  display in BASIC").
 
 **Fixed.**
 
