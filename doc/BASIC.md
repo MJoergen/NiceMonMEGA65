@@ -895,9 +895,10 @@ Stage 9 (#120) is written, in `basic/basic_trap.nasm` (decided on
   of RAM, 87 characters at most, as the buffers that it comes from,
   such as a TFTP server's message, are used again.
 - `LOAD` and `RUN` of a program's text keep the line that runs until
-  the file's first line, so a `TRAP` takes a failure before it, of
-  the card, the file, or the server, with the program whole (decided
-  on 2026-11-22). From the first line on, the line that runs is none,
+  the `NEW`, at the file's first line with a number, so a `TRAP` takes
+  a failure before it, of the card, the file, or the server, or of a
+  first line with no number, with the program whole (decided
+  on 2026-11-22). From the `NEW` on, the line that runs is none,
   as the load replaces the program, so a `TRAP` does not take its
   errors: only the statements that keep the program running are
   trapped. A `LOAD` of a `.bin` file that wrote a word below `HIMEM`

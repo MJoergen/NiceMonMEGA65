@@ -263,10 +263,10 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2A61` | 10850 |
-| Free | `0x2A62`–`0x2FFF` | 1438 |
-| BASIC | `0x3000`–`0x6DF1` | 15858 |
-| Free | `0x6DF2`–`0x7FFF` | 4622 |
+| The monitor | `0x0000`–`0x2A5E` | 10847 |
+| Free | `0x2A5F`–`0x2FFF` | 1441 |
+| BASIC | `0x3000`–`0x6DF7` | 15864 |
+| Free | `0x6DF8`–`0x7FFF` | 4616 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -281,7 +281,7 @@ ROM is built:
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1111 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
-| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 3061 | 0 |
+| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 3058 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
@@ -291,7 +291,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10850 | 71 |
+| In all | | 10847 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -537,7 +537,7 @@ The suites of `test/fat_runs.py`, step 7:
 | `fatfull` | `fs_write` on a card with 3 free clusters, and a folder of 65536 entries. |
 | `fatrows` | `DIR`'s rows: names of 23 to 26 characters, hidden and system files, a directory, and a size of 10 digits. |
 | `fatapi` | The entries' small cases: names and modes, reads of 0 bytes, a file open twice, words above 0xFF written, a directory handle's sector, a directory in mode 1, the order of the errors, and `fs_delete` of a file open to write. |
-| `fatpath` | Paths to the folders inside `NICE` (`path.img`, issue #168): `fs_open`, `fs_delete`, and mode 2 two levels deep, in either case, with long names and their 8.3 names, and the errors -20, -21, and -22 of each kind of bad path; BASIC's `DIR`, `LOAD`, `SAVE`, `BSAVE`, `RUN`, and `DELETE` through paths, and `SAVE` into `V2.0`, which gets `.BAS`; and TAB down a path. |
+| `fatpath` | Paths to the folders inside `NICE` (`path.img`, issue #168): `fs_open`, `fs_delete`, and mode 2 two levels deep, in either case, with long names and their 8.3 names, and the errors -20, -21, and -22 of each kind of bad path; BASIC's `DIR`, `LOAD`, `SAVE`, `BSAVE`, `RUN`, and `DELETE` through paths, `SAVE` into `V2.0`, which gets `.BAS`, and names with an empty last part, such as `SAVE "GAMES/"`, which get no extension and are error 20; and TAB down a path, with none after `//`, which is no path. |
 
 `make test FAT_SUITES=fatapi` runs one suite; `FAT_SUITES=` none.
 

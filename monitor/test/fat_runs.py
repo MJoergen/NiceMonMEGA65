@@ -196,18 +196,23 @@ SUITES = {
             "either case, with long names, and their errors", "path.img",
             keys="sys 0x8000\rsys 0x8400\rsys 0x8800\rhalt\r", ops="fatpath.ops",
             fsck=True),
-        Run("BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, and "
-            "SAVE into V2.0, a folder with a dot, which gets .BAS", "path.img",
+        Run("BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, "
+            "SAVE into V2.0, a folder with a dot, which gets .BAS, and names "
+            "with an empty last part, which get none, and are no names",
+            "path.img",
             keys='dir "games"\rdir "/GAMES/OLD/"\rdir "nope"\rdir "file.txt"\r'
                  'dir "1.2.3.4"\rload "games/chess.bin"\rdump 0x9000, 1\r'
                  'bsave "games/old/w", 0x9000, 1\r10 print "v2"\rsave "v2.0/prog"\r'
                  'new\rload "V2.0/PROG"\rlist\rrun "v2.0/prog"\rdir "v2.0"\r'
-                 'delete "games/old/w.bin"\rdir "GAMES/OLD"\rhalt\r', fsck=True),
+                 'delete "games/old/w.bin"\rdir "GAMES/OLD"\rsave "games/"\r'
+                 'load "games/"\rrun "games/"\rbsave "games/", 0x9000, 1\r'
+                 'save ""\rdir "games"\rhalt\r', fsck=True),
         Run("TAB down a path: a folder gets a /, then its names; a long name in a "
-            "path, and none in a folder that is not there", "path.img",
+            "path, and none in a folder that is not there, nor after //, which "
+            "is no path", "path.img",
             keys='load "ga\t\t\003load "games/o\t\003load "games/old/\t\003'
                  'load my\t\t\003load "my games/a\t\003load "nope/x\t\003'
-                 'load "/gam\t\003dir "g\t\003halt\r'),
+                 'load "/gam\t\003dir "g\t\003load "//g\t\003halt\r'),
     ],
 }
 

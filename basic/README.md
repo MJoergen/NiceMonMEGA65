@@ -176,7 +176,9 @@ may be a path of the folders inside `NICE`, such as
 `LOAD "GAMES/CHESS"` or `DELETE "GAMES/OLD/PONG.BIN"`, as
 [Files](../monitor/README.md#files) has it (issue #168). The `.BAS` or
 `.BIN` that they add goes on its last part, when that part has no dot:
-`SAVE "V2.0/PROG"` writes `PROG.BAS` in the folder `V2.0`. TAB completes
+`SAVE "V2.0/PROG"` writes `PROG.BAS` in the folder `V2.0`. A name with
+nothing after its last `/`, such as `SAVE "GAMES/"`, and an empty name
+get none, and are `File error 20, not a valid name`. TAB completes
 a path a folder at a time, with a `/` after a directory. The ROM makes
 no folder: one is made on a PC, or with `make sdcard CMD="mkdir GAMES"`.
 
@@ -484,10 +486,11 @@ A program that tries a second server when the first does not answer:
 ```
 
 A `TRAP` takes a failure of `LOAD` and `RUN` of a program's text that
-comes before the file's first line, such as no card, a file that is
-not there, or a TFTP server that does not answer, and the program
-stays whole. From the first line on, the load replaces the program, so
-a `TRAP` does not take its errors, such as `Line without a number`. A
+comes before the `NEW`, at the file's first line with a number, such
+as no card, a file that is not there, a TFTP server that does not
+answer, or a first line without a number, and the program stays whole.
+From the `NEW` on, the load replaces the program, so a `TRAP` does not
+take its errors, such as a `Line without a number` after it. A
 `LOAD` of a `.bin` file that wrote a word below `HIMEM` before it
 failed ends the program too, with `NEW`.
 
@@ -877,7 +880,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
-| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, a program that runs the next, and the failures of issue #158: `BSAVE` to a slot with no card, and `LOAD` and `DELETE` of a file that is not there, trapped, a failure with no `TRAP`, `LOAD` and `RUN` of a program's text that is not there, trapped, with the program kept, and a `LOAD` that fails after the file's first line, which a `TRAP` does not take. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
+| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, a program that runs the next, and the failures of issue #158: `BSAVE` to a slot with no card, and `LOAD` and `DELETE` of a file that is not there, trapped, a failure with no `TRAP`, `LOAD` and `RUN` of a program's text that is not there, trapped, with the program kept, a `LOAD` whose first line that is not blank has no number, trapped too, and a `LOAD` that fails after the file's first line with a number, which a `TRAP` does not take. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
 | `time` | The ROM, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, month 0, day 0, letters, wrong separators, and 2106, and the clock left alone after them; the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, 2105-12-31, the last day of a leap year, and blanks in the quotes; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
 
 `time` runs with `--step-time`, so that the clock starts at 0, not
@@ -910,7 +913,7 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2333 | 1483 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2339 | 1483 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1908 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2023 | 52 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1799 | 300 |
@@ -927,5 +930,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15858 | 2244 |
+| In all | | 15864 | 2244 |
 <!-- /romsize basic -->

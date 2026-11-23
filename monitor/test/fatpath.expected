@@ -124,7 +124,7 @@ NICE/MYGAME~1/AMUCHL~1.TXT: its sector 0 past the size: 472 bytes, zeros
 fsck.fat -n:
 Free cluster summary uninitialized (should be 128981)
 IMAGE: 12 files, 41/129022 clusters
-== BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, and SAVE into V2.0, a folder with a dot, which gets .BAS
+== BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, SAVE into V2.0, a folder with a dot, which gets .BAS, and names with an empty last part, which get none, and are no names
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
@@ -183,6 +183,27 @@ Directory of NICE/GAMES/OLD in slot 0
 PONG.BIN                          18
 Files: 1, directories: 0
 READY.
+save "games/"
+File error 20, not a valid name
+READY.
+load "games/"
+File error 20, not a valid name
+READY.
+run "games/"
+File error 20, not a valid name
+READY.
+bsave "games/", 0x9000, 1
+File error 20, not a valid name
+READY.
+save ""
+File error 20, not a valid name
+READY.
+dir "games"
+Directory of NICE/games in slot 0
+OLD                            <DIR>
+CHESS.BIN                         18
+Files: 1, directories: 1
+READY.
 halt
 Halted
 exit 0
@@ -205,7 +226,7 @@ NICE/V2      0/PROG.BAS: its sector 0 past the size: 498 bytes, zeros
 fsck.fat -n:
 Free cluster summary uninitialized (should be 128982)
 IMAGE: 11 files, 40/129022 clusters
-== TAB down a path: a folder gets a /, then its names; a long name in a path, and none in a folder that is not there
+== TAB down a path: a folder gets a /, then its names; a long name in a path, and none in a folder that is not there, nor after //, which is no path
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
@@ -220,6 +241,7 @@ load "my games/a long name.txt" ^C
 load "nope/x^C
 load "/gam^H^H^H^H/GAMES/^C
 dir "g^HGAMES/^C
+load "//g^C
 halt
 Halted
 exit 0

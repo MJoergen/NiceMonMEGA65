@@ -211,8 +211,11 @@ FUNCS = ? SIN(0), COS(0), TAN(0), ATAN(1) * 4, PI\r? ASIN(1), ACOS(-1), LOG(EXP(
 # card, Device not present, and LOAD, with slot 0 mounted again, and
 # DELETE of a file that is not there, File not found, and whose handler
 # prints ER, EL, DS, ERR$(ER), and DS$; LOAD of a file that is not there with no TRAP, which stops the
-# program; and LOAD of a program's text that is not there, which a TRAP
-# does not take, and which keeps the program. DIR lists the files.
+# program; LOAD and RUN of a program's text that is not there, which a
+# TRAP takes, with the program kept; LOAD of NONUM.BAS, whose first line
+# that is not blank has no number, which it takes too, as the NEW has
+# not come; and LOAD of BAD.BAS, which fails after its first line, and
+# which it does not take. DIR lists the files.
 # keys: INPUT, GET, the break key, and the keys typed ahead (issue
 # #114). INPUT of two numbers, with too few, which ask for the rest with
 # ??, too many, which are Extra ignored, a line that is no number, two

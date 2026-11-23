@@ -201,6 +201,19 @@ LIST
 30 END
 100 PRINT ER, EL, DS, ERR$(ER): PRINT DS$: RESUME NEXT
 READY.
+10 TRAP 100: LOAD "NONUM": PRINT "NEXT"
+20 END
+RUN
+110     10      21      Line without a number
+File error 21, no such file
+NEXT
+READY.
+LIST
+10 TRAP 100: LOAD "NONUM": PRINT "NEXT"
+20 END
+30 END
+100 PRINT ER, EL, DS, ERR$(ER): PRINT DS$: RESUME NEXT
+READY.
 10 TRAP 100: LOAD "BAD": PRINT "NOT HERE"
 RUN
 Line without a number
@@ -216,6 +229,7 @@ Directory of NICE in slot 0
 HELLO.BIN                      14436
 PC.BAS                            94
 BAD.BAS                           53
+NONUM.BAS                         38
 LONG.BAS                         232
 WIDE.BAS                         301
 HIGH.BAS                          13
@@ -223,12 +237,11 @@ PROG.BAS                         225
 T.TXT                             16
 EMPTY.BAS                          0
 BRK.BAS                            0
-Files: 10, directories: 0
+Files: 11, directories: 0
 READY.
 HALT
 Halted
 Screen:
-|READY.
 |10 TRAP 100: LOAD "BAD": PRINT "NOT HERE"
 |RUN
 |Line without a number
@@ -244,6 +257,7 @@ Screen:
 |HELLO.BIN                      14436
 |PC.BAS                            94
 |BAD.BAS                           53
+|NONUM.BAS                         38
 |LONG.BAS                         232
 |WIDE.BAS                         301
 |HIGH.BAS                          13
@@ -251,16 +265,16 @@ Screen:
 |T.TXT                             16
 |EMPTY.BAS                          0
 |BRK.BAS                            0
-|Files: 10, directories: 0
+|Files: 11, directories: 0
 |READY.
 |HALT
 |Halted
 VBASE at the halt 000000
 exit 0
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128984)
-IMAGE: 11 files, 38/129022 clusters
-Files in NICE: HELLO.BIN PC.BAS BAD.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS BRK.BAS
+Free cluster summary uninitialized (should be 128983)
+IMAGE: 12 files, 39/129022 clusters
+Files in NICE: HELLO.BIN PC.BAS BAD.BAS NONUM.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS BRK.BAS
 PROG.BAS:
    1   0       R   E   M       S   T   A   G   E       4   :    
    "   Q   U   O   T   E   S   "       A   N   D       ?       S

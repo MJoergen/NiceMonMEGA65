@@ -541,9 +541,10 @@ ip_like
 ; after it may go. Its lines are stored as lines typed in, after a NEW
 ; at the first (basic_cmd.nasm, bas_eol), so that a file that is not
 ; there keeps the program; then READY. The line that runs stays until
-; bas_eol has the file's first line, so that a failure before it, of
-; the card, the file, or the server, is an error that a TRAP takes, with
-; the program whole; after it, the load is no running program, and its
+; bas_eol's NEW, at the file's first line with a number, so that a
+; failure before it, of the card, the file, or the server, or of a first
+; line with no number, is an error that a TRAP takes, with the program
+; whole; from the NEW on, the load is no running program, and its
 ; errors are not trapped. With SLOT, a number, the card in
 ; it is mounted first, with slot_mount. RUN "NAME" comes to bas_lrun,
 ; with V_RUNF set, and load_fin runs what was loaded.
@@ -597,7 +598,9 @@ slot_mount
 
 ; name_copy: the name R1 copied to V_BLINE, with the extension at the
 ; byte address R3 after it when its last part, after its last /, has no
-; dot, and R1 = V_BLINE. Keeps R2. Uses R1, R3, R4, and R5.
+; dot, and R1 = V_BLINE. An empty last part, as in "" or "GAMES/", gets
+; none, so that it stays no name of a file, error 20 of fs_open, and
+; does not become the file .BAS. Keeps R2. Uses R1, R3, R4, and R5.
 name_copy
                 MOVE    R4, V_BLINE
                 CLR     R5              ; no dot
@@ -614,6 +617,10 @@ name_copy
                 TST     R5
         ?!Z     RET
                 SUB     R4, R4, 1       ; over the 0
+                CMP     R4, R1
+        ?Z      RET                     ; an empty name
+                CMP     @-1[R4], 0x2F
+        ?Z      RET                     ; an empty last part
 :
                 MOVE[M] @R4++, @R3++
         ?!Z     JMP     :-

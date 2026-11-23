@@ -1978,7 +1978,9 @@ comp_b
         ?!C     JMP     comp_cur
                 CALL    mounted
 ; The start in SEC, and R6 the length of its folder's part, up to its
-; last / and with it; the part before that / walked to V_FOLD
+; last / and with it, which is walked to V_FOLD with that /, as mode 2
+; of fs_open takes "GAMES/", so that a part that is no path there, such
+; as //, is none here
                 MOVE    R1, @V_T+2
                 CLR     R5
                 CLR     R6
@@ -1993,8 +1995,6 @@ comp_b
         ?Z      MOVE    R6, R5
                 JMP     :-
 :               MOVE    @V_T+8, R6
-                TST     R6
-        ?!Z     SUB     R6, R6, 1
                 CLR     @SEC[R6]
                 MOVE    R1, SEC
                 ONE     R2

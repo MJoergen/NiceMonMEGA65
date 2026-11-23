@@ -11,6 +11,8 @@ as a PC writes them:
   with no end.
 - BAD.BAS: a line, a line without a number, and a line after it, which
   LOAD does not reach.
+- NONUM.BAS: a line of blanks, a line without a number, the first that
+  is not blank, and a line after it, which LOAD does not reach.
 - LONG.BAS: a line of 213 characters, whose tokens do not fit.
 - WIDE.BAS: a line of 300 characters, more than a line of a file has.
 - HIGH.BAS: a line with a byte from 0x80 in its string.
@@ -26,6 +28,7 @@ FILES = {
     "PC.BAS": b"10 rem written on a pc\r\n20\tfor i = 1 to 3 : print i; : next\r\n"
               b"   \r\n\r\n   30 print \"done\"\r\n40 end",
     "BAD.BAS": b"10 PRINT \"BEFORE\"\nPRINT \"NO NUMBER\"\n20 PRINT \"AFTER\"\n",
+    "NONUM.BAS": b"  \nPRINT \"NO NUMBER\"\n20 PRINT \"AFTER\"\n",
     "LONG.BAS": b"5 PRINT \"FIRST\"\n10 ? " + b".5," * 70 + b"\n",
     "WIDE.BAS": b"10 REM " + b"X" * 293 + b"\n",
     "HIGH.BAS": b"10 PRINT \"\xe9\"\n",
