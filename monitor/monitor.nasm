@@ -76,9 +76,9 @@
 ; a character goes at the cursor, which moves on; CR moves the cursor to
 ; column 0, LF to column 0 of the next row, BS one column back, and TAB to
 ; the next multiple of 8; the other control codes and 0x7F do nothing.
-; 0x80 to 0x9F go on the screen as any character: they are blank in Spleen,
-; and show what a program draws for them in the font RAM (nice_cpu's
-; DEVICES.md §1.8). Past the last column the cursor goes to the next row, and past
+; 0x80 to 0x9F go on the screen as any character: the character ROM has
+; blocks and arrows at 0x80 to 0x99 and leaves 0x9A to 0x9F blank, and the
+; font RAM shows what a program draws for them (nice_cpu's DEVICES.md §1.8). Past the last column the cursor goes to the next row, and past
 ; the last row the screen's rows move up by one, by copying, which scrolls
 ; in niceemu too, where the display offset is plain memory, and the same
 ; on a board whose screen is smaller. So the rows shown are always the

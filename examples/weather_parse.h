@@ -5,16 +5,17 @@
 #ifndef WEATHER_PARSE_H
 #define WEATHER_PARSE_H
 
-// The codes of the glyphs that weather.c draws in the font RAM, which are
-// blank in Spleen: the halves of a block and the whole block for the
-// large clock, and the arrows of the wind.
+// The codes of the glyphs of the large clock, the halves of a block and
+// the whole block, and of the arrows of the wind, those of the character
+// ROM (nice_cpu's DEVICES.md 1.8): the low byte of the code point. On a
+// core whose ROM has them blank, weather.c draws them in the font RAM.
 enum {
-    G_UPPER = 0x80, // the upper half of a cell
-    G_LOWER = 0x81, // the lower half
-    G_FULL = 0x82,  // the whole cell
-    G_ARROW = 0x83, // 8 arrows: to the west, north, east, south, then
-                    // north-west, north-east, south-east, south-west,
-                    // as U+2190 to U+2193 and U+2196 to U+2199
+    G_UPPER = 0x80, // U+2580, the upper half of a cell
+    G_LOWER = 0x84, // U+2584, the lower half
+    G_FULL = 0x88,  // U+2588, the whole cell
+    G_ARROW = 0x90, // U+2190 to U+2199: to the west, north, east, south,
+                    // at + 0 to + 3, and north-west, north-east,
+                    // south-east, south-west, at + 6 to + 9
 };
 
 #define CFG_PLACE 64  // the bytes of a place's name, with its 0

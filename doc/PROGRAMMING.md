@@ -399,8 +399,11 @@ row, the top row first, with the leftmost of its 16 pixels in bit 15.
 The character ROM at `0xFFFE2000` holds the font Spleen in the same
 layout. A program copies the ROM into the RAM, writes the glyphs it
 wants, and writes `0xFFFE0000` to the font base at `0xFFFFFF86` to show
-them. The codes `0x00`–`0x1F` and `0x7F`–`0x9F` are blank in Spleen, so
-new glyphs there change no text. A glyph wider than a character is drawn
+them. The codes `0x00`–`0x1F`, `0x7F`, and `0x9A`–`0x9F` are blank in
+the ROM, so new glyphs there change no text. The ROM has blocks and
+arrows at `0x80`–`0x99`, which a program can use without the font RAM,
+on a core from V2.6; the word at `0xFFFE3000` reads `0xFFFF` when it has
+them. A glyph wider than a character is drawn
 across several codes side by side. The monitor shows Spleen again when
 the program returns to it. [SYSTEM.md](SYSTEM.md#the-font) has the
 details and a loop that copies the ROM, and `niceemu --window` draws the

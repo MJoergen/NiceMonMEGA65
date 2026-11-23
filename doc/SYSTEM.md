@@ -311,7 +311,15 @@ the mode too, but without the display offset.
 The characters are drawn from one of two fonts of 256 glyphs, as in
 [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font) and `niceemu --window`. The character ROM at
 `0xFFFE2000` holds [Spleen](https://github.com/fcambus/spleen) 16×32 with
-the codes of ISO 8859-1, where `0x00`–`0x1F` and `0x7F`–`0x9F` are blank.
+the codes of ISO 8859-1, and blocks and arrows at `0x80`–`0x99`, where
+ISO 8859-1 has none. `0x00`–`0x1F`, `0x7F`, and `0x9A`–`0x9F` are blank.
+The code of each block and arrow is the low byte of its Unicode code
+point: the blocks U+2580–U+258F at `0x80`–`0x8F`, such as ▀ at `0x80`,
+▄ at `0x84`, and █ at `0x88`, and the arrows ← ↑ → ↓ ↔ ↕ ↖ ↗ ↘ ↙,
+U+2190–U+2199, at `0x90`–`0x99`. nice_cpu's DEVICES.md §1.8 has the
+rows of each. The word at `0xFFFE3000`, row 0 of `0x80`, reads `0xFFFF`
+in a ROM with these glyphs, and 0 in the ROM of a core before V2.6,
+where `0x80`–`0x9F` are blank, so a program can tell the two apart.
 The font RAM at `0xFFFE0000` holds what a program writes. In both, the
 word at the font's address + `32 * c + r` is row `r` of the glyph of code
 `c`, row 0 at the top, and its bits 15..0 are the 16 pixels, the leftmost

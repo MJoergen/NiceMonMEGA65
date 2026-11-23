@@ -42,9 +42,8 @@ ROWS = 28  # the screen's, as nice.h's NICE_SCREEN_ROWS
 # The steps of a case: about 3 seconds of the host, far more than a fetch
 # from the peer takes, and less than the 60 s before a fetch again.
 STEPS = 100_000_000
-# The codes of weather_parse.h's glyphs, and how the checks write them
-G_UPPER, G_LOWER, G_FULL, G_ARROW = 0x80, 0x81, 0x82, 0x83
-ARROWS = "←↑→↓↖↗↘↙"
+# The codes of weather_parse.h's glyphs, those of the character ROM, are
+# the low byte of their code points, U+2580 to U+258F and U+2190 to U+2199
 
 REQUEST = ("GET /Copenhagen?format=%l|%C|%t|%w|%h&m&M HTTP/1.0\r\nHost: 10.0.0.2\r\n"
            "User-Agent: curl/8\r\nConnection: close\r\n\r\n").encode()
@@ -99,7 +98,7 @@ def card(tmp: str, cfg: Optional[str]) -> str:
 
 class Run:
     """A run of the program: the screen's rows as text, where the glyphs of
-    weather_parse.h are the characters of ARROWS and the blocks, the
+    weather_parse.h are the arrows and the blocks, the
     output of niceemu, and the peer."""
 
     def __init__(self, tmp: str, keys: str, cfg: Optional[str], answer: Optional[bytes],
@@ -149,10 +148,10 @@ class Run:
 
 def char(w: int) -> str:
     c = w & 0xFF
-    if G_ARROW <= c < G_ARROW + 8:
-        return ARROWS[c - G_ARROW]
-    if c in (G_UPPER, G_LOWER, G_FULL):
-        return "▀▄█"[c - G_UPPER]
+    if 0x80 <= c < 0x90:
+        return chr(0x2500 + c)
+    if 0x90 <= c < 0x9A:
+        return chr(0x2100 + c)
     if c < 0x20 or 0x7F <= c < 0xA0:
         return " "
     return chr(c)
@@ -204,7 +203,7 @@ def cases(tmp: str) -> None:
     check("ok.http: the place", r.row(ROW_PLACE) == "Copenhagen", r.row(ROW_PLACE))
     check("ok.http: the condition", r.row(ROW_COND) == "Patchy rain nearby", r.row(ROW_COND))
     want = "Temperature +8°C    Wind →5m/s    Humidity 77%"
-    check("ok.http: the values, with the degree sign and the arrow of the font RAM",
+    check("ok.http: the values, with the degree sign and the arrow of the ROM",
           r.row(ROW_VALUES) == want, r.row(ROW_VALUES))
     check("ok.http: the status", r.row(ROW_STATUS) == "Fetched less than a minute ago",
           r.row(ROW_STATUS))

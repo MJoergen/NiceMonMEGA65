@@ -57,14 +57,14 @@ static void answers(const char *dir)
 
     check("zurich.http: parsed", parse_file(dir, "zurich.http", &w, &a) == W_OK);
     check_str("zurich.http: the u with umlaut of ISO 8859-1", w.place, "Z\xFCrich");
-    char wind2[] = {(char)(G_ARROW + 7), '5', 'k', 'm', '/', 'h', 0};
+    char wind2[] = {(char)(G_ARROW + 9), '5', 'k', 'm', '/', 'h', 0};
     check_str("zurich.http: the arrow to the south-west", w.wind, wind2);
 
     check("lf.http: lines that end in LF alone, no Content-Length",
           parse_file(dir, "lf.http", &w, &a) == W_OK);
     check_str("lf.http: blanks around a field dropped", w.cond, "Light snow");
     check_str("lf.http: place", w.place, "Oslo");
-    char wind3[] = {(char)(G_ARROW + 4), ' ', '7', 'k', 'm', '/', 'h', 0};
+    char wind3[] = {(char)(G_ARROW + 6), ' ', '7', 'k', 'm', '/', 'h', 0};
     check_str("lf.http: the arrow to the north-west", w.wind, wind3);
     check_str("lf.http: the humidity before the newline", w.humid, "93%");
 

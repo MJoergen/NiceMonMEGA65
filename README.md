@@ -662,7 +662,9 @@ MandelbrotMEGA65. The exceptions are the third-party files named in
   this rests on its origin in the MEGA65 core.
 - The HDMI output in `synth/mega65/hdmi/` is LGPL v3.
 - The Spleen font in `src/video/font_pkg.vhd` is BSD 2-Clause, see
-  `font/LICENSE.spleen`.
+  `font/LICENSE.spleen`. The four diagonal arrows at `0x96` to `0x99`
+  are not Spleen's, and come from nice_cpu's emulator, as the rest of
+  the font does.
 
 `src/kbd_m65.vhd` is written after the GPL v3 driver of MiSTer2MEGA65,
 with the same timing on the pins but none of its code, and is MIT like the

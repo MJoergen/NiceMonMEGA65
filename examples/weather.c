@@ -180,9 +180,13 @@ static void arrow(int c, int dx, int dy)
         nice_poke(FONT_RAM + 32 * (unsigned)c + (unsigned)r, glyph[r]);
 }
 
-// Spleen copied to the font RAM, with the glyphs of weather_parse.h.
+// The glyphs of weather_parse.h: the character ROM's, or, on a core
+// before V2.6, whose ROM has them blank (0 at row 0 of 0x80), the ROM
+// copied to the font RAM with the glyphs drawn there.
 static void font_init(void)
 {
+    if (nice_peek(FONT_ROM + 32 * G_UPPER) == 0xFFFF)
+        return;
     for (unsigned i = 0; i < 8192; i++)
         nice_poke(FONT_RAM + i, nice_peek(FONT_ROM + i));
     for (unsigned r = 0; r < 32; r++) {
@@ -194,7 +198,7 @@ static void font_init(void)
         {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1},
     };
     for (int k = 0; k < 8; k++)
-        arrow(G_ARROW + k, dir[k][0], dir[k][1]);
+        arrow(G_ARROW + k + (k < 4 ? 0 : 2), dir[k][0], dir[k][1]);
     nice_poke(FONT_BASE, FONT_RAM);
 }
 

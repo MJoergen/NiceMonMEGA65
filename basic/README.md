@@ -545,7 +545,7 @@ A string where a number goes, or a number where a string goes, is a
 | `ASC(A$)` | The code of the first character of `A$`. `ASC("")` is an `Illegal quantity`. |
 | `VAL(A$)` | The number at the start of `A$`, after blanks, as `INPUT` reads it, such as `VAL("0x1F")` and `VAL("-3E2X")`, or 0 when there is none. |
 | `INSTR(A$, B$ [, N])` | The position of the first `B$` in `A$`, from 1, or 0 when there is none, looked for from position `N` or 1. An empty `B$` is found at `N`. |
-| `CHR$(N)` | The character of code `N`, from 0 to 255. |
+| `CHR$(N)` | The character of code `N`, from 0 to 255. `CHR$(0x80)` to `CHR$(0x99)` print blocks and arrows, which the editor gives no key for: ▀ at `0x80`, ▄ at `0x84`, █ at `0x88`, ▌ at `0x8C`, and ← ↑ → ↓ at `0x90` to `0x93` ([SYSTEM.md](../doc/SYSTEM.md#the-font) has them all). |
 | `STR$(X)` | The number `X` as `PRINT` shows it, such as `0.333333333333333`. |
 | `HEX$(X)` | The word `X` as 8 hex digits in upper case, such as `000000FF`. |
 | `LEFT$(A$, N)`, `RIGHT$(A$, N)` | The first and the last `N` characters of `A$`, or all of them when it has fewer. |

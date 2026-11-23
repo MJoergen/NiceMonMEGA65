@@ -199,10 +199,8 @@ void utf8_to_screen(const char *s, unsigned n, char *out, unsigned size)
             len = k;
         }
         i += len;
-        if (cp >= 0x2190 && cp <= 0x2193)
+        if ((cp >= 0x2190 && cp <= 0x2193) || (cp >= 0x2196 && cp <= 0x2199))
             cp = G_ARROW + (cp - 0x2190);
-        else if (cp >= 0x2196 && cp <= 0x2199)
-            cp = G_ARROW + 4 + (cp - 0x2196);
         else if (cp == 0xFE0F || cp == 0x200D)
             continue;                   // a variation selector, a joiner
         else if (cp == '\t')

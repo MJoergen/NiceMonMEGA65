@@ -52,6 +52,9 @@
 #                         ROM, a card of FAT32 with basload.nasm as
 #                         NICE/BASIC-T.ROM, the load, and the lock that
 #                         the second cold start finds.
+#             check-font  that src/video/font_pkg.vhd is what
+#                         font/gen_font_pkg.py makes of niceemu's font,
+#                         so that the board's glyphs are niceemu's.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -94,7 +97,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
 SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd i2c_chip_model.vhd ps2_kbd_model.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
                tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd tb_i2c.vhd tb_basload.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload \
+.PHONY: test cosim check-steps check-fmt check-font analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -102,11 +105,17 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd i2c_chip_model.vh
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload check-steps check-fmt check-font
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
 	@$(PYTHON) $(NICE_DIR)/assembler/nicefmt.py $(wildcard *.nasm) && echo "PASS check-fmt"
+
+# The character ROM, src/video/font_pkg.vhd, made again from niceemu's
+# font, word for word the same as the file
+check-font:
+	@$(PYTHON) ../font/gen_font_pkg.py $(NICE_DIR)/emulator/src/font.zig | cmp -s - ../src/video/font_pkg.vhd && \
+	  echo "PASS check-font" || { echo "FAIL check-font: src/video/font_pkg.vhd is not font/gen_font_pkg.py's"; exit 1; }
 
 check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin bytewin.bin sd.bin sd.img eth.bin)
 	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \

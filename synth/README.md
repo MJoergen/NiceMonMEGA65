@@ -245,7 +245,8 @@ receiver and break detection; `src/video/pix.vhd`, the pixel coordinates,
 and `src/video/video_pkg.vhd`, the video modes, from MandelbrotMEGA65,
 MIT; and `src/video/font_pkg.vhd`, the
 [Spleen](https://github.com/fcambus/spleen) 16×32 font, BSD 2-Clause
-(`font/LICENSE.spleen`), which `font/gen_font_pkg.py` makes.
+(`font/LICENSE.spleen`), with blocks and arrows, which
+`font/gen_font_pkg.py` makes from niceemu's font.
 
 ## Build times and size
 

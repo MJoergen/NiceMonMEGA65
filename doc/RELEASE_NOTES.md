@@ -21,6 +21,37 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.6
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.6`, and the character ROM has blocks and arrows
+  at `0x80`–`0x99`, which were blank, as in its emulator
+  ([#171](https://github.com/MJoergen/NiceMonMEGA65/issues/171),
+  [nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204),
+  [SYSTEM.md](SYSTEM.md#the-font)). The code of each is the low byte
+  of its Unicode code point: the blocks U+2580–U+258F at
+  `0x80`–`0x8F`, and the arrows U+2190–U+2199 at `0x90`–`0x99`.
+  `0x9A`–`0x9F` stay blank. A program that copies the ROM into the
+  font RAM and draws its own glyphs there shows the same as before.
+- The word at `0xFFFE3000`, row 0 of `0x80`, reads `0xFFFF` in this
+  ROM, and 0 in that of an older core, so a program can tell the two
+  apart. A BASIC from a card runs on an older core too, where
+  `PEEK(0xFFFE3000)` reads 0.
+- The font is in the FPGA, so it needs this release's bitstream or
+  core file. A new ROM alone, with `make r6 ROMPATCH=`, keeps the old
+  font.
+
+**New.**
+
+- BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
+  arrows ([basic/README.md](../basic/README.md)).
+- The weather display, `weather.bin`, shows the ROM's blocks and
+  arrows, and draws them in the font RAM only on an older core.
+- `make -C sim check-font`, part of `make test`, checks that the
+  board's font is niceemu's, word for word. `font/gen_font_pkg.py`
+  makes it from niceemu's font, not from Spleen's file.
+
 ## V2.5.1 (2026-11-23)
 
 **Upgrade notes.**

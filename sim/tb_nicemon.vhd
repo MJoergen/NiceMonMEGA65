@@ -94,8 +94,10 @@
 --    The fetch statistics still run, but stopped at the halt: two reads of
 --    FS_CYCLES are equal. The link writes and reads the screen's
 --    registers, which go out to the display, and the fonts: the character
---    ROM holds Spleen and drops a write, the font RAM keeps bits 15..0 of
---    a word and leaves the RAM it aliases, and the font base selects it.
+--    ROM holds Spleen and the blocks and arrows at 0x80 to 0x99, which
+--    0xFFFF at 0xFFFE3000 tells, and drops a write, the font RAM keeps
+--    bits 15..0 of a word and leaves the RAM it aliases, and the font base
+--    selects it.
 --    It writes and reads the board's registers (LEDs, RGB levels, display
 --    segments), which go out, and reads the buttons and switches; the
 --    read-only words and those that are not registers take no write.
@@ -1222,6 +1224,7 @@ begin
       report "tb_nicemon: the fonts";
       check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- Spleen's A, row 9
       check("FFFE3FFF", "0000" & to_hstring(C_FONT(8191)));
+      check("FFFE3000", "0000FFFF");                                    -- row 0 of 0x80, the upper half block
       wr("FFFE2829", "00000000");                                       -- the ROM takes no write
       check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));
       check("FFFE0000", "00000000");                                    -- the font RAM, 0 at power-up

@@ -8,9 +8,9 @@
 -- fills the debugger's overlay: the page, rows 0 to 27, with the 256 codes
 -- in other colors, the strip, rows 28 to 31, with text, and the words after
 -- them, which must not show. It keeps a model of the screen and of the
--- overlay. It writes the font RAM through the bus's port, Spleen with the
--- 64 blank codes 0x00-0x1F and 0x80-0x9F drawn as boxes, which it keeps in
--- a model too, and reads back a word of the RAM and of the ROM, which drops
+-- overlay. It writes the font RAM through the bus's port, the ROM's glyphs
+-- with the 64 codes 0x00-0x1F and 0x80-0x9F, which ISO 8859-1 has no glyph
+-- for, drawn as boxes, which it keeps in a model too, and reads back a word of the RAM and of the ROM, which drops
 -- a write.
 --
 -- The VGA clock starts when p_write is done, so the first frame shows all
@@ -272,8 +272,9 @@ begin
       variable row_v   : std_logic_vector(15 downto 0);
    begin
       wait until rising_edge(clk);
-      -- The font RAM: Spleen, with the 64 blank codes as boxes that hold
-      -- their code twice in the middle rows
+      -- The font RAM: the ROM's glyphs, with the 64 codes that ISO 8859-1
+      -- has no glyph for as boxes that hold their code twice in the middle
+      -- rows
       for i in 0 to 8191 loop
          code_v := i / 32;
          row_v  := C_FONT(i);

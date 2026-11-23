@@ -1739,6 +1739,10 @@ def test_fonts(link: Link) -> None:
     rows = link.read(FONT_ROM + 32 * 0x41, 32)
     check("the character ROM holds Spleen's A", rows == a,
           " ".join(f"{w:04X}" for w in rows))
+    # Row 0 of 0x80, the upper half block, which tells a program that the
+    # ROM has the blocks and arrows of nice_cpu's DEVICES.md 1.8
+    got = rd(link, FONT_ROM + 32 * 0x80)
+    check("the character ROM has the blocks", got == 0xFFFF, f"{got:08X}")
     row9 = FONT_ROM + 32 * 0x41 + 9
     check("W to the character ROM", wr(link, row9, 0))
     got = rd(link, row9)
