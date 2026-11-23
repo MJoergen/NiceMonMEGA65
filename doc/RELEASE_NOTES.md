@@ -111,6 +111,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The Nexys4DDR's USB keyboard shows CAPS LOCK and Num Lock on its
   LEDs, set by the board with no program
   ([#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
+- `examples/weather.bas` is the weather display rewritten in BASIC,
+  with a routine of machine code, `wfetch.bin`, for the fetch over
+  HTTP. The examples' zip has both (`examples/README.md`, "The weather
+  display in BASIC").
 
 **Fixed.**
 

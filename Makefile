@@ -327,7 +327,7 @@ ecma55: $(EMU) build/rom_test.bin
 	$(MAKE) -C basic ecma55
 
 weathertest: $(EMU) build/rom_test.bin
-	$(MAKE) -C examples build/weather.bin test
+	$(MAKE) -C examples build/weather.bin build/wfetch.bin test
 	$(PYTHON) tools/weathertest.py
 
 # The system in GHDL, its debug UART on a TCP port of 127.0.0.1, for the

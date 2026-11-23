@@ -87,7 +87,8 @@ or, in an existing clone:
 - `make tcptest` checks the monitor's TCP, and its timers, without a
   board (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make weathertest` checks the weather display, `examples/weather.c`,
-  on the host and in `niceemu`, and `examples/sieve.bas` in `niceemu`,
+  on the host and in `niceemu`, and its BASIC version,
+  `examples/weather.bas`, and `examples/sieve.bas` in `niceemu`,
   without a board (see [The examples](#the-examples)).
 - `make sdtest` checks `tools/nicemon.py sd` and `tools/nicemon.py nbd` on
   `niceemu --link` with images of a card, without a board (see [The
@@ -1313,8 +1314,15 @@ network's entries from C. `make weathertest` checks it in two parts:
   status of 500, an answer of another format, a refused connection, a
   line of the settings not understood, a settings file of more than
   1024 bytes, and one of 1024, the place typed when there is
-  no file, and ESC and Q back to the monitor. It takes about 30
-  seconds, in real time.
+  no file, and ESC and Q back to the monitor. Then it runs
+  `examples/weather.bas` the same way, with `WEATHER.BAS` and
+  `WFETCH.BIN` on the card, under the monitor of the tests alone: the
+  keys load the program, type its line of the server, and `RUN` it. It
+  checks that `wfetch.bin` lies between `HIMEM`, `0xD000`, and its
+  buffers, and the same screens and requests as for `weather.bin`, the
+  answers cut short and not HTTP too, a place in UTF-8 with the units
+  `u`, another port, and Q back to BASIC with Spleen's font. It takes
+  about 100 seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's
 benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known

@@ -1,6 +1,6 @@
 # The examples
 
-Programs in C for the NICE CPU, and one in BASIC with machine code. `make examples` at the top builds them to
+Programs in C for the NICE CPU, and two in BASIC with machine code. `make examples` at the top builds them to
 `examples/build/`. It needs clang with the wasm32 target, `wasm-ld`, and
 `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and `llvm`
 packages). [doc/PROGRAMMING.md](../doc/PROGRAMMING.md) says how C
@@ -12,6 +12,7 @@ reaches the board.
 | `bench.bin`, `bench_win.bin` | nice_cpu's benchmark, which `make hwtest` runs (CONTRIBUTING.md, "The examples"). |
 | `weather.bin` | A weather display on the screen, below. It runs under the monitor. |
 | `sieve.bas`, `sieve.bin` | A BASIC program that counts primes in BASIC, and then again with a routine of machine code that it loads beside it, and compares the times (BASIC with machine code, below). |
+| `weather.bas`, `wfetch.bin` | The weather display again, in BASIC, with a routine of machine code for the network (The weather display in BASIC, below). |
 
 ## The weather display
 
@@ -170,3 +171,74 @@ which BASIC uses.
 `make -C examples test` runs the program in `niceemu` with a card that
 holds both files, and compares what it prints with
 `test/sieve.expected`.
+
+## The weather display in BASIC
+
+`weather.bas` is the weather display of `weather.bin` rewritten in
+BASIC. The screen, the keys, the request, and the parse of the answer
+are BASIC. BASIC has no statements for DNS and TCP, so a routine of
+machine code, `wfetch.bin`, does the fetch, as `sieve.bin` does the
+sieve.
+
+### Running it
+
+1. Copy `weather.bas` and `wfetch.bin` to the folder `NICE` of the SD
+   card. The examples' zip of each release has both, and `make
+   examples` builds them in `examples/build/`.
+2. On the board, at BASIC's `READY.`, type `LOAD "WEATHER"`.
+3. Change the settings in lines 90 to 110, if needed, and type `RUN`.
+
+The settings are lines of the program, not a file, as BASIC cannot
+read a file's text:
+
+    90 PLACE$ = "Copenhagen"
+    100 SERVER$ = "wttr.in": PORT = 80
+    110 UNITS$ = "m"
+
+`PLACE$ = ""` lets wttr.in guess the place, and `UNITS$` is `"m"`,
+`"u"`, or `""`, as `units` in `WEATHER.CFG`. A character from `0x80`,
+such as `CHR$(252)`, ü, goes to the server in UTF-8. `SAVE "WEATHER"`
+keeps the changes on the card.
+
+The screen is that of `weather.bin`. R fetches now, and Q goes back to
+BASIC. CTRL-C stops the program too, but then the font stays the
+program's, until `POKE 0xFFFFFF86, 0`.
+
+### How it works
+
+Line 50 sets `HIMEM = 0xD000`, and line 60 loads `WFETCH.BIN`, which
+`wfetch.nasm` assembles for `0xD000`, as `sieve.bas` loads its routine.
+The program writes the screen with `POKE`, a word for each character
+with its color, and draws the glyphs of the clock and the arrows into
+the font RAM, as `weather.c` does.
+
+The routine and BASIC share these words:
+
+| Address | What |
+|---|---|
+| `0xD000` | The bytes of the answer, or an error of the monitor, below 0 |
+| `0xD001` | The server's port |
+| `0xD002` | The routine, which `SYS 0xD002` calls |
+| `0xD100` | The server's name, a character a word, and a 0 |
+| `0xD140` | The request, a character a word, and a 0 |
+| `0xD400` | The answer, up to 2048 bytes, a byte a word |
+
+The routine packs the name and the request into bytes. It gets an IP
+address by DHCP when the board has none, looks the name up, opens the
+connection, sends the request, and reads the answer until the server
+closes, or for 20 seconds at most. Then it unpacks the answer, a byte
+to a word, for `PEEK`.
+
+One fetch is one `SYS`, from the lookup to the close. A `SYS` ends with
+`mon_restore`, which closes the network
+([monitor/README.md](../monitor/README.md#the-dispatch-table), entry
+36), so no connection can stay open between two calls. So the clock
+stops while a fetch waits, for a second or so, where `weather.bin`
+fetches while it runs. `mon_restore` also sets the font back to
+Spleen's and shows the cursor, so the program sets both again after
+each `SYS`. `SYS` prints `Returned 00000000`, at row 25, which the
+program then clears.
+
+`make weathertest` runs it in `niceemu` against the same server of the
+test as `weather.bin`, with the same answers, and checks its screen
+and its requests (CONTRIBUTING.md, "The examples").
