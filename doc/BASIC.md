@@ -635,7 +635,8 @@ BASIC uses the FPU's.
 Proposed on 2026-11-23 in #170, and not written. A review of the same
 day, against the monitor's code and wttr.in's answers, moved the
 control block, changed `URL$`'s blank and the body's line end, and
-settled the three questions below. It is the first of stage
+settled the three questions below, and nice_cpu#204 then decided the
+codes of the glyphs, which the decode follows. It is the first of stage
 11's "statements for the network", cut to what a program that reads
 a web service needs. `examples/weather.bas`, the weather display of
 #128 in BASIC, shows the need. It is 375 lines, of which about 180
@@ -664,15 +665,24 @@ program that reads a web service would have them again.
   already, so the name is the protocol's.
 - **The body is decoded from UTF-8** to the codes of the screen, ISO
   8859-1, with `?` for what is not there, as `weather_parse.c`'s
-  `utf8_to_screen` does. With the glyphs of the character ROM
-  ([nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204),
-  below), U+2190 to U+2199 and the blocks U+2580,
-  U+2584, and U+2588 become those codes. A string holds a character a
-  word, so a decode to code points above 255 would fit, but `PRINT`
-  shows the low byte, and `CHR$` and `ASC` stop at 255. A BASIC with
-  `HTTP$` fixes those codes for good, so the table of nice_cpu#204 is
-  settled before it ships. The glyphs may follow in a later bitstream,
-  as `weather.bas` draws its own in the font RAM until then.
+  `utf8_to_screen` does. The arrows U+2190 to U+2199 and the blocks
+  U+2580 to U+258F become the low byte of their code point, `0x90` to
+  `0x99` and `0x80` to `0x8F`, the codes of their glyphs in the
+  character ROM of
+  [nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204)
+  (below). A code point of U+0080 to U+009F stays a `?`, as its code
+  would show one of those glyphs. A string holds a character a word,
+  so a decode to code points above 255 would fit, but `PRINT` shows
+  the low byte, and `CHR$` and `ASC` stop at 255.
+- **The decode does not ask the ROM.** A BASIC from a card runs on a
+  core of before nice_cpu#204 too, where those codes are blank.
+  `HTTP$` gives the codes all the same, and a program that needs the
+  glyphs reads the word at `0xFFFE3000`, row 0 of the code `0x80`,
+  which is `0xFFFF` in a ROM that has them, and 0 in one that has
+  not: `IF PEEK(0xFFFE3000) = 0 THEN PROCFONT`. A BASIC with `HTTP$`
+  fixes the codes for good. nice_cpu#204 decided them on 2026-11-23,
+  and no tag of nice_cpu has them yet, so a BASIC that ships before
+  that tag relies on the decision.
 - **At most 255 characters**, a string's limit. A longer body is an
   error, `String too long`, as `+` past 255 is, and `HTTP$` drops the
   connection at the 256th character (question 2). A web service for a
@@ -745,13 +755,26 @@ and `INSTR` on its `|`s, with `DS$` in the handler at line 900.
 `wfetch.nasm`, the request, the parse, and the table of the errors
 go, and the program drops to about 190 lines. With the glyphs, whose
 font code goes too, and with `CURSOR` and `PRINT` in place of its
-`POKE`s, to about 120.
+`POKE`s, to about 120, for a core that has the glyphs alone. With
+the font code kept for an older core, behind the probe of
+`0xFFFE3000`, it is about 35 lines more.
 
 The glyphs are a change of nice_cpu first,
 [nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204), as
-the emulator's character ROM is there: the half blocks, the whole block, and the 8 arrows at
-`0x80` to `0x8A`, blank in Spleen today, the codes that
-`weather_parse.h` uses.
+the emulator's character ROM is there. As decided there on
+2026-11-23, a glyph's code is the low byte of its code point: the 16
+blocks U+2580 to U+258F at `0x80` to `0x8F`, and the 10 arrows U+2190
+to U+2199 at `0x90` to `0x99`, blank in Spleen today. The proposal
+had 11 glyphs at `0x80` to `0x8A`, the codes that `weather_parse.h`
+uses. So the weather display's codes change, in `weather_parse.h`,
+`weather.c`, `weather.bas`, and `weathertest.py`: the lower half
+block from `0x81` to `0x84`, the whole block from `0x82` to `0x88`,
+and the arrows from `0x83`–`0x8A` to `0x90`–`0x93` and `0x96`–`0x99`.
+The programs draw their own glyphs today, so that change needs no
+tag of nice_cpu. It comes with `HTTP$` at the latest, whose decode
+gives the new codes. The board's font follows with the bump to
+nice_cpu's tag, in new bitstreams, as the font is in the FPGA
+(#171).
 
 Its questions, which the review of 2026-11-23 settled:
 
