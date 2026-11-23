@@ -632,7 +632,10 @@ BASIC uses the FPU's.
 
 ### HTTP (proposed)
 
-Proposed on 2026-11-23 in #170, and not decided. It is the first of stage
+Proposed on 2026-11-23 in #170, and not written. A review of the same
+day, against the monitor's code and wttr.in's answers, moved the
+control block, changed `URL$`'s blank and the body's line end, and
+settled the three questions below. It is the first of stage
 11's "statements for the network", cut to what a program that reads
 a web service needs. `examples/weather.bas`, the weather display of
 #128 in BASIC, shows the need. It is 375 lines, of which about 180
@@ -645,11 +648,17 @@ program that reads a web service would have them again.
 - **`HTTP$(HOST$, PATH$)`** is a function. It fetches
   `http://HOST$PATH$` with `GET` and HTTP/1.0, and gives the body as a
   string. `HOST$` is a name or an IP address, with `:PORT` or not, 80
-  when not given, as `LOAD`'s server has it. `PATH$` goes as it is,
-  so that its `?`, `&`, and `%` stay; it must start with `/`, or it
-  is an `Illegal quantity`. The request has `Host`, with the port
+  when not given. `LOAD`'s server is an IP address alone, so the name
+  and its port are a parse of `HTTP$`'s own, and `dns_lookup` takes
+  the name, or four numbers with dots as they are. `PATH$` goes as it
+  is, so that its `?`, `&`, and `%` stay; it must start with `/`, or
+  it is an `Illegal quantity`. The request has `Host`, with the port
   when it is not 80, `User-Agent`, and `Connection: close`, and the
   body ends where the server closes, or at `Content-Length`.
+- **Plain HTTP alone.** There is no HTTPS. Many services answer plain
+  HTTP with a 301 to `https://`, which `DS$` then shows. So `HTTP$`
+  reaches wttr.in, the devices of the local network, and one's own
+  servers.
 - **A function, not a statement**, as the answer is a value, and
   `B$ = HTTP$(...)` reads as `TIME$` does. `GET` is a keyword
   already, so the name is the protocol's.
@@ -660,32 +669,70 @@ program that reads a web service would have them again.
   below), U+2190 to U+2199 and the blocks U+2580,
   U+2584, and U+2588 become those codes. A string holds a character a
   word, so a decode to code points above 255 would fit, but `PRINT`
-  shows the low byte, and `CHR$` and `ASC` stop at 255.
-- **At most 255 characters**, a string's limit. `HTTP$` stops at the
-  255th character of the body, and drops the connection. A web service
-  for a small board answers in a line, as wttr.in's `?format=` does.
+  shows the low byte, and `CHR$` and `ASC` stop at 255. A BASIC with
+  `HTTP$` fixes those codes for good, so the table of nice_cpu#204 is
+  settled before it ships. The glyphs may follow in a later bitstream,
+  as `weather.bas` draws its own in the font RAM until then.
+- **At most 255 characters**, a string's limit. A longer body is an
+  error, `String too long`, as `+` past 255 is, and `HTTP$` drops the
+  connection at the 256th character (question 2). A web service for a
+  small board answers in a line, as wttr.in's `?format=` does.
+- **A line end at the body's end is dropped**, LF or CR LF, and not
+  counted. wttr.in's `?format=3` ends with one (measured 2026-11-23),
+  and a program would find the code 10 in its last field. Those inside
+  the body stay.
 - **A failure is an error**, with `DS` and `DS$`, as `LOAD` from a
   TFTP server has them (#158): the monitor's 40 to 57, and BASIC's
   own from 67 on, an answer that is not HTTP, one cut short, and a
   status other than 200. For the status, `DS$` is `HTTP status 301`
   and the Location, or the status and the body's first line, as the
-  weather display shows them. A status of 404 is `ER` 4, `File not
-  found`, the others 113, `Network error`, and no IP address or DNS
-  server `ER` 5, as for TFTP.
+  weather display shows them. wttr.in answers a place that it does not
+  know with 500 and a line of text (measured 2026-11-23). A status of
+  404 is `ER` 4, `File not found`, the others 113, `Network error`,
+  and no IP address or DNS server `ER` 5, as for TFTP.
 - **No DHCP of its own.** `HTTP$` needs an IP address and a DNS
   server, from `DHCP`, as `NTP` and `LOAD` from a server do. A
   program does `IF PEEK(0xFFFFFFB0) = 0 THEN DHCP` first.
-- **It waits**, up to 20 seconds, and polls the console as `SLEEP`
-  does, so CTRL-C breaks it. The program stops meanwhile, as it does
-  in `LOAD` from a server.
+- **It waits**, up to 20 seconds for the answer, and polls the console
+  as `SLEEP` does, so CTRL-C breaks it. Before that, the monitor's
+  `dns_lookup`, up to about 9 seconds, and the ARP of `tcp_open`, up
+  to 3, poll the network alone, so CTRL-C breaks it after them. The
+  worst case is about 32 seconds. The program stops meanwhile, as it
+  does in `LOAD` from a server.
 - **`URL$(S$)`** percent-encodes `S$` for a path: a letter, a digit,
-  and `-._~` stay, a blank becomes `+`, a character from `0x80` its
-  two bytes of UTF-8 as `%XX%XX`, and anything else `%XX`. It cannot
-  be part of `HTTP$`, as the path's own `%` must stay.
+  and `-._~` stay, a character from `0x80` becomes its two bytes of
+  UTF-8 as `%XX%XX`, and anything else `%XX`, so a blank is `%20`.
+  The proposal had `+` for a blank, which is a blank only in the query
+  of a form, and a plus in a path. wttr.in takes both, `New%20York`
+  and `New+York` (measured 2026-11-23). `URL$` cannot be part of
+  `HTTP$`, as the path's own `%` must stay.
 - **On the monitor's entries** 25 to 30, `dns_lookup` and the five of
-  TCP, in `basic_net.nasm`, beside TFTP. A guess of 450 words, of the
-  4622 that BASIC's image has free
+  TCP, in `basic_net.nasm`, beside TFTP. They are in the table since
+  1.5, so `HTTP$` needs nothing new of the monitor, and can come in a
+  release of BASIC alone. The proposal guessed 450 words, and the
+  review's count by its parts is 600 to 700, of the 4622 that BASIC's
+  image has free
   ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
+- **Nothing is packed.** `tcp_send` and `tcp_recv` copy with `@R4++`,
+  in `tcp_put` and `tcp_get` of `monitor_tcp.nasm`, so a plain address
+  is a buffer of a byte a word, as a string's characters are. The
+  request goes from the strings and the ROM's texts as they are, and
+  the answer comes to a buffer of words. `NTP "NAME"` gives
+  `dns_lookup` its name so already.
+  [monitor/README.md](../monitor/README.md#tcp-and-dns) promises
+  addresses of the byte window alone, and a BASIC from a card runs on
+  the monitors that are released. So the entries' text gets the plain
+  address, with a test, when `HTTP$` is written.
+- **The control block** of the connection is a string's block of the
+  heap, for the call alone (question 3). It is 32 words and its two
+  rings, packed, of 64 bytes or more each: 64 words at least, and 224
+  with `wfetch.nasm`'s rings of 512 and 256 bytes, within a string's
+  255. Two rules keep it safe. `HTTP$` makes no other block while the
+  ROM has it, as a sweep of the heap would move it, so the string of
+  the body is made before it. And every way out, the good end, an
+  error, the timeout, and CTRL-C, ends with `tcp_close` with 1, which
+  frees the handle at once: a close with 0 leaves the block the ROM's
+  until the peer has answered.
 
 The weather's fetch becomes
 
@@ -706,21 +753,29 @@ the emulator's character ROM is there: the half blocks, the whole block, and the
 `0x80` to `0x8A`, blank in Spleen today, the codes that
 `weather_parse.h` uses.
 
-Its open questions:
+Its questions, which the review of 2026-11-23 settled:
 
-1. **The `User-Agent`.** wttr.in answers a browser with a page of
-   HTML, and `curl/8`, which the weather display sends, with text.
-   Many services of plain text do so. `curl/8` makes `HTTP$` work with
-   them, but is not the truth; a name of BASIC's own, such as
-   `NiceMon-BASIC/2.5`, may get HTML. A third argument of headers
-   would settle it per program, at the cost of a longer call.
-2. **A body over 255 characters.** Cut, as above, or an error, `String
-   too long`, so that a program does not take half an answer for a
-   whole one.
-3. **The control block** of the connection, 32 words and its two
-   rings, 64 words or more each. In BASIC's own RAM it costs 128
-   words for good; on the heap, as a string's block, only while
-   `HTTP$` runs, but the heap may be too full for it.
+1. ~~**The `User-Agent`.**~~ Settled on 2026-11-23: a name of BASIC's
+   own, `NiceMon-BASIC/` and its version, and no third argument. The
+   proposal feared that such a name gets HTML from wttr.in, as a
+   browser does, where `curl/8`, which the weather display sends, gets
+   text. It does not: `curl/8`, `Example-BASIC/2.5`,
+   `ExampleClient/1.0`, and a request with no `User-Agent` all got
+   `text/plain` with HTTP/1.0, and only a browser's name HTML
+   (measured 2026-11-23). A third argument of headers waits for a
+   program that needs one.
+2. ~~**A body over 255 characters.**~~ Settled on 2026-11-23: an
+   error, `String too long`, `ER` 23, and no cut, so that a program
+   does not take half an answer for a whole one.
+3. ~~**The control block**~~ of the connection. Settled on 2026-11-23:
+   on the heap, as a string's block, while `HTTP$` runs. The proposal
+   had BASIC's own RAM as the other place, which the monitor refuses:
+   `tcp_cbok` of `monitor_tcp.nasm` gives `MON_E_TSIZE` for a block
+   below `0x8000` or past the first 64M words, as the ROM reaches the
+   rings through the byte window, which ends there, and BASIC's own
+   RAM is at `0xFFFFE800`. The rings are 64 bytes or more each, where
+   the proposal had words. A heap too full for the block is an `Out of
+   memory`, which the program's next string would be too.
 
 ### What changed in the list of #54
 
