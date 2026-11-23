@@ -23,8 +23,49 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 ## V2.5.1 (unreleased)
 
+**Upgrade notes.**
+
+- `BASIC-V2.5.1.ROM` on a card runs on the core of `V2.5` too, but
+  its paths, below, need this release's core, whose monitor walks
+  them. On the core of `V2.5`, a name with a `/`, such as
+  `LOAD "GAMES/CHESS.BIN"`, and `DIR "GAMES"` are `File error 20, not
+  a valid name` ([README.md](../README.md#a-new-basic)).
+- The modules of the host tools that are not commands are in
+  `tools/lib/`
+  ([#166](https://github.com/MJoergen/NiceMonMEGA65/issues/166),
+  [tools/lib/README.md](../tools/lib/README.md)). The commands and
+  their options are as they were. A script of your own that imports
+  one, such as `boardlink`, imports it as `from lib.boardlink import
+  ...`.
+
 **New.**
 
+- The folders inside `NICE` are reached by paths
+  ([#168](https://github.com/MJoergen/NiceMonMEGA65/issues/168),
+  [monitor/README.md](../monitor/README.md#files)). `LOAD
+  "GAMES/CHESS.BIN"` loads a file of the folder `GAMES`, `RUN`,
+  `SAVE`, `BSAVE`, and `DELETE` take such a name too, and `DIR
+  "GAMES"` lists the folder. TAB ends a directory's name with a `/`,
+  and then completes the names inside it. A leading `/` is `NICE`
+  itself, and a part that is empty, `.`, or `..` is `File error 20`,
+  so a path never leaves `NICE`. A program's `fs_open` and `fs_delete`
+  take the same paths. The ROM makes no folder: a PC makes one, or
+  `nicemon.py sd mkdir GAMES` over the link, and `nicemon.py sd`'s
+  `ls`, `get`, `put`, and `del` take paths too
+  ([tools/README.md](../tools/README.md#the-files)). `make hwtest`
+  checks a path on a card that has a folder inside `NICE`.
+- `nicemon.py load --bas prog.bas` types a BASIC program's text into
+  the board's BASIC from the PC, and then `RUN`, with no card and no
+  TFTP server
+  ([#167](https://github.com/MJoergen/NiceMonMEGA65/issues/167),
+  [tools/README.md](../tools/README.md#running-a-basic-program)):
+  `make load FILE=prog.bas ETH=IP ARGS=--bas`. `nicemon.py run --bas`
+  runs it so too, and prints what `niceemu` prints.
+- The examples have a BASIC program that calls a routine of machine
+  code: `sieve.bas` loads `sieve.bin` above a lower `HIMEM`, calls it
+  with `SYS`, and prints how long the sieve took in each
+  ([examples/README.md](../examples/README.md#basic-with-machine-code)).
+  Both files are in the examples' zip.
 - The Nexys4DDR's USB keyboard shows CAPS LOCK and Num Lock on its
   LEDs, set by the board with no program
   ([#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
@@ -37,6 +78,20 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   at the start, so these keys move the cursor. Num Lock gives the
   keypad's digits
   ([#165](https://github.com/MJoergen/NiceMonMEGA65/issues/165)).
+- A `LOAD` of a `.bin` file with a word in the stack's first 1K words
+  wrote over the stack that the `LOAD` ran on. Such a line is now
+  skipped, as one outside a program's RAM is, which ends at `0x1E3FF`
+  on the MEGA65 and at `0xE3FF` on the Nexys4DDR
+  ([basic/README.md](../basic/README.md#loading-without-a-host)).
+- A `TRAP` takes a failure of `LOAD "NAME"` and `RUN "NAME"` of a
+  BASIC program's text that comes before the file's first line with a
+  number, such as no card, a file that is not there, or a first line
+  without a number, as the program is still whole. The program
+  stopped at each of them. From that line on, the load replaces the
+  program, and a `TRAP` does not take its errors
+  ([basic/README.md](../basic/README.md#failures-of-the-files-and-the-network)).
+- `SAVE ""` is `File error 20, not a valid name`. It wrote a file
+  named `.BAS`, as the extension went onto the empty name.
 
 ## V2.5 (2026-11-22)
 
