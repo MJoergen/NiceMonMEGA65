@@ -630,6 +630,98 @@ BASIC uses the FPU's.
   settled: no names are reserved).
   `ON` is the statement's keyword, read again after `CURSOR`.
 
+### HTTP (proposed)
+
+Proposed on 2026-11-23 in #170, and not decided. It is the first of stage
+11's "statements for the network", cut to what a program that reads
+a web service needs. `examples/weather.bas`, the weather display of
+#128 in BASIC, shows the need. It is 375 lines, of which about 180
+are no weather: they build the request, call a routine of machine
+code, `wfetch.nasm`, with `SYS`, set the font and the cursor again
+after it, and parse the answer with `PEEK`, the status line, the
+headers, `Content-Length`, and UTF-8, a byte at a time. Every
+program that reads a web service would have them again.
+
+- **`HTTP$(HOST$, PATH$)`** is a function. It fetches
+  `http://HOST$PATH$` with `GET` and HTTP/1.0, and gives the body as a
+  string. `HOST$` is a name or an IP address, with `:PORT` or not, 80
+  when not given, as `LOAD`'s server has it. `PATH$` goes as it is,
+  so that its `?`, `&`, and `%` stay; it must start with `/`, or it
+  is an `Illegal quantity`. The request has `Host`, with the port
+  when it is not 80, `User-Agent`, and `Connection: close`, and the
+  body ends where the server closes, or at `Content-Length`.
+- **A function, not a statement**, as the answer is a value, and
+  `B$ = HTTP$(...)` reads as `TIME$` does. `GET` is a keyword
+  already, so the name is the protocol's.
+- **The body is decoded from UTF-8** to the codes of the screen, ISO
+  8859-1, with `?` for what is not there, as `weather_parse.c`'s
+  `utf8_to_screen` does. With the glyphs of the character ROM
+  ([nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204),
+  below), U+2190 to U+2199 and the blocks U+2580,
+  U+2584, and U+2588 become those codes. A string holds a character a
+  word, so a decode to code points above 255 would fit, but `PRINT`
+  shows the low byte, and `CHR$` and `ASC` stop at 255.
+- **At most 255 characters**, a string's limit. `HTTP$` stops at the
+  255th character of the body, and drops the connection. A web service
+  for a small board answers in a line, as wttr.in's `?format=` does.
+- **A failure is an error**, with `DS` and `DS$`, as `LOAD` from a
+  TFTP server has them (#158): the monitor's 40 to 57, and BASIC's
+  own from 67 on, an answer that is not HTTP, one cut short, and a
+  status other than 200. For the status, `DS$` is `HTTP status 301`
+  and the Location, or the status and the body's first line, as the
+  weather display shows them. A status of 404 is `ER` 4, `File not
+  found`, the others 113, `Network error`, and no IP address or DNS
+  server `ER` 5, as for TFTP.
+- **No DHCP of its own.** `HTTP$` needs an IP address and a DNS
+  server, from `DHCP`, as `NTP` and `LOAD` from a server do. A
+  program does `IF PEEK(0xFFFFFFB0) = 0 THEN DHCP` first.
+- **It waits**, up to 20 seconds, and polls the console as `SLEEP`
+  does, so CTRL-C breaks it. The program stops meanwhile, as it does
+  in `LOAD` from a server.
+- **`URL$(S$)`** percent-encodes `S$` for a path: a letter, a digit,
+  and `-._~` stay, a blank becomes `+`, a character from `0x80` its
+  two bytes of UTF-8 as `%XX%XX`, and anything else `%XX`. It cannot
+  be part of `HTTP$`, as the path's own `%` must stay.
+- **On the monitor's entries** 25 to 30, `dns_lookup` and the five of
+  TCP, in `basic_net.nasm`, beside TFTP. A guess of 450 words, of the
+  4622 that BASIC's image has free
+  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
+
+The weather's fetch becomes
+
+```
+TRAP 900
+B$ = HTTP$(SERVER$, "/" + URL$(PLACE$) + "?format=%l|%C|%t|%w|%h&m&M")
+```
+
+and `INSTR` on its `|`s, with `DS$` in the handler at line 900.
+`wfetch.nasm`, the request, the parse, and the table of the errors
+go, and the program drops to about 190 lines. With the glyphs, whose
+font code goes too, and with `CURSOR` and `PRINT` in place of its
+`POKE`s, to about 120.
+
+The glyphs are a change of nice_cpu first,
+[nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204), as
+the emulator's character ROM is there: the half blocks, the whole block, and the 8 arrows at
+`0x80` to `0x8A`, blank in Spleen today, the codes that
+`weather_parse.h` uses.
+
+Its open questions:
+
+1. **The `User-Agent`.** wttr.in answers a browser with a page of
+   HTML, and `curl/8`, which the weather display sends, with text.
+   Many services of plain text do so. `curl/8` makes `HTTP$` work with
+   them, but is not the truth; a name of BASIC's own, such as
+   `NiceMon-BASIC/2.5`, may get HTML. A third argument of headers
+   would settle it per program, at the cost of a longer call.
+2. **A body over 255 characters.** Cut, as above, or an error, `String
+   too long`, so that a program does not take half an answer for a
+   whole one.
+3. **The control block** of the connection, 32 words and its two
+   rings, 64 words or more each. In BASIC's own RAM it costs 128
+   words for good; on the heap, as a string's block, only while
+   `HTTP$` runs, but the heap may be too full for it.
+
 ### What changed in the list of #54
 
 The review of 2026-11-11 changed the list of #54 in these places:
@@ -1301,7 +1393,9 @@ Each has an issue, under #54.
     Written in V2.5, in `basic/basic_mach.nasm`, with the language of
     [The machine](#the-machine), in 438 words (measured 2026-11-21).
     The display offset has no statement.
-11. Later, in no order: statements for the network, after #111;
+11. Later, in no order: statements for the network, after #111,
+    the first of which, `HTTP$` and `URL$`, #170, are proposed in
+    [HTTP (proposed)](#http-proposed);
     virtual screens, #163, `FIND` and `CHANGE`, #162; and graphics,
     sprites, and sound, with their hardware.
 
