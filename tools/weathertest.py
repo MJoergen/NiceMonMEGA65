@@ -353,16 +353,17 @@ def basic_cases(tmp: str) -> None:
               r.row(ROW_PLACE) == place and r.row(ROW_VALUES) == values,
               f"{r.row(ROW_PLACE)!r} {r.row(ROW_VALUES)!r}")
 
-    keys = (BAS_KEYS + '90 PLACE$ = "St. Z" + CHR$(252) + "rich/a~b"\r110 UNITS$ = "u"\r'
-            '100 SERVER$ = "10.0.0.2": PORT = 8080\rRUN\r')
+    keys = (BAS_KEYS + '90 PLACE$ = "St. Z" + CHR$(252) + "rich/a~b" + CHR$(9) + "c"\r'
+            '110 UNITS$ = "u"\r100 SERVER$ = "10.0.0.2": PORT = 8080\rRUN\r')
     r = Run(tmp, keys, None, answer("ok.http"), basic=True)
     r2 = Run(tmp, keys.replace("8080", "80"), None, answer("ok.http"), basic=True)
     script = r2.script
     assert script is not None
-    want_req = ("GET /St.+Z%C3%BCrich%2Fa~b?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\n"
+    want_req = ("GET /St.+Z%C3%BCrich%2Fa~b%09c?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\n"
                 "Host: 10.0.0.2\r\nUser-Agent: curl/8\r\nConnection: close\r\n\r\n").encode()
-    check("weather.bas: a place with a blank, a slash, and a u with umlaut, in UTF-8, "
-          "and the units u, without &M", script.request == want_req, repr(script.request))
+    check("weather.bas: a place with a blank, a slash, a u with umlaut, in UTF-8, and a "
+          "TAB, as %09, and the units u, without &M", script.request == want_req,
+          repr(script.request))
     check("weather.bas: the port 8080, where the peer, on 80, refuses",
           again(r, "Error -53, the server refused the connection"), r.row(ROW_ERROR))
 

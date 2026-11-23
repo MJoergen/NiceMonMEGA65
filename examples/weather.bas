@@ -205,8 +205,8 @@
 2050 FOR I = 1 TO LEN(PLACE$)
 2060 C = ASC(MID$(PLACE$, I, 1)): E$ = CHR$(C)
 2070 IF C = 32 THEN E$ = "+"
-2080 IF C > 32 AND C < 128 AND INSTR("-._~", E$) = 0 AND (C < 48 OR C > 57) AND (C < 65 OR C > 90) AND (C < 97 OR C > 122) THEN E$ = "%" + RIGHT$(HEX$(C), 2)
-2090 IF C < 32 OR C >= 128 THEN E$ = "%" + RIGHT$(HEX$(0xC0 OR (C >> 6)), 2) + "%" + RIGHT$(HEX$(0x80 OR (C AND 0x3F)), 2)
+2080 IF C <> 32 AND C < 128 AND INSTR("-._~", E$) = 0 AND (C < 48 OR C > 57) AND (C < 65 OR C > 90) AND (C < 97 OR C > 122) THEN E$ = "%" + RIGHT$(HEX$(C), 2)
+2090 IF C >= 128 THEN E$ = "%" + RIGHT$(HEX$(0xC0 OR (C >> 6)), 2) + "%" + RIGHT$(HEX$(0x80 OR (C AND 0x3F)), 2)
 2100 PROCAPP(E$)
 2110 NEXT I
 2120 ENDIF
