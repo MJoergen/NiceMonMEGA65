@@ -464,7 +464,7 @@ failed, as BASIC 65's disk status does:
 
 | `ER` | Message | When |
 |---:|---|---|
-| 4 | `File not found` | The file is not on the card (`DS` 21), or the TFTP server has no such file (`DS` 64, `TFTP error 1`). |
+| 4 | `File not found` | The file is not on the card (`DS` 21), the TFTP server has no such file (`DS` 64, `TFTP error 1`), or the web server has no such page (`DS` 69, `HTTP status 404`). |
 | 5 | `Device not present` | No card in the slot, no such slot, no IP address, no DNS server, or no answer to ARP, from the DHCP server, the DNS server, the time server, or the TFTP server. |
 | 112 | `File error` | Any other failure of the card or a file, with `DS` below 40. |
 | 113 | `Network error` | Any other failure of the network. |
@@ -473,7 +473,8 @@ failed, as BASIC 65's disk status does:
 SD card's, 16 to 32 the files', and 40 to 57 the network's. BASIC's own
 are 60 to 62 for `NTP`, 63 and 64 for TFTP, no answer and an error of
 the server, 65 for a TFTP server that is no `IP[:PORT]`, and 66 for an
-offset of `NTP` that is no `+HH:MM` or `-HH:MM`.
+offset of `NTP` that is no `+HH:MM` or `-HH:MM`, and 67 to 69 for
+`HTTP$` ([HTTP](#http)).
 
 A program that tries a second server when the first does not answer:
 
@@ -550,6 +551,8 @@ A string where a number goes, or a number where a string goes, is a
 | `HEX$(X)` | The word `X` as 8 hex digits in upper case, such as `000000FF`. |
 | `LEFT$(A$, N)`, `RIGHT$(A$, N)` | The first and the last `N` characters of `A$`, or all of them when it has fewer. |
 | `MID$(A$, N [, M])` | `M` characters of `A$` from position `N`, from 1, or all of them from `N` on. A position past the end gives `""`. |
+| `URL$(A$)` | `A$` encoded for the path of a URL, such as `URL$("New York")`, `New%20York` ([HTTP](#http)). |
+| `HTTP$(H$, P$)` | The page at `http://H$P$`, from a web server ([HTTP](#http)). |
 | `TIME$` | The clock's date and time, as `YYYY-MM-DD HH:MM:SS`, or `""` when it is not set. `TIME$ = A$` sets the clock, as `TIME` does, and a string that it does not take is an `Illegal quantity`. |
 
 A position below 1 and a negative count are an `Illegal quantity`.
@@ -563,7 +566,7 @@ A position below 1 and a negative count are an `Illegal quantity`.
 The characters of a string are one to a word, as on the screen. A
 string in quotes stays in its line, and `LEFT$`, `MID$`, and `RIGHT$`
 point into their string, but a new string, of `+`, `CHR$`, `STR$`,
-`HEX$`, `TIME$`, `INPUT`, `READ`, and `GET`, takes a block of the heap
+`HEX$`, `TIME$`, `URL$`, `HTTP$`, `INPUT`, `READ`, and `GET`, takes a block of the heap
 below the frames: its characters and 2 words. An assignment that
 replaces a string leaves its old block unused. When a new block does
 not fit above the arrays, BASIC moves the blocks in use up over those
@@ -571,6 +574,58 @@ that are not, once, and the rest is `Out of memory`. So a program
 never runs out of room for strings while its strings in use fit.
 `CLR`, `RUN`, `NEW`, and `HIMEM` drop the strings, and an edit keeps
 them, as it keeps the variables.
+
+### HTTP
+
+`HTTP$(H$, P$)` fetches the page at `http://H$P$` from a web server,
+and gives its text, the body of the answer:
+
+```
+10 IF PEEK(0xFFFFFFB0) = 0 THEN DHCP
+20 PRINT HTTP$("wttr.in", "/" + URL$("New York") + "?format=3")
+```
+
+- `H$` is the server: a name, such as `"wttr.in"`, or an IP address,
+  with `:PORT` after it or not, 80 when not. A name needs a DNS server,
+  as `NTP` does, so `DHCP` or `IP` first.
+- `P$` is the path, with its query, and goes as it is. It starts with
+  a `/`, or it is an `Illegal quantity`. `URL$` encodes a part of it,
+  such as a name with blanks.
+- The request is `GET` with HTTP/1.0, with the headers `Host`,
+  `User-Agent: NiceMon-BASIC/` and the version, and `Connection:
+  close`. There is no HTTPS.
+- The text is decoded from UTF-8 to the characters of the screen: ISO
+  8859-1 as it is, the arrows ← to ↙ and the blocks ▀ to ▏ as the codes
+  `0x90` to `0x99` and `0x80` to `0x8F` of their glyphs
+  ([SYSTEM.md](../doc/SYSTEM.md#the-font)), and a `?` for anything
+  else. A line end at the end of the text is dropped, and those inside
+  it stay.
+- The text has 255 characters at most, or it is `String too long`.
+- `HTTP$` waits 20 seconds for the whole answer at most, and CTRL-C
+  stops it. A name that needs a lookup, and the server's address, may
+  take up to 12 seconds more, which CTRL-C does not stop.
+
+A failure is an error, with `DS` and `DS$`
+([Failures](#failures-of-the-files-and-the-network)), so a `TRAP`
+takes it:
+
+| `DS` | `DS$` | When |
+|---:|---|---|
+| 53 | `The server refused the connection` | Nothing listens on the port. |
+| 55 | `No answer from the server` | No answer within 20 seconds. |
+| 67 | `Not an HTTP server` | The answer is not HTTP. |
+| 68 | `The answer of the server was cut short` | The server closed before the end of the headers, or of `Content-Length`. |
+| 69 | `HTTP status 404, No such page` | A status other than 200, with the `Location` of a redirect, or the first line of the text. 404 is `ER` 4, `File not found`, and the others are 113. |
+
+Many servers answer plain HTTP with a redirect to `https://`, which
+`DS$` then shows. A program that runs on an older core, whose character
+ROM has no blocks and arrows, reads `PEEK(0xFFFE3000)`, which is 0
+there, and draws them in the font RAM.
+
+`URL$(A$)` encodes `A$` for a path: a letter, a digit, and `-._~` stay,
+a character from 128 on becomes the two bytes of its UTF-8, each as
+`%XX`, and any other character `%XX`, so a blank is `%20`, and `ü` is
+`%C3%BC`.
 
 ## The screen and the time
 
@@ -833,7 +888,20 @@ the default. It runs these steps in order:
    fails after a `LOAD` of a word below `HIMEM` keeps the program. A
    program's `TRAP` takes an ERROR 1, File not found, with a message
    of 116 characters, of which `DS$` keeps 87.
-7. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
+7. **HTTP.** `test/web.py` runs `HTTP$` and `URL$` against the web
+   server of `tools/lib/tcppeer.py`, which answers each path with an
+   answer of its own, in real time, not with `--step-time`. A program
+   typed before its `RUN` fetches them, as keys typed while `HTTP$`
+   waits would go to the keys typed ahead. It covers a body with
+   UTF-8, the arrows, and the blocks, `Content-Length`, line ends
+   inside the body and at its end, a body of 255 characters and two
+   longer, the statuses 404, 301 with a `Location`, and 500, answers
+   that are not HTTP or are cut short, bytes that are no UTF-8, an
+   empty body, a refused port, a name with no DNS server, and a path
+   and a port that are an `Illegal quantity`, each through a `TRAP`,
+   and the request that the server got. Its 19 fetches, more than the
+   4 handles of TCP, show that each frees its handle.
+8. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
    benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
    with strings until it is swept, in `bench/`, and checks their
    output. Their steps, which it prints, are those of the instruction
@@ -913,22 +981,22 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2339 | 1483 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1908 | 39 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2362 | 1505 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1910 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2023 | 52 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1799 | 300 |
-| `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 1071 | 150 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1803 | 300 |
+| `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2043 | 222 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1174 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1607 | 11 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1609 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1204 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
-| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 670 | 20 |
+| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 697 | 20 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 15864 | 2244 |
+| In all | | 16894 | 2338 |
 <!-- /romsize basic -->

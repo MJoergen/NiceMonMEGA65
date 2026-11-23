@@ -42,8 +42,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   core file. A new ROM alone, with `make r6 ROMPATCH=`, keeps the old
   font.
 
+- `HTTP$` and `URL$` are keywords of BASIC, and no names of variables
+  any more: `URL$ = "X"` is `Syntax error; URL$ is a keyword`.
+
 **New.**
 
+- BASIC reads web pages: `HTTP$(H$, P$)` fetches `http://H$P$` and
+  gives its text, decoded from UTF-8, and `URL$(A$)` encodes a part of
+  a path ([#170](https://github.com/MJoergen/NiceMonMEGA65/issues/170),
+  [basic/README.md](../basic/README.md#http)). A failure is an error
+  with `DS` and `DS$`, such as `HTTP status 404, No such page`, which a
+  `TRAP` takes. It is plain HTTP alone, and the text has 255
+  characters at most. `PRINT HTTP$("wttr.in",
+  "/Copenhagen?format=3")` shows the weather.
 - BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
   arrows ([basic/README.md](../basic/README.md)).
 - The weather display, `weather.bin`, shows the ROM's blocks and

@@ -631,6 +631,596 @@ tput_abort
                 CALL    UDP_SEND
                 JMP     UDP_CLOSE       ; which returns to the caller
 
+; HTTP$(H$, P$) and URL$(S$), the functions of strings of HTTP (issue
+; #170, doc/BASIC.md, "HTTP"), which sprimary calls through SFNS with R8
+; after the token.
+;
+; HTTP$ fetches http://H$P$ with GET and HTTP/1.0, and gives the body,
+; decoded from UTF-8 to the codes of the screen. H$ is a name or an IP
+; address, which dns_lookup takes, with :PORT or not, 80 by default, and
+; P$ starts with a /. The connection is a TCP connection of the entries
+; 26 to 30, whose control block is a block of the heap, with no owner,
+; for the call alone: no block is made while the ROM has it, as a sweep
+; would move it, so the body's block, of HTTP_BODY characters, is made
+; first, in the slot of the result. V_OPEN is HTTP_OPEN while it is
+; open, so that files_end closes it after an error or the break key,
+; and every way out closes it with an abort, which frees the handle at
+; once. The answer is read in parts of up to HTTP_RX bytes into V_TBUF,
+; and each byte goes to h_byte: the status line, the headers, whose
+; Content-Length and Location it keeps, and the body. The whole exchange
+; waits HTTP_WAIT microseconds at most, and polls the console, so that
+; CTRL-C breaks it. The registers R9-R12 are kept, which the expression
+; that calls it may hold.
+HTTP_RX         .EQU    512             ; the bytes of the ring received,
+HTTP_RINGS      .EQU    0x02000100      ; and the rings as tcp_open takes them, 512 and 256
+HTTP_CB         .EQU    224             ; the words of the control block: 32, and the rings packed
+HTTP_BODY       .EQU    257             ; the characters of the body's block: a string, and a CR LF
+HTTP_WAIT       .EQU    20000000        ; the microseconds of the exchange at most
+HTTP_LINE       .EQU    95              ; the characters of a header's line kept at V_TPKT
+HTTP_OPEN       .EQU    0xFFFFFFFD      ; V_OPEN while the connection is open, -3
+V_REQ           .EQU    V_NAME          ; the request, a byte a word, up to V_TSRC, 900 words,
+V_HDST          .EQU    V_NAME          ; and after it is sent, the text of DS$ for a status
+E_HNOTHTTP      .EQU    -67             ; the errors of HTTP$, which no entry returns: not HTTP,
+E_HSHORT        .EQU    -68             ; an answer cut short,
+E_HSTATUS       .EQU    -69             ; and a status other than 200
+f_http
+                PUSH    R9
+                PUSH    R10
+                PUSH    R11
+                PUSH    R12
+                MOVE    R1, HTTP_BODY
+                OR      R2, @V_SSP, TAG_SLOT
+                CALL    salloc
+                CLR     R2
+                CALL    s_push          ; the body, empty, in the slot of the result
+                CALL    s_lpar          ; H$
+                CMP     @R8++, T_COMMA
+        ?!Z     JMP     err_syntax
+                CALL    sexpr           ; P$
+                CALL    rpar
+                MOVE    R1, HTTP_CB
+                NOT     R2, R0          ; a block with no owner
+                CALL    salloc
+                MOVE    R11, R1         ; the control block
+; From here on no block is made, and no string moves
+                CALL    s_top
+                MOVE    R9, R3          ; P$'s entry, after H$'s and the body's
+                TST     R2
+        ?Z      JMP     err_quant
+                CMP     @R1, 0x2F       ; /
+        ?!Z     JMP     err_quant
+                MOVE    @V_HBODY, @-4[R3]
+                MOVE    R4, V_REQ
+                MOVE    R1, TEXT_B+4*S_HGET
+                CALL    h_text
+                MOVE    R1, @R9
+                MOVE    R2, @1[R9]
+                CALL    s_copy          ; P$
+                MOVE    R1, TEXT_B+4*S_HHOST
+                CALL    h_text
+                MOVE    R10, R4         ; the host's first character
+                MOVE    R1, @-2[R9]
+                MOVE    R2, @-1[R9]
+                CALL    s_copy          ; H$
+                MOVE    R12, R4         ; the word after it
+                MOVE    R1, TEXT_B+4*S_HAGENT
+                CALL    h_text
+                MOVE    R1, TEXT_B+4*VERSION
+                CALL    h_text
+                MOVE    R1, TEXT_B+4*S_HEND
+                CALL    h_text
+                MOVE    @V_HN, R4       ; the request's end, until it is sent
+; The port after a colon, which ends the host
+                MOVE    @V_TPORT, 80
+                MOVE    R1, R10
+:
+                CMP     R1, R12
+        ?Z      JMP     h_host          ; no port
+                CMP     @R1++, 0x3A     ; :
+        ?!Z     JMP     :-
+                SUB     R5, R1, 1       ; the colon
+                CMP     R1, R12
+        ?Z      JMP     err_quant       ; a port without digits
+                CLR     R2
+:
+                CMP     R1, R12
+        ?Z      JMP     :+
+                SUB     R3, @R1++, 0x30
+                CMP     R3, 10
+        ?!C     JMP     err_quant       ; no digit
+                ADD     R2, R2, R2      ; R2 is 10 * R2 + the digit
+                ADD     R3, R3, R2
+                SHL     R2, R2, 2
+                ADD     R2, R2, R3
+                CMP     R2, 0x10000
+        ?!C     JMP     err_quant
+                JMP     :-
+:
+                TST     R2
+        ?Z      JMP     err_quant       ; port 0
+                MOVE    @V_TPORT, R2
+                MOVE    R12, R5
+h_host
+                CMP     R10, R12
+        ?Z      JMP     err_quant       ; no host
+                MOVE    R6, @R12        ; the host with a 0 after it, for dns_lookup
+                PUSH    R6
+                CLR     @R12
+                MOVE    R1, R10
+                MOVE    R2, V_TSRV
+                CALL    DNS_LOOKUP
+                POP     R6
+                MOVE    @R12, R6
+                TST     R1
+        ?!Z     JMP     io_fail
+                MOVE    R1, R11
+                MOVE    R2, @V_TSRV
+                MOVE    R3, @V_TPORT
+                MOVE    R4, HTTP_RINGS
+                CALL    TCP_OPEN
+                TST     R1
+        ?N      JMP     io_fail
+                MOVE    @V_TTID, R1     ; the handle
+                MOVE    @V_OPEN, HTTP_OPEN
+                MOVE    @V_TTIME, @io.us
+; The request, in the parts that the ring to send takes
+                MOVE    R9, V_REQ
+                SUB     R10, @V_HN, R9
+h_send
+                MOVE    R1, @V_TTID
+                MOVE    R2, R9
+                MOVE    R3, R10
+                CALL    TCP_SEND
+                TST     R1
+        ?N      JMP     h_fail
+                ADD     R9, R9, R1
+                SUB[M]  R10, R10, R1
+        ?Z      JMP     :+
+                CALL    h_wait
+                JMP     h_send
+; The answer
+:
+                CLR     @V_HN
+                CLR     @V_HNEED
+                CLR     @V_HLINE
+                NOT     @V_HCL, R0
+                CLR     @V_HSTAT
+                CLR     @V_HDS
+h_recv
+                MOVE    R1, @V_TTID
+                MOVE    R2, V_TBUF
+                MOVE    R3, HTTP_RX
+                CALL    TCP_RECV
+                TST     R1
+        ?Z      JMP     h_idle
+                CMP     R1, MON_E_TEOF
+        ?Z      JMP     h_end
+                TST     R1
+        ?N      JMP     h_fail
+                MOVE    R9, V_TBUF
+                ADD     R10, R9, R1
+:
+                CMP     R9, R10
+        ?Z      JMP     h_recv
+                MOVE    R1, @R9++
+                CALL    h_byte
+                TST     @V_HCL
+        ?!Z     JMP     :-
+                CMP     @V_HLINE, 0xFFFFFFFF
+        ?!Z     JMP     :-
+                JMP     h_end           ; the body's bytes of Content-Length
+h_idle
+                CALL    h_wait
+                JMP     h_recv
+; The end of the answer: the body, without a line end at its end, in
+; the slot of the result, or the error
+h_end
+                MOVE    R1, E_HNOTHTTP
+                TST     @V_HSTAT
+        ?Z      JMP     h_fail          ; no status line
+                MOVE    R1, E_HSHORT
+                CMP     @V_HLINE, 0xFFFFFFFF
+        ?!Z     JMP     h_fail          ; in the headers
+                MOVE[M] R2, @V_HCL
+        ?N      JMP     :+
+        ?!Z     JMP     h_fail          ; fewer bytes than Content-Length
+:
+                CMP     @V_HSTAT, 200
+        ?!Z     JMP     h_status
+                TST     @V_HNEED
+        ?Z      JMP     :+
+                MOVE    R1, 0x3F        ; a sequence cut short
+                CALL    h_put
+:
+                CALL    h_close
+                MOVE    R5, @V_HN
+                ADD     R3, R5, @V_HBODY
+                TST     R5
+        ?Z      JMP     :+
+                CMP     @-1[R3], 10     ; LF
+        ?!Z     JMP     :+
+                SUB[M]  R5, R5, 1
+        ?Z      JMP     :+
+                CMP     @-2[R3], 13     ; CR
+        ?Z      SUB     R5, R5, 1
+:
+                CMP     R5, STR_MAX+1
+        ?!C     JMP     err_strlong
+                SUB     @V_SSP, @V_SSP, 2  ; H$ and P$
+                CALL    s_top
+                MOVE    @1[R3], R5
+                POP     R12
+                POP     R11
+                POP     R10
+                POP     R9
+                RET
+h_status
+                MOVE    R1, E_HSTATUS
+; h_fail: the connection closed, and the failure R1 raised with io_fail
+h_fail
+                PUSH    R1
+                CALL    h_close
+                POP     R1
+                JMP     io_fail
+h_long
+                CALL    h_close
+                JMP     err_strlong
+h_nothttp
+                MOVE    R1, E_HNOTHTTP
+                JMP     h_fail
+
+; h_close: the connection of HTTP$ aborted, which frees its handle at
+; once, also for files_end. Uses R1-R6.
+h_close
+                CLR     @V_OPEN
+                MOVE    R1, @V_TTID
+                ONE     R2
+                JMP     TCP_CLOSE       ; which returns to the caller
+
+; h_wait: the timeout of HTTP$, MON_E_TTIMEOUT, when the exchange took
+; HTTP_WAIT microseconds; else the console polled, so that CTRL-C is a
+; break, at the statement, which CONT runs again. Uses R1-R6.
+h_wait
+                SUB     R1, @io.us, @V_TTIME
+                CMP     R1, HTTP_WAIT
+        ?!C     JMP     :+
+                PUSH    R8
+                MOVE    R8, @V_STMT
+                CALL    poll
+                POP     R8
+                RET
+:
+                MOVE    R1, MON_E_TTIMEOUT
+                JMP     h_fail
+
+; h_text: the packed text at the byte address R1, up to its 0, to the
+; words from R4, a byte a word, with CR LF for each |. Uses R1-R3.
+h_text
+                MOVE[M] R2, @R1++
+        ?Z      RET
+                CMP     R2, 0x7C        ; |
+        ?Z      MOVE    @R4++, 13
+        ?Z      MOVE    R2, 10
+                MOVE    @R4++, R2
+                JMP     h_text
+
+; h_byte: the byte R1 of the answer, in the status line or a header, or
+; in the body: of a status of 200 decoded from UTF-8 into the body, else
+; its first line kept for DS$, after which the status is raised. Uses
+; R1-R7.
+h_byte
+                MOVE[M] R2, @V_HLINE
+        ?N      JMP     h_body
+                CMP     R1, 10          ; LF
+        ?Z      JMP     :+
+                CMP     R2, HTTP_LINE
+        ?!C     RET                     ; past what is kept
+                MOVE    @V_TPKT[R2], R1
+                ADD     @V_HLINE, R2, 1
+                RET
+:
+                CLR     @V_HLINE
+                TST     R2
+        ?Z      JMP     :+
+                CMP     @V_TPKT-1[R2], 13  ; CR
+        ?Z      SUB     R2, R2, 1
+:
+                TST     @V_HSTAT
+        ?Z      JMP     h_first
+                TST     R2
+        ?Z      JMP     h_hend
+                MOVE    R1, TEXT_B+4*S_HLEN
+                CALL    h_hdr
+        ?Z      JMP     h_clen
+                MOVE    R1, TEXT_B+4*S_HLOC
+                CALL    h_hdr
+        ?!Z     RET
+                MOVE    R4, V_HDST      ; Location: its value, for DS$
+:
+                CMP     R3, R2
+        ?Z      JMP     :+
+                MOVE    @R4++, @V_TPKT[R3]
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                SUB     @V_HDS, R4, V_HDST
+                RET
+h_clen
+                CLR     R4              ; Content-Length: its digits
+:
+                CMP     R3, R2
+        ?Z      JMP     :+
+                SUB     R5, @V_TPKT[R3], 0x30
+                CMP     R5, 10
+        ?!C     JMP     :+
+                CMP     R4, 0x1000000
+        ?!C     JMP     :+              ; more than any body
+                ADD     R4, R4, R4
+                ADD     R5, R5, R4
+                SHL     R4, R4, 2
+                ADD     R4, R4, R5
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                MOVE    @V_HCL, R4
+                RET
+; The status line, HTTP/ and the version, a blank, and the 3 digits
+h_first
+                MOVE    R1, TEXT_B+4*S_HTTP
+                CLR     R3
+:
+                MOVE[M] R4, @R1++
+        ?Z      JMP     :+
+                CMP     R3, R2
+        ?Z      JMP     h_nothttp
+                CMP     @V_TPKT[R3], R4
+        ?!Z     JMP     h_nothttp
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                CMP     R3, R2
+        ?Z      JMP     h_nothttp
+                CMP     @V_TPKT[R3], 0x20
+                ADD     R3, R3, 1
+        ?!Z     JMP     :-
+                CLR     R4
+                MOVE    R5, 3
+:
+                CMP     R3, R2
+        ?Z      JMP     h_nothttp
+                SUB     R6, @V_TPKT[R3], 0x30
+                CMP     R6, 10
+        ?!C     JMP     h_nothttp
+                ADD     R4, R4, R4
+                ADD     R6, R6, R4
+                SHL     R4, R4, 2
+                ADD     R4, R4, R6
+                ADD     R3, R3, 1
+                SUB[M]  R5, R5, 1
+        ?!Z     JMP     :-
+                TST     R4
+        ?Z      JMP     h_nothttp
+                MOVE    @V_HSTAT, R4
+                RET
+; The empty line after the headers: the body, or for another status
+; with a Location, that status
+h_hend
+                NOT     @V_HLINE, R0
+                CMP     @V_HSTAT, 200
+        ?Z      RET
+                TST     @V_HDS
+        ?Z      RET
+                JMP     h_status
+h_body
+                MOVE[M] R2, @V_HCL
+        ?N      JMP     :+
+                SUB     @V_HCL, R2, 1
+:
+                CMP     @V_HSTAT, 200
+        ?Z      JMP     h_utf8
+                CMP     R1, 10          ; the end of another status's first line
+        ?Z      JMP     h_status
+                CMP     R1, 13
+        ?Z      JMP     h_status
+                MOVE    R2, @V_HDS
+                CMP     R2, DSS_MAX
+        ?!C     RET
+                SUB     R3, R1, 0x20
+                CMP     R3, 0x5F
+        ?!C     RET                     ; a control code, or not ASCII
+                MOVE    @V_HDST[R2], R1
+                ADD     @V_HDS, R2, 1
+                RET
+; UTF-8: a sequence cut short is a ?, and its byte starts anew
+h_utf8
+                MOVE[M] R2, @V_HNEED
+        ?Z      JMP     h_lead
+                AND     R3, R1, 0xC0
+                CMP     R3, 0x80
+        ?!Z     JMP     :+
+                SHL     R3, @V_HCP, 6
+                AND     R4, R1, 0x3F
+                OR      R1, R3, R4
+                MOVE    @V_HCP, R1
+                SUB     R2, R2, 1
+                MOVE    @V_HNEED, R2
+                TST     R2
+        ?!Z     RET
+                JMP     h_cp
+:
+                CLR     @V_HNEED
+                PUSH    R1
+                MOVE    R1, 0x3F
+                CALL    h_put
+                POP     R1
+h_lead
+                CMP     R1, 0x80
+        ?C      JMP     h_put           ; ASCII
+                CMP     R1, 0xC0
+        ?C      JMP     h_q             ; a byte that starts no sequence
+                MOVE    R2, 1
+                AND     R3, R1, 0x1F
+                CMP     R1, 0xE0
+        ?C      JMP     :+
+                MOVE    R2, 2
+                AND     R3, R1, 0x0F
+                CMP     R1, 0xF0
+        ?C      JMP     :+
+                MOVE    R2, 3
+                AND     R3, R1, 0x07
+                CMP     R1, 0xF8
+        ?!C     JMP     h_q
+:
+                MOVE    @V_HNEED, R2
+                MOVE    @V_HCP, R3
+                RET
+; h_cp: the code point R1 as a code of the screen: the arrows U+2190 to
+; U+2199 and the blocks U+2580 to U+258F as the low byte of their code
+; point, the codes of their glyphs in the character ROM, ISO 8859-1 as it
+; is, and a ? for U+0080 to U+009F and anything else
+h_cp
+                SUB     R2, R1, 0x2190
+                CMP     R2, 10
+        ?C      JMP     :+
+                SUB     R2, R1, 0x2580
+                CMP     R2, 16
+        ?C      JMP     :+
+                SUB     R2, R1, 0x80
+                CMP     R2, 0x20
+        ?C      JMP     h_q
+                CMP     R1, 0x100
+        ?C      JMP     h_put
+h_q
+                MOVE    R1, 0x3F        ; ?
+                JMP     h_put
+:
+                AND     R1, R1, 0xFF
+; h_put: the code R1 to the body, or String too long past its block
+h_put
+                MOVE    R2, @V_HN
+                CMP     R2, HTTP_BODY
+        ?!C     JMP     h_long
+                ADD     R3, R2, @V_HBODY
+                MOVE    @R3, R1
+                ADD     @V_HN, R2, 1
+                RET
+
+; h_hdr: Z when the line at V_TPKT, of R2 characters, is the header of
+; the name at the byte address R1, in lower case with its colon, in any
+; case, with R3 at its value, after the blanks. Uses R1 and R3-R6.
+h_hdr
+                CLR     R3
+:
+                MOVE[M] R4, @R1++
+        ?Z      JMP     :+
+                CMP     R3, R2
+        ?Z      JMP     :++             ; the line is shorter
+                MOVE    R5, @V_TPKT[R3]
+                SUB     R6, R5, 0x41
+                CMP     R6, 26
+        ?C      ADD     R5, R5, 0x20    ; in lower case
+                CMP     R5, R4
+        ?!Z     RET
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                CMP     R3, R2
+        ?Z      RET                     ; Z
+                CMP     @V_TPKT[R3], 0x20
+        ?!Z     JMP     h_yes
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                CMP     R0, 1           ; not Z
+                RET
+h_yes
+                CMP     R0, R0          ; Z
+                RET
+
+; URL$(S$): S$ percent-encoded for the path of a URL: a letter, a digit,
+; and -._~ stay, a character from 0x80 becomes the two bytes of its
+; UTF-8 as %XX%XX, and any other %XX, so a blank is %20. Its block
+; takes S$'s slot, as + takes Y's. Uses R1-R7.
+f_url
+                CALL    s_paren
+                CALL    s_top
+                CLR     R5              ; the characters of the result
+:
+                SUB[M]  R2, R2, 1
+        ?N      JMP     :+
+                MOVE    R6, @R1++
+                CALL    url_kind
+                ADD     R5, R5, R7
+                JMP     :-
+:
+                CMP     R5, STR_MAX+1
+        ?!C     JMP     err_strlong
+                SUB     R2, @V_SSP, 1
+                OR      R2, R2, TAG_SLOT
+                MOVE    R1, R5
+                CALL    salloc
+                MOVE    R4, R1
+                CALL    s_top           ; again, as the sweep may have moved S$
+                MOVE    @R3, R4
+                MOVE    @1[R3], R5
+                MOVE    R5, R1
+:
+                SUB[M]  R2, R2, 1
+        ?N      RET
+                MOVE    R6, @R5++
+                CALL    url_kind
+                CMP     R7, 3
+        ?Z      JMP     :+
+        ?C      MOVE    @R4++, R6       ; as it is
+        ?C      JMP     :-
+                SHR     R1, R6, 6       ; two bytes of UTF-8
+                OR      R1, R1, 0xC0
+                CALL    url_hex
+                AND     R6, R6, 0x3F
+                OR      R6, R6, 0x80
+:
+                MOVE    R1, R6
+                CALL    url_hex
+                JMP     :--
+
+; url_kind: R7 the characters that URL$ makes of the character R6: 1, 3,
+; or 6. Uses R3 and R7.
+url_kind
+                MOVE    R7, 6
+                CMP     R6, 0x80
+        ?!C     RET
+                MOVE    R7, 1
+                OR      R3, R6, 0x20
+                SUB     R3, R3, 0x61
+                CMP     R3, 26
+        ?C      RET                     ; a letter
+                SUB     R3, R6, 0x30
+                CMP     R3, 10
+        ?C      RET                     ; a digit
+                CMP     R6, 0x2D        ; -
+        ?Z      RET
+                CMP     R6, 0x2E        ; .
+        ?Z      RET
+                CMP     R6, 0x5F        ; _
+        ?Z      RET
+                CMP     R6, 0x7E        ; ~
+        ?Z      RET
+                MOVE    R7, 3
+                RET
+
+; url_hex: % and the byte R1 in 2 hex digits to the words from R4. Uses R3.
+url_hex
+                MOVE    @R4++, 0x25
+                SHR     R3, R1, 4
+                CALL    :+
+                AND     R3, R1, 0xF
+:
+                ADD     R3, R3, 0x30
+                CMP     R3, 0x3A
+        ?!C     ADD     R3, R3, 7       ; A to F
+                MOVE    @R4++, R3
+                RET
+
 S_NODHCP
                 .ASCII_B 'No answer from a DHCP server'
                 .DAT    0
@@ -675,6 +1265,26 @@ S_NTPBAD
                 .DAT    0
 S_NTPKOD
                 .ASCII_B 'The time server refused: '
+S_HGET          .ASCII_B 'GET '
+                .DAT    0
+S_HHOST         .ASCII_B ' HTTP/1.0|Host: '
+                .DAT    0
+S_HAGENT
+                .ASCII_B '|User-Agent: NiceMon-BASIC/'
+S_HEND          .ASCII_B '|Connection: close||'
+                .DAT    0
+S_HTTP          .ASCII_B 'HTTP/'
+S_HLEN          .ASCII_B 'content-length:'
+S_HLOC          .ASCII_B 'location:'
+S_HNOT          .ASCII_B 'Not an HTTP server'
+S_HSHORT
+                .ASCII_B 'The answer of the server was cut short'
+S_HSTAT         .ASCII_B 'HTTP status '
+                .DAT    0
+S_TREF          .ASCII_B 'The server refused the connection'
+S_TRESET
+                .ASCII_B 'The server reset the connection'
+S_TTIME         .ASCII_B 'No answer from the server'
 ; The failures of the network, and their texts, which io_fail's
 ; io_text shows (basic_trap.nasm), and a 0
 IO_TEXTS
@@ -682,4 +1292,6 @@ IO_TEXTS
                 .DAT    MON_E_DNSTIME, S_DNSTIME, MON_E_DNSNAME, S_DNSNAME, MON_E_DNSFAIL, S_DNSFAIL
                 .DAT    MON_E_NODHCP, S_NODHCP, E_NTPTIME, S_NONTP, E_NTPBAD, S_NTPBAD
                 .DAT    E_NTPKOD, S_NTPKOD, E_TNOANS, S_NOTFTP, E_TERROR, S_TFTPERR
-                .DAT    E_TBAD, S_BADTFTP, E_NTPOFF, S_BADNTP, 0
+                .DAT    E_TBAD, S_BADTFTP, E_NTPOFF, S_BADNTP, E_HNOTHTTP, S_HNOT
+                .DAT    E_HSHORT, S_HSHORT, E_HSTATUS, S_HSTAT, MON_E_TREFUSED, S_TREF
+                .DAT    MON_E_TRESET, S_TRESET, MON_E_TTIMEOUT, S_TTIME, 0

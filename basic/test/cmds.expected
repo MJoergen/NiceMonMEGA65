@@ -57,6 +57,7 @@ DATA 1, "A,B", C    the items that READ reads, numbers and strings
 READ V, W$, ...     V and W$ the next items of DATA
 RESTORE [N]         READ from the first DATA again, or from line N
 A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$
+HTTP$(H$, P$)       the body of http://H$P$; URL$(S$) S$ encoded for a path
 ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
 DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
 DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X

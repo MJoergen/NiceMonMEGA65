@@ -510,7 +510,8 @@ ecma55: $(ROM_TEST)
 # words stay, but for VBASE, bits 23-0 of R14, which must be 0.
 # test/dis.py
 # checks the rows of DIS against nicedis.py and niceasm first,
-# test/ntp.py NTP, with DHCP and DNS before it, and test/tftp.py TFTP's
+# test/ntp.py NTP, with DHCP and DNS before it, test/web.py HTTP$ and
+# URL$ against tools/lib/tcppeer.py, and test/tftp.py TFTP's
 # LOAD and DIR, and test/bench.py runs the benchmarks of bench/ and
 # checks their output. time writes to a copy of super.img, and runs with
 # --step-time, so that the dates it writes are fixed; its output has what
@@ -528,6 +529,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@$(PYTHON) test/bench.py $(EMU) $(ROM_TEST) $(BENCH)
 	@$(PYTHON) test/ntp.py $(EMU) $(ROM_TEST) test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(ROM_TEST) test/tftp.expected $(BUILD)/tftp.out
+	@$(PYTHON) test/web.py $(EMU) $(ROM_TEST)
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt

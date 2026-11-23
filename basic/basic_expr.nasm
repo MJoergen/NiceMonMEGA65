@@ -204,7 +204,7 @@ KW_TOK
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP, T_WHILE, T_UNTIL
                 .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
                 .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
-                .DAT    T_TI, T_OFF, T_ER, T_EL, T_ERRS, T_DS, T_DSS
+                .DAT    T_TI, T_OFF, T_ER, T_EL, T_ERRS, T_DS, T_DSS, K_SFN*K+9, K_SFN*K+10
 KW_TOK_END
 
 ; The characters of one-character tokens, each with its token

@@ -76,7 +76,7 @@ V_LEND          .EQU    0xFFFFE803      ; the last byte that LOAD read, for the 
 V_LPOS          .EQU    0xFFFFE804      ; for LOAD from a file: the next free word of V_LINE
 V_TLIST         .EQU    0xFFFFE805      ; not 0 for a listing of TFTP, of DIR, which bin_eol shows
 V_LBAS          .EQU    0xFFFFE806      ; while LOAD reads a program's text: 1 before its first line, 2 after, else 0
-V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, -2 for that of a write, or 0
+V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, -2 for that of a write, -3 for HTTP$'s connection, or 0
 V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 8 words, slots 1, 2, 4, and 8 at V_ARGS, +1, +3, and +7
 V_LSTATS        .EQU    0xFFFFE810      ; for LOAD: the counts of bin_line, 7 words
 V_NET           .EQU    0xFFFFE818      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
@@ -101,6 +101,14 @@ V_TTIME         .EQU    0xFFFFE8A4      ; the microseconds when it was sent,
 V_TEND          .EQU    0xFFFFE8A5      ; the bytes of the DATA's block, or of an ERROR,
 V_TPORT         .EQU    0xFFFFE8A6      ; the server's port for the RRQ or the WRQ,
 V_TOP           .EQU    0xFFFFE8A7      ; the request's opcode, 1 for an RRQ or 2 for a WRQ,
+V_HBODY         .EQU    0xFFFFE8A8      ; for HTTP$, with TFTP's server, TID, time, and port: the body's first character,
+V_HN            .EQU    0xFFFFE8A9      ; its characters, or the request's end until it is sent,
+V_HCP           .EQU    0xFFFFE8AA      ; the code point of a sequence of UTF-8,
+V_HNEED         .EQU    0xFFFFE8AB      ; and its bytes still to come,
+V_HLINE         .EQU    0xFFFFE8AC      ; the characters of a header's line at V_TPKT, or -1 in the body,
+V_HCL           .EQU    0xFFFFE8AD      ; the bytes of the body that Content-Length leaves, or -1,
+V_HSTAT         .EQU    0xFFFFE8AE      ; the status, or 0 before the status line,
+V_HDS           .EQU    0xFFFFE8AF      ; and the characters of the text for DS$ at V_HDST
 V_TPKT          .EQU    0xFFFFE8B0      ; and the packet sent, a byte per word, up to TFTP_PKT, or in a write the one received
 V_NTPIP         .EQU    0xFFFFE910      ; for NTP: the server's IP address, which dns_lookup writes
 V_ENT           .EQU    0xFFFFE920      ; for DIR: an entry of fs_readname, 4 words,
@@ -783,7 +791,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    40              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"DS"DS$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"DS"DS$"HTTP$"URL$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -808,7 +816,7 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
-                .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
+                .DAT    H_DATA, H_READ, H_REST, H_STR, H_HTTP, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
                 .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_SLEEP, H_FG, H_BG, H_CUR, H_CURP, H_RCUR
                 .DAT    H_TRAP, H_RESUME, H_ER, H_DS
                 .DAT    H_P, H_PG, 0
@@ -881,6 +889,7 @@ H_READ          .ASCII_B 'READ V, W$, ...     V and W$ the next items of DATA'
 H_REST          .ASCII_B 'RESTORE [N]         READ from the first DATA again, or from line N'
 H_STR           .ASCII_B 'A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$'
                 .DAT    0
+H_HTTP          .ASCII_B 'HTTP$(H$, P$)       the body of http://H$P$; URL$(S$) S$ encoded for a path'
 H_ON            .ASCII_B 'ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it'
 H_DEF           .ASCII_B 'DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string'
 H_DO            .ASCII_B 'DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X'

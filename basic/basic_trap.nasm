@@ -293,6 +293,8 @@ io_hex
                 CALL    io_b
                 CMP     R7, E_NTPKOD
         ?Z      JMP     io_kod
+                CMP     R7, E_HSTATUS
+        ?Z      JMP     io_http
                 CMP     R7, E_TERROR
         ?!Z     RET
                 MOVE    R5, V_TBUF      ; the ERROR
@@ -306,7 +308,7 @@ io_hex
                 MOVE    R1, S_UCOMMA
                 CALL    io_b
                 ADD     R5, R5, 4
-:
+io_chars
                 CMP     R5, R6
         ?!C     RET
                 MOVE[M] R1, @R5++
@@ -315,9 +317,23 @@ io_hex
         ?!C     RET                     ; no more fits in DS$
                 SUB     R2, R1, 0x20
                 CMP     R2, 0x5F
-        ?!C     JMP     :-              ; a control code
+        ?!C     JMP     io_chars        ; a control code
                 CALL    putc
-                JMP     :-
+                JMP     io_chars
+; HTTP$'s status, File not found for 404, as the TFTP error 1, and the
+; Location or the first line of the body, if there is one
+io_http
+                MOVE    R1, @V_HSTAT
+                CMP     R1, 404
+        ?Z      ONE     R9
+                CALL    putdec
+                MOVE[M] R6, @V_HDS
+        ?Z      RET
+                MOVE    R1, S_UCOMMA
+                CALL    io_b
+                MOVE    R5, V_HDST
+                ADD     R6, R6, R5
+                JMP     io_chars
 io_other
                 MOVE    R1, S_NET
                 CALL    io_b

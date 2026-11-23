@@ -570,7 +570,7 @@ s_num_arg
 ; token, which leave a string on top. LEFT$, MID$, and RIGHT$ give a part
 ; of their string, which they do not copy.
 SFNS
-                .DAT    f_chr, f_str, f_hex, f_left, f_mid, f_right, f_time, f_err, f_ds
+                .DAT    f_chr, f_str, f_hex, f_left, f_mid, f_right, f_time, f_err, f_ds, f_http, f_url
 
 ; CHR$(N): the character of code N, 0 to 255
 f_chr

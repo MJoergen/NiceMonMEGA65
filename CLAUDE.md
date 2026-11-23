@@ -228,7 +228,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   typed ahead, `INPUT`, `GET`, the arrays, and `HIMEM`,
   `basic_cmd.nasm`, the routines of the statements
   that were the monitor's commands, and `SAVE` and `LOAD` of a
-  program's text (#60), `DHCP`, `NTP`, and TFTP in
+  program's text (#60), `DHCP`, `NTP`, TFTP, and `HTTP$` and `URL$` (#170) in
   `basic_net.nasm`, `TIME` in `basic_time.nasm`, `DIS` in
   `basic_dis.nasm`, and the screen editor of stage 7 (#118) in
   `basic_edit.nasm`, and the strings of stage 5 (#116), with

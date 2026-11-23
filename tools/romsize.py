@@ -50,7 +50,7 @@ ROM_PARTS = {
     "basic_prog.nasm": "The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the "
                        "break key, `INPUT`, `GET`, the arrays, and `HIMEM`",
     "basic_cmd.nasm": "The routines of the statements that were the commands",
-    "basic_net.nasm": "`DHCP`, `NTP`, and TFTP",
+    "basic_net.nasm": "`DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$`",
     "basic_time.nasm": "`TIME`, and the clock's side of `NTP`",
     "basic_dis.nasm": "The disassembler of `DIS`",
     "basic_edit.nasm": "The screen editor",

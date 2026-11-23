@@ -927,8 +927,8 @@ putdec
                 POP     R7
                 RET
 
-; files_end: the file of LOAD or SAVE, or TFTP's endpoint, that an error
-; or the break key left open, closed, and the load and the save of a
+; files_end: the file of LOAD or SAVE, TFTP's endpoint, or the connection
+; of HTTP$, that an error or the break key left open, closed, and the load and the save of a
 ; program's text ended, for main. The lines that SAVE has in V_FBUF are
 ; written first to the card, and dropped for a TFTP server, which gets an
 ; ERROR instead, with tput_abort, so that it drops the file. Uses R1-R6.
@@ -944,6 +944,8 @@ files_end
                 CLR     @V_OPEN
                 CMP     R1, 0xFFFFFFFE
         ?Z      JMP     tput_abort      ; which returns to the caller
+                CMP     R1, HTTP_OPEN
+        ?Z      JMP     h_close         ; which returns to the caller
                 TST     R1
         ?N      JMP     UDP_CLOSE       ; which returns to the caller
                 SUB     R1, R1, 1
