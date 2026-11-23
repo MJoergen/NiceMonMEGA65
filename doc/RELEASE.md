@@ -41,8 +41,9 @@ and keep their names.
   - `BASIC-V1.0.ROM`, BASIC's image alone, as a file for a card: in
     the folder `NICE`, a MEGA65 with a core of `V2.5` or later loads
     it at power-up, in place of its own BASIC
-    ([BASIC_ROM.md](BASIC_ROM.md)). Its version is the tag, and it has
-    no flag "keep".
+    ([BASIC_ROM.md](BASIC_ROM.md)). Its paths to the folders inside
+    `NICE` need a core of `V2.5.1` or later, whose monitor walks them.
+    Its version is the tag, and it has no flag "keep".
   - `demo.bin`, the demo of `demo/`, a program under the monitor,
     with the tag in its title bar.
   - `weather.bin`, the weather display of `examples/`, a program under

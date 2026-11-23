@@ -227,7 +227,10 @@ the monitor's write of a word back to itself changes nothing in
   running. The layout is that of the monitor's own RAM, from
   `0xFFFFF000`, and the screen's rows, and a change of either refuses
   the older images: version 2 has the 28 rows of #157, where version
-  1 had 25.
+  1 had 25. Neither number shows what an entry does: `fs_open` and
+  `fs_delete` take paths from `V2.5.1` on (#168), so a BASIC from then
+  on reaches the folders inside `NICE` only on a core from then on,
+  and gets error 20 for a path on the core of `V2.5`.
 - **BASIC's RAM.** Its size is the image's own, the word at `0x300B`.
   The monitor has it in three places today: SP at `mon_reset` and at
   `mon_exit`, and the end of a program's RAM in `bin_line`. It then

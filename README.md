@@ -165,7 +165,10 @@ only the cores of its own layout of the ROM and the screen: the files
 before V2.4 fit the cores before V2.4, those of V2.4 and V2.4.1 fit
 the cores of V2.4 and V2.4.1, and those from V2.5 on fit the cores
 from V2.5 on. The monitor passes over a file that does not fit, and runs
-the BASIC of its core. Each release has its BASIC as a file of its
+the BASIC of its core. A name with a path, such as
+`LOAD "GAMES/CHESS.BIN"`, also needs a core from V2.5.1 on, as the
+monitor walks the path: on the core of V2.5 it is `File error 20, not a
+valid name`. Each release has its BASIC as a file of its
 own, such as `BASIC-V2.5.ROM`. To use it:
 
 1. Copy the file into the folder `NICE` of a card. Older ones may stay
