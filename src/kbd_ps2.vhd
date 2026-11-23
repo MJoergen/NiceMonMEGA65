@@ -53,8 +53,10 @@
 -- keyboard that does not take the command is then asked 1 + C_TRIES times
 -- per change, not again and again. The LEDs are
 -- sent at reset, and again when the keyboard says AA, which it does after
--- its self-test, when it is plugged in. The answers, FA and AA, go to
--- data_o as any byte does, and kbd_ps2_ascii.vhd ignores them.
+-- its self-test, when it is plugged in: that is a change of its own, with
+-- all its tries, whatever the change before it used up. The answers, FA
+-- and AA, go to data_o as any byte does, and kbd_ps2_ascii.vhd ignores
+-- them.
 --
 -- The lines' outputs ps2_clk_o and ps2_data_o are registers of their own,
 -- copies of the state machine's lines a cycle later, which drive nothing
@@ -260,7 +262,10 @@ begin
                      data_o       <= frame_v(8 downto 1);
                      data_valid_o <= '1';
                      if frame_v(8 downto 1) = C_PASSED then
+                        -- A keyboard plugged in: the LEDs again, with all
+                        -- the tries
                         resend <= '1';
+                        tries  <= 0;
                      end if;
                      if state = ST_ANSWER then
                         -- FA after ED sends the LED byte, and FA after it

@@ -11,8 +11,8 @@
 -- half a frame, which the receiver must drop. It checks the commands that
 -- set the LEDs, ED and the LED byte, at reset, after CAPS LOCK and Num Lock,
 -- after the keyboard's AA, with a keyboard that answers late, hangs after
--- the LED byte, or does not answer, and that they wait until no keys have
--- come for 100 ms. p_rx
+-- the LED byte, or does not answer, also after its AA, which gets all the
+-- tries again, and that they wait until no keys have come for 100 ms. p_rx
 -- takes the bytes and the detector's pulses, and p_cmds the commands. The
 -- system clock is 10 MHz, so that the filter and the timeout of the receiver
 -- have their real lengths.
@@ -439,6 +439,11 @@ begin
       expect_cmds(X"ED00ED00ED00");
       expect("Aa");
       wait for 250 ms;               -- the wait for the last FA ends
+
+      report "tb_ps2: AA after the tries are used up gets all three again";
+      send(X"AA");                   -- plugged in again, and still no answer
+      expect_cmds(X"ED00ED00ED00");
+      wait for 250 ms;
       kbd_answer <= '1';
 
       report "tb_ps2: the LEDs change only after 100 ms without keys";
