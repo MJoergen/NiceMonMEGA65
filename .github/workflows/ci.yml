@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# A new push to a branch cancels the run of its older one, which would
+# otherwise hold runners that the new run waits for.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # The GHDL tests on both cores. Ubuntu 24.04 has GHDL 4.1.0, the version
   # of README.md. niceemu is built so that check-steps compares the step

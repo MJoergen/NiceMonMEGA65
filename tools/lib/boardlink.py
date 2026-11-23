@@ -63,12 +63,13 @@ NET_RX_GOOD = 0xFFFFFFB3
 NET_TX = 0xFFFFFFB5
 NET_STATUS = 0xFFFFFFB6
 
-# The simulation takes about 4 ms of real time for each byte on its UART,
-# and clears the memory, its 64K words of RAM and the screen's 32K side by
-# side, a word of each a cycle, in a few seconds. These leave room for a
-# slower computer.
+# The simulation takes 4 to 18 ms of real time for each byte on its UART,
+# by the computer, and clears the memory, its 64K words of RAM and the
+# screen's 32K side by side, a word of each a cycle, in a few seconds.
+# These leave room for a slower computer, and a W of the demo's 5K words,
+# 40 KB, which takes 12 minutes on a slow one.
 COSIM_WAIT = 20.0
-COSIM_BYTE = 0.02
+COSIM_BYTE = 0.05
 # The TCP port of the board's debug link on Ethernet (src/eth/eth_tcp.vhd)
 ETH_PORT = 4510
 

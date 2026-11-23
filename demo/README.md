@@ -81,9 +81,10 @@ The two run in `niceemu` like any program, from address 0:
 
     niceemu --screen -i demo/build/test1.txt demo/build/test/monitor_demo.bin
 
-`tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run
+`tools/hwtest.py`, and so `make linktest`, run
 `build/test/monitor_demo.bin` with `SYS 0x8000` and a few keys through
-`nicemon.py run`,
+`nicemon.py run`, and `make cosimtest` runs `build/test/demo_test.bin`
+with `nicemon.py run --monitor` under the monitor in the simulation's ROM,
 and compare its registers and screen with `niceemu`'s. `make hwtest`
 and `make linktest` also run F11's self-test, which `make cosimtest`
 leaves out, as the simulation is slow.

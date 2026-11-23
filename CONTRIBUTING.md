@@ -550,18 +550,20 @@ of the connection is a break, which ends the line's input. One host is
 served at a time. Another host waits until the first has half-closed or
 closed.
 
-The simulation is far slower than real time, about 250 bytes a second on
-the UART. A short request takes a fraction of a second, a clear of the
-memory about 4 s, and a load of 1000 words about 40 s. So `boardlink.py`
-waits longer for an answer there: 20 s, and 20 ms more for each byte of
-the request. Only small programs are practical.
+The simulation is far slower than real time, 50 to 250 bytes a second
+on the UART, by the computer. A short request takes a fraction of a
+second, a clear of the memory about 4 s, and a load of 1000 words 40 to
+150 s. So `boardlink.py` waits longer for an answer there: 20 s, and
+50 ms more for each byte of the request. Only small programs are practical.
 
-`make cosimtest` starts `make cosim` on a free port. It runs hwtest's
+`make cosimtest` starts `make cosim` on a free port, with
+`build/rom_test.bin`, the monitor of the tests, in its ROM. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
 shorter in simulated time, and its checks of the pause, the step, the
 breakpoints, the writes of the registers, and the FPU.
-Then it runs the programs that `make hwtest` compares, and the monitor's
-with `--monitor --rom` and with a short program pasted into `LOAD`, with
+Then it runs the programs that `make hwtest` compares, and under the
+monitor in the ROM, with `--monitor` and no `--rom`, the monitor's test
+program, a short program pasted into `LOAD`, and the demo, with
 `nicemon.py run --cosim` and with `niceemu`, whose output and exit status must
 be the same, and checks that `nicemon.py load` refuses a word beyond the
 simulated system's 64K words of RAM. The simulated system's I2C bus has
@@ -570,8 +572,8 @@ set the clock of the time of day to its time. Then the monitor starts
 again, gets `TIME` with a date and a time, and must write them to the
 model and clear its status (#105).
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
-take too long. CI runs it on both cores, where it takes two to four
-hours on each, most of it in the monitor's runs.
+take too long. It takes under an hour on each core, most of it in the
+load of the demo and in the monitor's runs, and CI runs it on both.
 
 ## The formal checks
 

@@ -2388,6 +2388,8 @@ def test_primes(link: Link, primes: str, board: str) -> None:
 
 # BASIC's statement that runs the demo at 0x8000 (demo/)
 DEMO_KEY = b"SYS 0x8000\r"
+# The keys that comparisons() and test_monitor() type for the demo
+DEMO_KEYS = b"Hello\tNICE\r\nabc\x7fd\x1b[Ae\n"
 
 
 def monitor_demo() -> str:
@@ -2497,7 +2499,7 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     demo = monitor_demo()
     keys = os.path.join(tmp, "keys.txt")
     with open(keys, "wb") as f:
-        f.write(DEMO_KEY + b"Hello\tNICE\r\nabc\x7fd\x1b[Ae\n")
+        f.write(DEMO_KEY + DEMO_KEYS)
     # Every byte value, six times over: 1536 bytes, far more than the
     # 16-byte FIFO of the testbench holds
     text = os.path.join(tmp, "input.bin")
@@ -2565,7 +2567,8 @@ def test_run(link_args: list[str],
 
 
 def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
-                 via: str = "", long: bool = False) -> None:
+                 via: str = "", long: bool = False,
+                 tests_rom: bool = False, demo: bool = False) -> None:
     """Runs the monitor's test program, monitor/test/hello.nasm at 0x8000,
     with run.py --monitor --rom and the monitor of the tests, and with
     niceemu, on the two joined, with r and h, the commands that run it and
@@ -2581,8 +2584,13 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     8000 700 before the h, 448 rows, about 20 KB, which the board sends
     while run.py ends the input with a break: the host has to read on
     meanwhile (issue #67). The simulation of make cosim is too slow for
-    it. link_args are run.py's options for the link, and via names it in
-    the checks, as for test_run. The port must be closed meanwhile."""
+    it. With tests_rom, the system's ROM is the monitor of the tests,
+    build/rom_test.bin, as in make cosim with ROM=, so run.py runs without
+    --rom, under that ROM, and skips the load of its 26K words, which takes
+    the simulation more than half an hour. With demo, the demo at 0x8000
+    runs too, with BASIC's SYS 0x8000 and a few keys, as in comparisons().
+    link_args are run.py's options for the link, and via names it in the
+    checks, as for test_run. The port must be closed meanwhile."""
     subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor", "build/hello.bin"], check=True)
     monitor = f"{REPO}/build/rom_test.bin"
@@ -2622,6 +2630,14 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
         lines = f.read()
     inputs.append((f" with LOAD, {os.path.basename(paste)} pasted, and SYS 0x8000",
                    b"LOAD\r" + lines + b"\rSYS 0x8000\rHALT\r", none, monitor))
+    if demo:
+        # monitor_demo.bin is the monitor of the tests and the demo joined
+        subprocess.run(["make", "-s", "-C", f"{REPO}/demo",
+                        "build/test/demo_test.bin"], check=True)
+        inputs.append((" with keys", DEMO_KEYS,
+                       f"{REPO}/demo/build/test/demo_test.bin", monitor_demo()))
+    rom_args = [] if tests_rom else ["--rom", monitor]
+    rom_name = "" if tests_rom else "--rom rom_test.bin "
     if os.path.exists(NICEEMU):
         for name, keys, prog, emu_prog in inputs:
             board_in = os.path.join(tmp, "monitor_in.txt")
@@ -2632,8 +2648,8 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
                 f.write(b"SYS 0x8000\r" + keys)
             emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", emu_prog],
                                  stdin=subprocess.DEVNULL, capture_output=True)
-            board = subprocess.run(run_py + ["--rom", monitor, "--input",
-                                             board_in, "--screen", prog],
+            board = subprocess.run(run_py + rom_args + ["--input",
+                                                        board_in, "--screen", prog],
                                    stdin=subprocess.DEVNULL,
                                    capture_output=True)
             for r in (emu, board):
@@ -2642,7 +2658,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
             board.stdout = BG_DHCP.sub(b"", board.stdout)
             same = (emu.stdout == board.stdout and
                     emu.returncode == board.returncode)
-            check(f"run.py --monitor --rom rom_test.bin "
+            check(f"run.py --monitor {rom_name}"
                   f"{os.path.basename(prog)}{name} as niceemu{via}", same,
                   "" if same else
                   f"\n  niceemu (exit {emu.returncode}): "

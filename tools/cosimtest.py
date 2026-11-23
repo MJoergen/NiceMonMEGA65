@@ -3,14 +3,17 @@
 board.
 
 It starts "make -C sim cosim", the RTL in GHDL with its debug UART on a
-free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad
+free port of 127.0.0.1, with build/rom_test.bin, the monitor of the
+tests, in its ROM, which the tools hide as on the board. On it, it runs hwtest.py's checks of bad
 packets, except the one of a gap between two bytes, as a gap in real
 time is far shorter in simulated time, and its checks of the pause, the
 step, the breakpoints, and the writes of the registers, against niceemu
 --link, and its check of the FPU. Then it runs the programs of
 hwtest.py's comparison, two of the FPU among them, with run.py
---cosim on that port and with niceemu alone, and the monitor's test
-program, with run.py --monitor and with BASIC's LOAD. Each must print
+--cosim on that port and with niceemu alone, and under the monitor in
+the ROM, with run.py --monitor and no --rom, the monitor's test program,
+BASIC's LOAD, and the demo. A load of the monitor's 26K words over the
+link would take the simulation more than half an hour each time. Each must print
 the same and exit with the same status. The monitor's cold start must set
 the clock of the time of day from the model of the real-time clock on
 the I2C bus of the simulated system (#105). Last, load.py must refuse a word
@@ -54,8 +57,7 @@ def test_rtc(port: str, tmp: str) -> None:
     """The clock from the real-time clock: the I2C master is present, and
     with "set" cleared, the monitor's cold start in test_monitor sets the
     clock to the model's time, which the simulation has run on from for
-    no more than a minute. Then the monitor that test_monitor left in the
-    RAM starts again, and its time, typed, writes the model, whose
+    no more than a minute. Then the monitor in the ROM starts again, and its time, typed, writes the model, whose
     registers it reads back, and clears its status."""
     args = argparse.Namespace(cosim=int(port), tcp=None)
     link = open_link(args)
@@ -68,7 +70,7 @@ def test_rtc(port: str, tmp: str) -> None:
                      hwtest.rd(link, hwtest.CLOCK_STATUS) == 0)
     finally:
         link.close()
-    test_monitor(["--cosim", port], tmp)
+    test_monitor(["--cosim", port], tmp, tests_rom=True, demo=True)
     link = open_link(args)
     try:
         link.control(HOLD | RAM)
@@ -77,7 +79,7 @@ def test_rtc(port: str, tmp: str) -> None:
         hwtest.check("clock set from the real-time clock at the cold start",
                      ok and 0 <= clock - RTC_TIME < 60,
                      f"{clock - RTC_TIME:+.3f} s from the model's time")
-        link.control(RAM)
+        link.control(0)
         text = b""
         end = time.monotonic() + 300
         while b"READY.\r\n" not in text and time.monotonic() < end:
@@ -113,13 +115,15 @@ def main() -> None:
     hwtest.QUIET = 5.0
     hwtest.RUN_TIMEOUT = 600.0
     hwtest.I2C_WAIT = 600.0
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     with tempfile.TemporaryDirectory() as tmp:
         log_path = os.path.join(tmp, "cosim.log")
         with open(log_path, "wb") as log:
             # A session of its own, so that make, GHDL, and the simulation
             # stop together.
             sim = subprocess.Popen(["make", "-s", "-C", f"{REPO}/sim",
-                                    "cosim", "COSIM_PORT=0"], stdout=subprocess.PIPE,
+                                    "cosim", "COSIM_PORT=0",
+                                    f"ROM={REPO}/build/rom_test.bin"], stdout=subprocess.PIPE,
                                    stderr=log, start_new_session=True)
         try:
             assert sim.stdout is not None
@@ -152,7 +156,11 @@ def main() -> None:
                     f"{REPO}/sim/fpusum.nasm", tmp))
             finally:
                 link.close()
-            test_run(["--cosim", port], comparisons(tmp))
+            # The demo runs under the ROM's monitor in test_rtc, not
+            # loaded at 0 with the monitor
+            demo = hwtest.monitor_demo()
+            test_run(["--cosim", port],
+                     [c for c in comparisons(tmp) if c[0] != demo])
             test_rtc(port, tmp)
             # The simulated system has nicemon's default RAM, 64K words
             test_fit(["--cosim", port], tmp, 0x10000)

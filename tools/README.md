@@ -227,10 +227,11 @@ The connection is the UART line, as a USB serial adapter is: it sends
 no `b` notice, and a half-close is a break, which ends the line's
 input. One host is served at a time.
 
-The simulation is far slower than real time, about 250 bytes a second
-on the UART. A clear of the memory takes about 4 s, and a load of 1000
-words about 40 s, so only small programs are practical. The tools wait
-longer for an answer there, 20 s and 20 ms more for each byte of the
+The simulation is far slower than real time, 50 to 250 bytes a second
+on the UART, by the computer. A clear of the memory takes about 4 s,
+and a load of 1000 words 40 to 150 s, so only small programs are
+practical. The tools wait longer for an answer there, 20 s and 50 ms
+more for each byte of the
 request (`COSIM_WAIT` and `COSIM_BYTE` in `lib/boardlink.py`).
 
 `make cosimtest`, `tools/cosimtest.py`, uses it to check the RTL with
@@ -243,8 +244,9 @@ a free port, and runs on it:
   the registers, and the FPU;
 - the programs that `make hwtest` compares, with `nicemon.py run
   --cosim` and with `niceemu`, whose output and exit status must be the
-  same, and the monitor's test program with `--monitor --rom` and with
-  BASIC's `LOAD`;
+  same, and under the monitor of the tests, `build/rom_test.bin`, which
+  the simulation has in its ROM, the monitor's test program with
+  `--monitor` and no `--rom`, BASIC's `LOAD`, and the demo;
 - the clock from the model of the R6's real-time clock at the
   monitor's cold start, and BASIC's `TIME`, which writes it (#105);
 - and `nicemon.py load`'s refusal of a word beyond the simulated
@@ -253,8 +255,8 @@ a free port, and runs on it:
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
 take too long. It prints a line for each check, and last how many
 passed, and exits with status 1 when one fails. `NICE=multi` in the
-environment picks the multi-cycle core. CI runs it on both cores, two
-to four hours on each
+environment picks the multi-cycle core. CI runs it on both cores,
+under an hour on each
 ([CONTRIBUTING.md](../CONTRIBUTING.md#the-simulated-board)).
 
 ## nicemon.py load
