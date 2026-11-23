@@ -83,7 +83,7 @@ directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0.
 with directives for timing: `synth_design -directive
 PerformanceOptimized -retiming`, `opt_design -directive Explore`,
 `place_design -directive ExtraTimingOpt`, or the `PLACE_TIMING` of the
-board's Makefile, `AltSpreadLogic_high` on the R6, and `AggressiveExplore`
+board's Makefile, `AltSpreadLogic_high` on the R6 and the Nexys4DDR, and `AggressiveExplore`
 for `phys_opt_design` and `route_design`, with `phys_opt_design` again
 after routing ([Makefile.inc](Makefile.inc)). Every board's Makefile
 sets `FLOW=timing`: the Nexys4DDR's slower part needs it, and the

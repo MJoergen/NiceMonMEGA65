@@ -69,6 +69,7 @@ board that was not built then.
 | 2026-11-20 | nice_cpu V2.4, whose `DIGITS` rounds once (#154), with the ROM and `FLOW=timing` | 0.010 / 0.056 | 0.042 / 0.042 |
 | 2026-11-20 | BASIC's part of the ROM from `0x3000` (40e66f6), which takes writes on the MEGA65 from an address at or above `G_ROM_BASIC`, a comparison where it was address bit 14, with the ROM and `FLOW=timing`; the R3 0.178 / 0.048. The paths to the ROM's write enables and to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3 | 0.100 / 0.046 | 0.077 / 0.022 |
 | 2026-11-21 | nice_cpu V2.5 and the screen of 80×28 characters (#157), with the ROM and `FLOW=timing` | 0.290 / 0.056 | 0.028 / 0.036 |
+| 2026-11-23 | The Nexys4DDR's keyboard LEDs and keypad (#25, #165), with the ROM and `FLOW=timing`: the Nexys4DDR −0.010 placed with `ExtraTimingOpt`, on the path from DBUS to the timer; 0.001 with `AltSpreadLogic_high` | 0.290 / 0.056 | 0.001 / 0.019 |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.
@@ -120,6 +121,10 @@ The sizes, from the same builds:
   #75, `ExtraTimingOpt` missed 100 MHz by 0.198 ns on the path from the
   RAM into WRITE, and `AltSpreadLogic_high` met it by 0.015 ns. It is
   the `PLACE_TIMING` of `synth/r6/Makefile` since then.
+- **The Nexys4DDR places with `AltSpreadLogic_high` too.** With #25
+  and #165, `ExtraTimingOpt` missed 90 MHz by 0.010 ns on the path from
+  DBUS to the timer, and `AltSpreadLogic_high` met it by 0.001 ns. It
+  is the `PLACE_TIMING` of `synth/nexys4ddr/Makefile` since then.
 - **With the ROM, the R6 sometimes needs `FLOW=timing`.** Since #71,
   the ROM's 32 block RAMs push the RAM's farther, and some builds with
   the ROM missed in the default flow and met with `FLOW=timing`. So
