@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V2.6
+## V2.6 (2026-11-24)
 
 **Upgrade notes.**
 
@@ -72,6 +72,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `examples/weather.bas` is the weather display rewritten in BASIC,
   which fetches with `HTTP$`. The examples' zip has it
   (`examples/README.md`, "The weather display in BASIC").
+- `examples/chess.bas` is a very simple chess program in BASIC alone,
+  after nice_chess, which plays a legal game against a player or
+  against itself. The examples' zip has it (`examples/README.md`,
+  "Chess in BASIC").
 - BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
   arrows ([basic/README.md](../basic/README.md)).
 - The cursor key up at the top row of the screen scrolls back one row

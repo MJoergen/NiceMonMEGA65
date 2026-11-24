@@ -889,7 +889,7 @@ bitstream that reads the flash, into the FPGA. The R3 and R3A have an
 S25FL256S, and the R4, R5, and R6 an S25FL512S. It stops unless the chip
 is that of the bitstream's board. The bitstream names its board by its
 UserID, which `r3.xdc` and `r6.xdc` set, or else by its path (`synth/r3/`,
-`nicemon-V2.5.1-r3.bit`). A bitstream that names neither is programmed
+`nicemon-V2.6-r3.bit`). A bitstream that names neither is programmed
 with a note. `ARGS=--no-board-check` skips the check, for a board whose
 flash is not the usual one. When the check fails, the FPGA keeps the
 bridge, and the screen stays blank until the board is programmed.
