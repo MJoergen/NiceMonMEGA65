@@ -46,9 +46,10 @@ describes.
 | `sdtest.py` | Checks `nicemon.py sd` and `nbd` on `niceemu --link` with images of a card, without a board. |
 | `tftptest.py` | Checks `nicemon.py tftpd`, and BASIC's TFTP in `niceemu` against it, without a board. |
 | `tcptest.py` | Checks the monitor's TCP in `niceemu` against `tcppeer.py`, and its timers with `--step-time`, without a board. |
-| `weathertest.py` | Checks the weather display, `examples/weather.c`, in `niceemu` against `tcppeer.py`, without a board. |
+| `weathertest.py` | Checks the weather display, `examples/weather.c`, and its BASIC version, `examples/weather.bas`, in `niceemu` against `tcppeer.py`, without a board. |
 | `cosimtest.py` | Checks `nicemon.py run` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `romsize.py` | Measures the words of the ROM and of the demo, and writes or checks their tables in `monitor/INTERNALS.md`, `basic/README.md`, and `demo/README.md`. |
+| `basic_rom.py` | Fills in the header of BASIC's image after assembly, and checks an image, such as a `BASIC*.ROM` file for a card. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
@@ -89,11 +90,10 @@ option that `nbd` and `tftpd` share.
 The old names, `tools/load.py`, `run.py`, `mon.py`, `sdcard.py`,
 `sdnbd.py`, `flash.py`, and `tftpd.py`, still run the matching
 subcommand until V3.1 removes them
-([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)). They
-take the options that V2.4.1 renamed by their old names too, with a
-warning that names the new one. Each is a stub of a few lines, and its
-module is in `tools/lib/`
-([#166](https://github.com/MJoergen/NiceMonMEGA65/issues/166)).
+([#159](https://github.com/MJoergen/NiceMonMEGA65/issues/159)). They
+take the old names of the options too, with a warning that names the
+new one. Each is a stub of a few lines, and its module is in
+`tools/lib/`.
 
 ## The line
 
@@ -248,7 +248,7 @@ a free port, and runs on it:
   the simulation has in its ROM, the monitor's test program with
   `--monitor` and no `--rom`, BASIC's `LOAD`, and the demo;
 - the clock from the model of the R6's real-time clock at the
-  monitor's cold start, and BASIC's `TIME`, which writes it (#105);
+  monitor's cold start, and BASIC's `TIME`, which writes it;
 - and `nicemon.py load`'s refusal of a word beyond the simulated
   system's 64K words of RAM.
 
@@ -447,8 +447,7 @@ words, but its text, such as
 On the board, BASIC's `LOAD "NAME"` reads such a file from the SD card,
 or from a TFTP server, as if its lines were typed, and `RUN` runs it.
 `--bas` does the same from the PC, with no card, and so is to a BASIC
-program what `--monitor` is to a program at `0x8000`
-([#167](https://github.com/MJoergen/NiceMonMEGA65/issues/167)):
+program what `--monitor` is to a program at `0x8000`:
 
     tools/nicemon.py load --eth 192.168.1.65 --bas prog.bas
     make load FILE=prog.bas ETH=192.168.1.65 ARGS=--bas
@@ -468,7 +467,10 @@ So the program runs with BASIC's memory as after the board's cold start,
 and a program that was there before is gone.
 
 The file is read as `LOAD "NAME"` reads one: a line ends with CR LF,
-LF, or CR, a TAB is a blank, and a line of blanks is passed over. A
+LF, or CR, a TAB is a blank, and a line of blanks is passed over. The
+blanks before a line's number, and all but one after it, are dropped,
+so the indent that BASIC's `SAVE` writes is not typed, and does not
+count toward the line's 254 characters. A
 line that `LOAD` would stop at is refused before the link opens: one
 that does not start with its number, one longer than 254 characters,
 and one with a byte that is no printable ASCII, such as a letter with
@@ -705,7 +707,8 @@ monitor's folder `NICE` (see
   names, with the 8.3 name after the row of a file that has a long
   name, or with `PATH` a folder inside it, as `DIR "PATH"` does.
 - `get NAME [DEST]` copies a file to `DEST`, by default its name in the
-  current directory, or with `-` to stdout. The name it writes is the
+  current directory, under its name into `DEST` when that is a
+  directory, or with `-` to stdout. The name it writes is the
   long name when that is a plain file name, or else the 8.3 name, so a
   card's long name with a path in it writes nowhere else.
 - `put SRC [NAME]` writes the host's file `SRC`, or stdin for `-`, as the
@@ -747,7 +750,7 @@ an 8.3 alias, as the monitor does, so a host file such as
 name with no extension, as `NICE` is.
 
 A `NAME` may be a path of the folders inside `NICE`, such as
-`GAMES/CHESS.BIN`, as the monitor takes it (issue #168): each part
+`GAMES/CHESS.BIN`, as the monitor takes it: each part
 before a `/` is a folder, by its long name or its 8.3 name, a leading
 `/` is `NICE` itself, and a part that is empty, `.`, or `..` is error 20,
 so a path never leaves `NICE`. A folder that is not there is error 21,
@@ -1022,10 +1025,12 @@ and niceemu first, and runs it.
   prints what the timing reports in DIR would give. `make bump TAG=V1.0
   [ARGS=--push]` runs it
   ([CONTRIBUTING.md](../CONTRIBUTING.md#the-timing-badges)).
-- `tools/release.py TAG --port DEVICE [--eth IP]` builds, tests, and
-  stages a release, and `tools/release.py TAG --publish` tags and
-  publishes it. `make release TAG=V1.0 PORT=DEVICE` passes the port, and
-  `ARGS="--eth IP"` or `ARGS=--publish` the rest
+- `tools/release.py TAG --port DEVICE [--eth IP] [--board r3|r6]`
+  builds, tests, and stages a release, and `tools/release.py TAG
+  --publish` tags and publishes it. `--board` names the MEGA65 on the
+  cable, which `make hwtest` tests, the R6 by default. `make release
+  TAG=V1.0 PORT=DEVICE` passes the port, and `ARGS="--eth IP"`,
+  `ARGS="--board r3"`, or `ARGS=--publish` the rest
   ([RELEASE.md](../doc/RELEASE.md)).
 - `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,
   `tools/tcptest.py`, `tools/weathertest.py`, and `tools/cosimtest.py`
@@ -1040,6 +1045,13 @@ and niceemu first, and runs it.
   ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words),
   [basic/README.md](../basic/README.md#its-words), and
   [demo/README.md](../demo/README.md#its-words)).
+- `tools/basic_rom.py fill IN OUT --version V [--keep]` fills in the
+  header of BASIC's image after assembly: its length, its version as a
+  number, the flag "keep" with `--keep`, and its checksum. `make rom`
+  runs it. `tools/basic_rom.py check FILE...` checks each image's
+  lines, addresses, header, and checksum, as the monitor checks a
+  card's `BASIC*.ROM`, and prints its version, length, and flags
+  ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md#the-image)).
 - `tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE] prog.bin`
   runs the program in niceemu, with the console input of `-i` and at
   most `-n` steps, as niceemu's options, and draws the screen as the

@@ -25,16 +25,16 @@ header of `nicemon.vhd` is the address map, and
   bus and one for the data bus, which has the byte windows of [nice_cpu's
   DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows), with byte enables on the RAM.
 - **DEVICES** ([devices.vhd](devices.vhd)) are nice_cpu's: the timer,
-  the math unit, the performance counters, the fetch statistics, the
-  floating-point unit (FPU), the SD card controller
-  ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
-  board's slots, the network station's registers, the Ethernet
+  the math unit, the performance counters, the clock of the time of
+  day, the fetch statistics, the floating-point unit (FPU), the SD card
+  controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the board's
+  slots, the network station's registers, which hold the Ethernet
   station's addresses and its counts of frames, and the port for
   Ethernet frames, whose frames the station receives and sends. The
   timer interrupts the core, and the controller has the pins, which the
   diagram does not show.
-- **SCREEN REGS** ([scr_regs.vhd](scr_regs.vhd)) hold the cursor and the
-  display offset.
+- **SCREEN REGS** ([scr_regs.vhd](scr_regs.vhd)) hold the cursor, the
+  display offset, the font base, and the mode word.
 - **BOARD REGS** ([board_io.vhd](board_io.vhd)) are the Nexys4DDR's
   LEDs, display, buttons, and switches, and, on every board, the size of
   the RAM, the UART's baud rate, and the I2C master ([i2c.vhd](i2c.vhd)),
@@ -87,8 +87,9 @@ held, halted, or paused, the bus is the link's.
 Most of the system runs on the system clock, 100 MHz on the MEGA65 and
 90 MHz on the Nexys4DDR. The text display runs on the pixel clock, and
 the Ethernet station's receiver and transmitter on the PHY's 50 MHz
-clock. The frames, the screen, and the overlay cross between the clocks
-in dual-clock memories, and the few registers through synchronizers.
+clock. The frames, the screen, the overlay, and the fonts cross between
+the clocks in dual-clock memories, and the few registers through
+synchronizers.
 
 ## On the board level
 

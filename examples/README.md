@@ -42,7 +42,8 @@ Nexys4DDR, set it after each reset. Without it, the screen shows
 The board needs a network with a DHCP server, the service that hands out
 IP addresses, as most home routers have. When the board has no IP
 address yet, the program asks for one by itself, as BASIC's `DHCP`
-does.
+does, and so it does when the board has an address but no DNS server,
+the service that turns the name `wttr.in` into an address.
 
 The program needs the core of V2.6 or later, whose font has the blocks
 of the clock and the arrows of the wind. On an older core it says so,
@@ -132,7 +133,7 @@ program prints how long each took:
 
 Those times are from `niceemu`'s test, which counts a microsecond for
 each instruction, so the ratio is that of the instructions. The boards
-run both faster, at 100 MHz:
+run both faster, the MEGA65 at 100 MHz and the Nexys4DDR at 90 MHz:
 
 | | BASIC | Machine code | Machine code is |
 |---|---:|---:|---:|

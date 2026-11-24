@@ -59,7 +59,7 @@ $(BUILD)/test/monitor_demo.bin: ../build/rom_test.bin $(BUILD)/test/demo_test.bi
 # This one runs it under the ROM's BASIC, with two inputs. In the first,
 # SYS 0x8000 runs the demo, which shows the board's text and the version
 # V9.9, and takes what is typed, and halts at the end of the input. In
-# the second, F12 returns to BASIC, which clears the screen and says that
+# the second, F12 clears the screen and returns to BASIC, which says that
 # the demo returned 0, and VER shows the ROM's version, and HALT halts.
 TEST1 = SYS 0x8000\rHello, NiceMonMEGA65!
 TEST2 = SYS 0x8000\rabc\033[24~VER\rHALT\r

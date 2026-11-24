@@ -54,7 +54,7 @@ NEW
 940 CLS: DUMP 0x3000, 1: DIS 0x3000, 1: S = 0xFFFF0000
 950 PRINT HEX$(PEEK(S)); " "; HEX$(PEEK(S + 9)); " "; HEX$(PEEK(S + 80)); " "; HEX$(PEEK(S + 89)); " "; HEX$(PEEK(S + 126)): END
 960 HELP: RCURSOR C, R: S = 0xFFFF0000 + 80 * R
-970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 240)); " "; HEX$(PEEK(S - 307))
+970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 320)); " "; HEX$(PEEK(S - 387))
 980 END
 985 CLS: LIST 50: S = 0xFFFF0000
 990 PRINT HEX$(PEEK(S + 10)); " "; HEX$(PEEK(S + 14)); " "; HEX$(PEEK(S + 19)); " "; HEX$(PEEK(S + 28)); " "; HEX$(PEEK(S + 36))

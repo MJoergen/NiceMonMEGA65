@@ -22,11 +22,22 @@ For those who write programs, or control the board from a PC:
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) lists the changes in each release,
   newest first.
 
+Three more are beside their code:
+
+- [basic/README.md](../basic/README.md) has BASIC, which the board
+  starts with: its statements, functions, and errors.
+- [monitor/README.md](../monitor/README.md) has the monitor, the part of
+  the ROM below BASIC, with the routines that a program calls for the
+  screen, the keyboard, the files, and the network.
+- [tools/README.md](../tools/README.md) has the tools on the PC,
+  `nicemon.py` and its subcommands, which load, run, and debug programs
+  on the board.
+
 Design notes, which record how a part came to be as it is:
 
 - [DEBUGGER.md](DEBUGGER.md) is the design note of the on-board debugger,
-  mon.py's functions with the MEGA65's own keyboard and screen, of which
-  stages 1 to 10 are written.
+  the functions of `nicemon.py mon` with the MEGA65's own keyboard and
+  screen, of which stages 1 to 10 are written.
 - [SDCARD.md](SDCARD.md) is the design of the storage on the SD cards,
   from the registers to BASIC's `SAVE` and `LOAD`. The controller, the
   slots, the ROM's reading and writing of FAT32 cards, and BASIC's
@@ -34,7 +45,7 @@ Design notes, which record how a part came to be as it is:
 - [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey of the BASIC dialects
   behind the interpreter in the ROM.
 - [BASIC.md](BASIC.md) is the design note of that interpreter, with its
-  decisions, the room in the ROM, and its stages, of which 1 to 8 are
+  decisions, the room in the ROM, and its ten stages, which are all
   written.
 - [BASIC_ROM.md](BASIC_ROM.md) is the design of BASIC's image from a
   card's `BASIC*.ROM`, which replaces BASIC's part of the ROM at the

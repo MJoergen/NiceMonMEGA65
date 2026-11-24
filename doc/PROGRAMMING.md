@@ -181,14 +181,15 @@ The program calls them through the dispatch table, a row of jumps at
 fixed addresses at the start of the ROM
 ([monitor/README.md](../monitor/README.md#the-dispatch-table)). BASIC,
 an image of its own in the ROM at `0x3000`, calls the monitor through
-them alone, so a program can do all that BASIC does (#152):
+them alone, so a program can do all that BASIC does:
 
 - A terminal on the screen, with the cursor, the scrolling, and a copy
   to the PC: `mon_putc`, `mon_out`, `scr_cls`, `scr_moveto`,
   `scr_getxy`, and `scr_color`.
 - The files of the SD card, `fs_mount` to `fs_delete`, and
   `fs_readname`: they read, write, list, and delete the files of the
-  card's folder `NICE`.
+  card's folder `NICE`, and those of the folders inside it, by a path
+  such as `GAMES/CHESS.BIN`.
 - A UDP endpoint, `udp_open` to `udp_close`, which sends and receives
   datagrams.
 - The IP settings, `net_config`, `net_set`, `net_dhcp`, and `net_poll`,
@@ -279,8 +280,7 @@ A program that uses floats computes them on the floating-point unit,
 the FPU, at `0xFFFFFF88`–`8F`, which every board and the emulator have
 ([SYSTEM.md](SYSTEM.md#io-registers)), and so do the functions of
 `math.h`, `sin` to `hypot`. Such a program checks for the FPU at its
-start, and traps with code 9, "no FPU", on the bitstreams and core files
-before `V2.2`, which have none.
+start, and traps with code 9, "no FPU", on a system that has none.
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on
 Debian and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps
@@ -348,7 +348,8 @@ happen in the board's RAM.
 **Size.** The program's wasm linear memory, which holds its data, its C
 stack, and its heap, is one page, 16384 words, and the program and its
 memory must fit below the stack in the RAM. With `printf` and `scanf`,
-the prime example takes about 36K words in all.
+the prime example takes about 30K words in all, as `make examples`
+builds it.
 
 ## The memory
 
@@ -578,9 +579,9 @@ The file entries, `fs_mount` to `fs_delete`, add those of FAT32
 | -17 | FAT12, which is not supported |
 | -18 | FAT16, which is not supported |
 | -19 | exFAT, which is not supported |
-| -20 | Not a valid name: empty, or longer than 255 characters; for a new file also a name with a control code, one of `"*/:<>?`, a backslash, or a vertical bar, or one that ends in a blank or a dot |
-| -21 | No such file |
-| -22 | A directory, opened as a file |
+| -20 | Not a valid name: empty, or longer than 255 characters; a path with a part that is empty, `.`, or `..`; for a new file also a name with a control code, one of `"*:<>?`, a backslash, or a vertical bar, or one that ends in a blank or a dot. A `/` separates the parts of a path, so it is no character of a name |
+| -21 | No such file, or no such folder of its path |
+| -22 | A directory, opened as a file, or a file used as a folder of a path |
 | -23 | Too many open files: two are |
 | -24 | Not an open file, or not one of the right kind |
 | -25 | No such mode |

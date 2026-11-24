@@ -13,7 +13,8 @@
 --   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
 --   paused  bit 4 is 1: the core stops between instructions
 --   notice  a packet the link sends on its own: b08 at reset, h at a halt,
---           p at a pause, x at a breakpoint, and o for a lost input byte
+--           p at a pause, x at a breakpoint, w at a watchpoint, and o for
+--           a lost input byte
 --
 -- THEORY OF OPERATION
 -- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an
@@ -89,7 +90,9 @@
 --                          A write to it is dropped. The font base, 86
 --                          below, selects the font that the display shows.
 --                          An instruction fetch in 0xFFFE0000-3FFF reads
---                          the RAM's alias there, not a font (DEVICES.md §8).
+--                          the memory that the address aliases, the ROM
+--                          while it is shown and the RAM otherwise, not a
+--                          font (DEVICES.md §8).
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
 --                          their own, so that the emulator's 80x28 screen,
 --                          the first 2240, does not land on word 0. The rest
@@ -102,7 +105,10 @@
 --                          the MEGA65, the RAM words 0x18000-0x1FEFF. A
 --                          smaller screen leaves more of them: with 2^13
 --                          words and a RAM of 2^16, as on the Nexys4DDR,
---                          they start at 0xFFFF2000. The runtime's stack
+--                          they start at 0xFFFF2000 while the ROM is
+--                          hidden; while it is shown, the ROM, which
+--                          repeats with the RAM, is at 0xFFFF2000-7FFF
+--                          there. The runtime's stack
 --                          starts at 0xFFFFFF00 and grows down into them,
 --                          and so does the stack of a program in the ROM.
 --   0xFFFFFF00             The console of DEVICES.md §1. A write sends bits

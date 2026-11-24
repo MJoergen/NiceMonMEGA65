@@ -25,7 +25,10 @@ All code is VHDL-2008, analyzed with plain `ghdl --std=08` (no `-frelaxed`).
   OPERATION`, `INTERFACE CONTRACTS -- these are requirements on the
   environment:` with items `a)`, `b)`, and `c)`, and `RESET`.
 - The architecture is `synthesis`, or `simulation` for a unit that only
-  simulates (`sim/`).
+  simulates (`sim/`). The two architectures of `nice_core` in
+  `src/core/` are `pipeline` and `multicycle`, after the core that each
+  wraps, and a stand-in in `formal/` for an entity of the system is
+  `formal`.
 - Closing keywords are written in full: `end entity perf;`,
   `end architecture synthesis;`, and `end process p_bus;`.
 

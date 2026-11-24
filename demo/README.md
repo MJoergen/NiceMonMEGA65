@@ -29,7 +29,7 @@ has what each demo shows and how it works. On the boards:
 - The keys are those of the MEGA65's keyboard, or of the Nexys4DDR's
   PS/2 keyboard ([The keyboard](../doc/SYSTEM.md#the-keyboard)). F1, F3,
   F5, and so on need no SHIFT on the MEGA65. F12, SHIFT and F11 on the
-  MEGA65, goes back to BASIC, which clears the screen and prints
+  MEGA65, clears the screen and goes back to BASIC, which prints
   `Returned 00000000`.
 - The counters count the core's cycles at 100 MHz on the MEGA65, and at
   90 MHz on the Nexys4DDR, and the time is real.

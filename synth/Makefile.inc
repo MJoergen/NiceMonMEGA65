@@ -23,7 +23,7 @@
 # the Nexys4DDR's slower part about 0.5 ns. The Makefiles of the
 # Nexys4DDR and the MEGA65 (mega65/mega65.mk) set it. PLACE_TIMING is place_design's directive in it,
 # ExtraTimingOpt unless the board's Makefile picks another, as
-# synth/r6/Makefile does.
+# synth/r6/Makefile and synth/nexys4ddr/Makefile do.
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado
 FLOW         ?= default

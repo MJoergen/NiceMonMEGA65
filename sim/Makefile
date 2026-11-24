@@ -59,7 +59,7 @@
 #             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
 #             With -j these all run side by side, and the test takes as
-#             long as tb_text alone. Each one is also a target: make
+#             long as tb_basload alone. Each one is also a target: make
 #             tb_kbd runs just that one.
 # make cosim  runs the system with its debug UART on a TCP port of
 #             127.0.0.1, cosim/tb_cosim.vhd, until it is stopped, for the

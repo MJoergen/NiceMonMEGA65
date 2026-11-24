@@ -140,8 +140,10 @@ dhcp_commit
 ; The DHCP exchange in the background (issue #126). After a reset of the
 ; system the station has no IP address, and the cold start begins an
 ; exchange with bg_start. getline carries it on while it waits for the
-; first key of a line, with bg_step, so it costs nothing while a command
-; or a program runs, and nothing without a cable. The first DISCOVER goes
+; first key of a line, with bg_step, and con_key at each call that finds
+; no key, which BASIC makes for the keys of its line and every 64
+; statements of a program. So it costs nothing while a program in machine
+; code runs, and nothing without a cable. The first DISCOVER goes
 ; BG_FIRST microseconds after the cold start, as the PHY negotiates the
 ; link again after a reset; each after it waits twice as long as the one
 ; before, from BG_START up to BG_MAX, plus up to a second that the

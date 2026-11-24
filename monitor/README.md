@@ -74,7 +74,7 @@ routines and the ARP cache of the network, and FAT32.
 tests.
 
 The monitor and BASIC are in NICE assembly. The ROM is two images,
-assembled apart (#152): the monitor's at `0x0000`, and BASIC's at
+assembled apart: the monitor's at `0x0000`, and BASIC's at
 `0x3000`, from the files of [../basic](../basic). BASIC calls the
 monitor through the entries of the dispatch table alone, as a program
 does, and the monitor jumps to BASIC through two vectors alone, at
@@ -95,13 +95,14 @@ each, and the words that are free:
 | `common.nasm` | What the monitor and BASIC share: the devices' addresses, the packed texts, IP addresses, and the conversions of dates |
 | `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
-| `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
+| `build/folder.nasm` and `build/version.nasm` | The card's folder and the version, which the Makefile writes |
 
 BASIC's image is the files of [../basic](../basic/README.md#building),
-then its own copies of `common.nasm`, `monlib.nasm`, `mon.nasm`, and
-the version.
+then its own copies of `common.nasm`, `monlib.nasm`, and `mon.nasm`,
+its texts with the folder's name, and the version.
 
-`mon.h` has the entries' declarations for C, and is no part of the ROM.
+`mon.h` has the entries' declarations for C, all but that of
+`mon_reset`, and is no part of the ROM.
 Each image has a RAM of its own: the monitor's at `0xFFFFF000`, and
 BASIC's below it, at `0xFFFFE800` for 2K words.
 
@@ -174,7 +175,7 @@ program starts with none of the values that this one left there.
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, the blocks and arrows of the character ROM at `0x80` to `0x99`, blank at `0x9A` to `0x9F`, and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2240 words at `0xFFFF0000`, as in `niceemu`. It keeps the word of `scr_links`: a wrap past the last column links the next row to its row, and a LF does not. A character that goes to column 0 of a row makes that row a line of its own, unless the cursor came there by that wrap: so a row written again from its start, after `scr_moveto` or a CR, is not part of the line above it. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0, and the word of `scr_links`. |
-| 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 27 is 27. A character put at column 0 after it starts a line of its own for `scr_links`, also where a wrap had left the cursor, since V2.4.1. |
+| 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 27 is 27. A character put at column 0 after it starts a line of its own for `scr_links`, also where a wrap had left the cursor. |
 | 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. |
 | 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. The `MON_FG_` and `MON_BG_` colors of `mon.h` and `mon.nasm`, added: `MON_FG_YELLOW+MON_BG_BLUE`. |
 | 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files below). → R1 0, or an error. Table 1.1. |
@@ -204,9 +205,9 @@ program starts with none of the values that this one left there.
 | 33 | `42` | `bin_line` | R1 the word address of a line, one character a word up to a 0 word, R2 the word address of 7 words, which the program clears before the first line of a load. Parses a line of a `.bin` file, `ADDR WORD` in hex, and writes the word, when the address is in a program's RAM, below the stack's first 1K words, as `LOAD` does ([basic/README.md](../basic/README.md#loading-without-a-host)). The 7 words count: the words written, the lowest and the highest address written, the lines skipped, the number of the first, and the lines, and the last is the end of a program's RAM, which it writes. → R1 1 when the word was written, 0 for a line of blanks only, or -1 when the line was skipped. Table 1.6. |
 | 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
 | 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
-| 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor, since V2.4.1. → R1 0. Table 1.6. |
-| 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.5.1`, for BASIC's banner. Table 1.7. |
-| 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, it keeps the network going, as `con_getline` does. Table 1.7. |
+| 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor. → R1 0. Table 1.6. |
+| 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.6`, for BASIC's banner. Table 1.7. |
+| 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, and once at a call that does not wait, it keeps the network going, as `con_getline` does. Table 1.7. |
 | 39 | `4E` | `scr_back` | R1 a number of rows: the scrollback that many rows further back when it is above 0, forward when below 0, and the screen again when it is 0 or reaches the screen. → R1 the rows shown back now, 0 for the screen. Table 1.7. |
 | 40 | `50` | `fs_complete` | R1 the word address of a line, one character a word, R2 that of the cursor in it, and R3 that of the word after the last that the line may take. TAB on that line, as `con_getline` has it: completes the name of a file or a directory of the card's folder before the cursor, or of the folder that its path names, a directory with a `/` after it, or lists the matches and shows the line again, up to the cursor. → R1 the new cursor. Table 1.7. |
 | 41 | `52` | `scr_links` | R1 the word of the rows of the screen that go on from the row above, bit r for row r, 1 to 27, or -1 to keep it; bit 0 and the bits from 28 are dropped. `mon_putc` sets a row's bit when it wraps to the row past the last column, clears it at a LF and when a row is written again from its column 0, and moves the bits up with the rows when the screen scrolls; `scr_cls` clears them, and so does the end of a program that moved the cursor through its registers. A wrap leaves the cursor at column 0 of the row it set the bit of, and what goes there next is more of that line, unless `scr_moveto` or the end of a program came between: BASIC's screen editor takes a line of up to four rows by them. The two forget the wrap since V2.4.1. The monitor of V2.4 does not, and its table is 1.8 too, so `mon_version` does not tell the two apart. A program that writes the screen's words itself, and leaves text for the editor, writes the word too, or 0. → R1 the old word. Table 1.8. |
@@ -300,7 +301,7 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   is built, `make rom FOLDER=NAME`, an 8.3 name of 1 to 8 letters,
   digits, `_`, and `-`, in either case, which error -29's text names; the
   tests need `NICE`. Deleted entries, `.`, and `..` are passed over.
-- **Paths** reach the folders inside `NICE` (issue #168): a name may be
+- **Paths** reach the folders inside `NICE`: a name may be
   `SUB/SUB/NAME`, split at each `/`, and each part before the last is a
   directory of the folder before it, found as a file is, by its long
   name or its 8.3 name, in either case. `LOAD "GAMES/CHESS.BIN"` reads
@@ -329,8 +330,9 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   entries and an 8.3 alias, as mtools makes them: `mixed.Bin` is
   `MIXED.BIN`, and a name that does not fit, `mandelbrot.bin`, gets a
   tail, `MANDEL~1.BIN`, or `~2` and on when that is taken. A name may
-  not have the characters `"*/:<>?\|` or control codes, nor end in a blank
-  or a dot (error -20). The long-name entries are written before the 8.3
+  not have the characters `"*:<>?\|` or control codes, nor end in a blank
+  or a dot (error -20); a `/` ends a part of a path. The long-name
+  entries are written before the 8.3
   entry, so a reset between them leaves orphans, which `fsck.fat`
   removes. Its clusters are taken as its data reaches them,
   and `fs_close` puts its size into its directory entry, so a file is
@@ -384,9 +386,12 @@ sets serves both.
   program that enables it reads the frames itself.
 - **DHCP in the background.** When the board has no IP
   address at the cold start, as after a reset, the monitor gets one from
-  DHCP on its own. It does so only while it waits for the first key of
-  a line after `READY.`, so a statement or a program is never slowed by
-  it. The first DISCOVER goes 2 seconds after the cold start, as the
+  DHCP on its own. The exchange goes on while BASIC waits for a key of
+  a line, and while a BASIC program runs, as BASIC polls the keyboard
+  every 64 statements through `con_key`, which keeps the network going
+  at each call that finds no key. A machine-code program carries it on
+  only through its own calls of `con_key` and `con_getline`. The first
+  DISCOVER goes 2 seconds after the cold start, as the
   Ethernet PHY needs that long to bring the link up after a reset. The
   next goes 4 seconds later, and each after it twice as late, up to
   every 64 seconds, plus up to a second more (RFC 2131). The ACK sets
@@ -413,13 +418,14 @@ sets serves both.
   list of stations shows it: the host name is `nicemon-` and the last
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
-  `NiceMonMEGA65 V2.5.1`. The transaction's number is the microsecond counter
+  `NiceMonMEGA65 V2.6`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
-  kept, and renewed while BASIC waits for a line, and by a
-  program's polls while the network is on, as `net_poll` has it. A
-  program that does not use the network renews nothing, so a board
-  that runs one longer than its lease may have its address given to
-  another station.
+  kept, and renewed while BASIC waits for a line and while a BASIC
+  program runs, by the same polls. A machine-code program renews it
+  through its calls of `con_key` and `con_getline`, and through its
+  polls while the network is on, as `net_poll` has it. One that does
+  neither renews nothing, so a board that runs it longer than its lease
+  may have its address given to another station.
 - `DHCP` keeps the mask and the gateway of the ACK, which UDP uses
   below, and the first DNS server and the first NTP server, which it
   shows; `IP "A.B.C.D"` and the cold start set the four to none, and
@@ -492,7 +498,7 @@ no answer ends a load after a line, the summary of the lines before it
 comes first, as their words are in the RAM.
 
 `SAVE "NAME", "IP"` and `BSAVE "NAME", A, N, "IP"` write a file to the
-server, the bytes that they write to the card (issue #155). The WRQ
+server, the bytes that they write to the card. The WRQ
 goes to port 69, or to `PORT`, and the server's ACK of block 0 gives the
 port of the rest. The bytes go in DATA blocks of 512, each sent when it
 fills, and the last of less than 512 bytes, which is empty when the
@@ -519,7 +525,7 @@ Port 69 needs root, or the capability that
 6969. `make tftpd ARGS=--write` takes the files of `SAVE` and `BSAVE`
 too, which replace those of the same name, and anyone who reaches the
 port may write while it runs, as TFTP has no login. On the board, `DHCP`, then `DIR "192.168.1.10", "*.BIN"` lists
-the programs, and `LOAD "HELLO.BIN", "192.168.1.10"` loads one, with the
+the programs, and `LOAD "WEATHER.BIN", "192.168.1.10"` loads one, with the
 PC's address, and `:6969` after it for the other port. Any other TFTP
 server, such as `tftpd-hpa`, serves the
 files too, but answers a pattern with an error.
@@ -648,10 +654,10 @@ gives the state:
 
 The errors are those of UDP, -40 to -44, and -45 to -57
 ([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
-The entries run on the program's stack. The deepest, `tcp_recv`, takes
-24 words of it with the return address, `dns_lookup` 15, and `net_dhcp`
-11, as measured in the tests in `niceemu`, within the 32 words of
-Programs below.
+The entries run on the program's stack. The deepest of the network's,
+`tcp_recv`, takes 24 words of it with the return address, `dns_lookup`
+15, and `net_dhcp` 11, as measured in `niceemu`, within the 36 words
+of Programs below.
 
 ## Programs
 
@@ -681,10 +687,13 @@ Programs below.
   the size of the RAM from `0xFFFFFF9E`
   ([SYSTEM.md](../doc/SYSTEM.md#io-registers)), which reads 0 in
   `niceemu`, where the memory has no limit. The monitor's routines use
-  at most 32 words of the stack when a program calls them. The stack is
+  at most 36 words of the stack when a program calls them, with the
+  return address, as measured in `niceemu`: `fs_complete` takes that
+  many for a name down a path, and so does `con_getline` when a TAB
+  completes one. The stack is
   in use before the program runs: `SYS` takes the top 2 words, from
-  `0x1E7FF` or `0xE7FF` down, `LOAD` of typed lines reaches 8 words
-  below the top, and `LOAD` from a card 22. So a load, `LOAD` and
+  `0x1E7FF` or `0xE7FF` down, `LOAD` of typed lines reaches 7 words
+  below the top, and `LOAD` from a card 30. So a load, `LOAD` and
   `bin_line`, writes no word in the stack's first 1K words, from
   `0x1E400` or `0xE400` up, which is BASIC's default `HIMEM` too, and
   skips such a line, as it skips one outside the RAM.

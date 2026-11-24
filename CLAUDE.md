@@ -200,7 +200,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
   `monitor/INTERNALS.md` and `basic/README.md` and the demo's in
   `demo/README.md`, which the tests of the monitor and the demo
-  check), `screenshot.py`
+  check), `basic_rom.py` (the header of BASIC's image, filled in and
+  checked, for the ROM and for a card's file, #153), `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator, with the weather display of #128,
   `weather.c`, for the monitor, a release asset of its own as
@@ -250,7 +251,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the network in `monitor_eth.nasm`, TCP in `monitor_tcp.nasm`, #111,
   the clock in `monitor_clock.nasm` (#148): `clock_set`, the dates of
   files (#109), and the clock from the real-time clock at the cold
-  start (#105), and in `common.nasm` what both images share, each with
+  start (#105), the loader of BASIC's image from a card's `BASIC*.ROM`
+  in `monitor_basic.nasm` (#153), and in `common.nasm` what both images share, each with
   a copy of its own, with `BASIC_BASE` and the vectors), all of
   it assembly, with no C in the ROM (#149; its tests need clang for
   their programs in C, and mtools, `mkfs.fat`, and `sfdisk`), the
@@ -278,9 +280,11 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   A release's notes start with its dated section of `doc/RELEASE_NOTES.md`.
 - After a submodule bump: `make -C nice_cpu/emulator build` (the tools and
   `hwtest` use `nice_cpu/emulator/zig-out/bin/niceemu`, and a stale binary
-  checks old behavior), `make -j test`, a look at the "Compared with the
-  emulator" table, and a new bitstream, as the core's timing margin at
-  100 MHz is small.
+  checks old behavior), `python3 font/gen_font_pkg.py
+  nice_cpu/emulator/src/font.zig > src/video/font_pkg.vhd` when the tag
+  changed niceemu's font, as check-font fails until then, `make -j
+  test`, a look at the "Compared with the emulator" table, and a new
+  bitstream, as the core's timing margin at 100 MHz is small.
 - A bitstream with a ROM boots from it. The tools hide it with bit 3 of the
   control register (a link write of `0000000D` to `FFFFFFF0` to hold,
   clear, and hide, then `00000008` to run), so a program loads at 0 as in

@@ -44,7 +44,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The weather display, `weather.bin`, shows the ROM's blocks and
   arrows, and no longer draws its own in the font RAM. So it needs
   this release's core, and says so on an older one.
-
 - `HTTP$`, `URL$`, and `LISTO` are keywords of BASIC, and no names of
   variables any more: `URL$ = "X"` is `Syntax error; URL$ is a keyword`.
 - `LIST` indents and right-aligns its lines, and `SAVE` writes them so
@@ -75,9 +74,26 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   (`examples/README.md`, "The weather display in BASIC").
 - BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
   arrows ([basic/README.md](../basic/README.md)).
+- The cursor key up at the top row of the screen scrolls back one row
+  through the rows that left the top
+  ([#173](https://github.com/MJoergen/NiceMonMEGA65/issues/173),
+  [basic/README.md](../basic/README.md#the-statements)). While they
+  are shown, the cursor keys up and down move a row further back or
+  forward, down to the screen again, with the cursor on its row. Page
+  Up and Page Down still move 27 rows, and `HELP` has a line for the
+  keys.
 - `make -C sim check-font`, part of `make test`, checks that the
   board's font is niceemu's, word for word. `font/gen_font_pkg.py`
-  makes it from niceemu's font, not from Spleen's file.
+  makes it from niceemu's font, not from Spleen's file. `make hwtest`
+  checks that the board's character ROM has the blocks.
+
+**Fixed.**
+
+- `nicemon.py load --bas` and `run --bas` refused a line of a file
+  that `SAVE` wrote when its indent took it past 254 characters, though
+  `LOAD "NAME"` reads it. They now drop the blanks before a line's
+  number, and all but one after it, as `LOAD` does
+  ([tools/README.md](../tools/README.md#running-a-basic-program)).
 
 ## V2.5.1 (2026-11-23)
 

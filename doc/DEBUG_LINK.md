@@ -103,10 +103,12 @@ program. `tools/nicemon.py load` does all of this (see
 [The control register](#the-control-register)).
 
 With the ROM shown, the link's writes to BASIC's part of the ROM,
-`0x3000`–`0x7FFF`, go to the ROM, also after the core has locked it
-([SYSTEM.md](SYSTEM.md#address-map), #153), and those to the
+`0x3000`–`0x7FFF`, go to the ROM on the MEGA65, also after the core has
+locked it ([SYSTEM.md](SYSTEM.md#address-map)), and those to the
 monitor's part, `0x0000`–`0x2FFF`, are dropped. So a host can put a
-BASIC of its own into the ROM, and start the core with the ROM shown.
+BASIC of its own into the MEGA65's ROM, and start the core with the ROM
+shown. The Nexys4DDR's ROM takes no writes, so there these writes are
+dropped too.
 
 The clear also ends the halt and the stop of the program that it wipes.
 When the clear starts, bit 1 of the control register, the halt reason,
@@ -176,7 +178,7 @@ that an interrupt routine returns to.
 
 The link's version is 8, which the board sends as `b08` at reset, and
 which `0xFFFFFFF2` reads. A host written for an older version works
-unchanged. Version 8 adds the NMI request at `0xFFFFFFD7`. The board
+unchanged. Version 8 has the NMI request at `0xFFFFFFD7`. The board
 keeps a request there, which a hold drops, but does not pass it to
 the core, so no NMI comes
 ([#106](https://github.com/MJoergen/NiceMonMEGA65/issues/106)).

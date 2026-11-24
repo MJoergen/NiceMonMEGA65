@@ -300,10 +300,10 @@ and outputs, and its room.
   debugger; `system.vhd` gives the board
   the debugger's segments in Focus and the program's otherwise. The
   LEDs stay the program's.
-- **Row 28 names the board's toggle key**, from a generic of the
+- **Row 31 names the board's toggle key**, from a generic of the
   debugger.
 - **Room.** The board has little. It has 135 block RAMs, of which the
-  system now uses 133 with a ROM
+  system now uses 134 with a ROM
   ([synth/README.md](../synth/README.md#block-ram)): the overlay took 4
   of them, and the table of the strip's cells half of one. The system
   clock is 90 MHz on a -1 part, built with retiming. The builds of
@@ -468,7 +468,7 @@ about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
   debugger's pause; and the strip shows R1 counting and the PC moving while
   the program runs, white, and the stop's values at the pause.
 - `make hwtest`, a stretch goal: a register of `board_io.vhd`, at
-  `0xFFFFFF97`, a free word there, that enters Focus when written, so
+  `0xFFFFFF9D`, the free word there, that enters Focus when written, so
   that the test enters
   the debugger over the UART with no one at the keyboard, and so that
   `make cosimtest` reaches it too. A program can then drop into the
@@ -483,8 +483,8 @@ come.
 
 Each a commit that builds and passes the tests:
 
-1. **The overlay** (done). `text.vhd` gets the 29 rows, the overlay
-   memory, and its ports; `dbg.vhd` writes a fixed strip after reset,
+1. **The overlay** (done). `text.vhd` gets the strip's 4 rows, the
+   overlay memory, and its ports; `dbg.vhd` writes a fixed strip after reset,
    which the toggle pulse shows and hides; `mega65.vhd` gets the
    MEGA+HELP detector and `nexys4ddr/top.vhd` the Scroll Lock detector,
    entities of their own; `system.vhd` the keyboard mux. No link
@@ -494,8 +494,8 @@ Each a commit that builds and passes the tests:
    `dbg_host.vhd`, the third input of the mux in `nicemon.vhd`, and the
    formal check. Test: `tb_dbg_host`.
 3. **The live strip and the core keys** (done). The refresh of the
-   control register, the halt reason, and the stop register; F1 to F9
-   and their letters; R0–R15 and the word at the PC read at a stop,
+   control register, the halt reason, and the stop register; the core's
+   keys and their letters; R0–R15 and the word at the PC read at a stop,
    which a `p`, `x`, or `h` makes the debugger look for at once. The
    first useful debugger.
 4. **The catch, and the sticky setting** (done). Strip, F12, and the
@@ -515,7 +515,7 @@ Each a commit that builds and passes the tests:
    pause and halt. Tests: `tb_dbg`, `tb_dbg_host`, the formal check, and
    `tb_nicemon`.
 10. **The settings page** (done):
-    the UART's baud rate as a register, `0xFFFFFF9F`, and F10 and `n`,
+    the UART's baud rate as a register, `0xFFFFFF9F`, and F5 and `n`,
     with `dbg_set.vhd`. Tests: `tb_dbg`, `tb_nicemon`, the formal check
     of `board_io`, and `make hwtest`'s rates.
 11. Later, in no order: a console page, with a tap on the core's
@@ -591,7 +591,7 @@ Made on 2026-10-30, with the reasons:
   condition, and the operands in the assembler's syntax are a small
   table and eight operand patterns; the full listing, with `nicedis.py`
   as the model, is a page of its own.
-- **Row 27 writes what `nicedis.py` writes** (decided at stage 8), not
+- **Row 30 writes what `nicedis.py` writes** (decided at stage 8), not
   the sketch's `ADD ?1 M C`: the assembler takes it back, mon.py shows
   the same, and `tb_dbg_decode` compares the two. Where `nicedis.py`
   writes `.DAT` for an unused field that is not R0, the row shows the
@@ -641,6 +641,6 @@ Made on 2026-11-05 for stage 10:
   out of `nicemon` anyway, for the Ethernet station, so the page reads
   them without the link; a write goes through the link, as every write
   of the debugger does, and needs the core paused, halted, or held.
-- **Row 28 has single spaces between the keys**, which made room for
+- **Row 31 has single spaces between the keys**, which made room for
   `F10 link` in its 80 columns before the
   keys moved.

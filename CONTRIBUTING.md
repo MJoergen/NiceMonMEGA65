@@ -143,26 +143,26 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor, the ROM's image at `0x0000`, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, FAT32, the ROM's words, and the build and the tests. |
 | [basic/](basic/README.md) | BASIC, the ROM's image at `0x3000`, in NICE assembly, on the monitor's entries alone: its statements, its tests in `niceemu`, and its README, with the statements, the build, the tests, and its words. `rom.mk`, at the top, joins the two images into the ROM, `build/rom.bin`. |
 | [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
-| [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | The commands, and in `lib/` the modules that are not commands, which [tools/lib/README.md](tools/lib/README.md) lists (issue #166): `lib/boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, `lib/cli.py`, the messages and exit codes that they share, and the tools that use it, which `nicemon.py` runs as its subcommands, with one name and the options after the subcommand (issue #156), and which the old names still run until V3.1: `lib/load.py`, `nicemon.py load`, which loads a program into the MEGA65 or Nexys4DDR, `lib/run.py`, `nicemon.py run`, which runs a program on the board as `niceemu` runs it, `lib/mon.py`, `nicemon.py mon`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `lib/sdcard.py`, `nicemon.py sd`, which lists the board's SD card and copies its files to the host, `lib/sdnbd.py`, `nicemon.py nbd`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `lib/flash.py`, `nicemon.py flash`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, with `lib/jtag.py`, which finds the JTAG cable of the board's UART and checks the board, for `hwtest.py` too, and `lib/spiflash.py`, which clears the protection of the sectors of the MEGA65's flash, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `nicemon.py run` and `mon` on `niceemu --link`, `lib/tftpd.py`, `nicemon.py tftpd`, a TFTP server for BASIC's `LOAD` and `DIR`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `lib/tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `lib/sdcard.py` and `lib/sdnbd.py`, `cosimtest.py`, which checks `nicemon.py run` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md`, `basic/README.md`, and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [examples/](examples/) | Example C programs, with the weather display, two BASIC programs, `sieve.bas`, with its routine of machine code, `sieve.nasm`, and `weather.bas`, and the Makefile that builds them for the MEGA65. |
+| [tools/](tools/) | The commands, and in `lib/` the modules that are not commands, which [tools/lib/README.md](tools/lib/README.md) lists (issue #166): `lib/boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, `lib/cli.py`, the messages and exit codes that they share, and the tools that use it, which `nicemon.py` runs as its subcommands, with one name and the options after the subcommand (issue #156), and which the old names still run until V3.1: `lib/load.py`, `nicemon.py load`, which loads a program into the MEGA65 or Nexys4DDR, `lib/run.py`, `nicemon.py run`, which runs a program on the board as `niceemu` runs it, `lib/mon.py`, `nicemon.py mon`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `lib/sdcard.py`, `nicemon.py sd`, which lists the files of the board's SD card, copies them to and from the host, deletes them, makes folders, and formats a card, `lib/sdnbd.py`, `nicemon.py nbd`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `lib/flash.py`, `nicemon.py flash`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, with `lib/jtag.py`, which finds the JTAG cable of the board's UART and checks the board, for `hwtest.py` too, and `lib/spiflash.py`, which clears the protection of the sectors of the MEGA65's flash, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `nicemon.py run` and `mon` on `niceemu --link`, `lib/tftpd.py`, `nicemon.py tftpd`, a TFTP server for BASIC's `LOAD` and `DIR`, with listings, and with `--write` for its `SAVE` and `BSAVE`, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `lib/tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display, in C and in BASIC, against it, `sdtest.py`, which checks `lib/sdcard.py` and `lib/sdnbd.py`, `cosimtest.py`, which checks `nicemon.py run` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md`, `basic/README.md`, and `demo/README.md`, `basic_rom.py`, which fills in and checks the header of BASIC's image, for the ROM and for a card's file, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
-| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
+| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, the SD card slots, and the I2C bus with the MEGA65's real-time clock. |
 | [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its version, the control register, the UART's baud rate, and the link over TCP. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
 | [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
 | [SDCARD.md](doc/SDCARD.md) | The design of the storage on the SD cards, from the controller to the files and BASIC, with its issues. |
 | [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter in the ROM. |
-| [BASIC.md](doc/BASIC.md) | The design note of the BASIC interpreter in the ROM: its decisions, its internals, the room in the ROM, and its stages, of which 1 to 8 are written. |
+| [BASIC.md](doc/BASIC.md) | The design note of the BASIC interpreter in the ROM: its decisions, its internals, the room in the ROM, and its ten stages, which are all written. |
 | [BASIC_ROM.md](doc/BASIC_ROM.md) | The design of BASIC's image from a card's `BASIC*.ROM`, which replaces BASIC's part of the ROM at the first cold start. |
 | [CODING_STYLE.md](doc/CODING_STYLE.md) | The style of the VHDL, which `make lint` checks as far as vsg can. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
-| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
+| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `font/`, `sim/gen_decode.py`, and scripts of `monitor/test/` and `basic/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make -C sim test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo, the monitor, and BASIC, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 
 ### What is in src/
 
@@ -223,22 +223,25 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 
 ## Running the tests
 
-You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
-The tests of the demo and the monitor need niceemu, `make -C
-nice_cpu/emulator build`, which needs Zig. The monitor's tests need
-clang with the wasm32 target, lld, and llvm, as `make examples` does
-(see [The examples](#the-examples)), and mtools, `mkfs.fat`, and
-`sfdisk`. `make lint` needs vsg, 3.35.0 in CI, and `make typecheck`
-mypy. `.github/workflows/ci.yml` installs them all.
+You need GHDL (tested with 4.1.0) and Python 3, gcc for `make cosim`,
+and `mkfs.fat` and mtools for the card of `tb_basload`. The tests of the
+demo, the monitor, and BASIC need niceemu, `make -C nice_cpu/emulator
+build`, which needs Zig. The monitor's tests need clang with the wasm32
+target, lld, and llvm, as `make examples` does (see
+[The examples](#the-examples)), and they and BASIC's need mtools,
+`mkfs.fat`, and `sfdisk` for their cards. `make linktest`,
+`make sdtest`, and `make weathertest` make cards with them too. `make
+lint` needs vsg, 3.35.0 in CI, and `make typecheck` mypy.
+`.github/workflows/ci.yml` installs them all.
 
     make -j test
 
 It prints a `PASS` line for each testbench, and a `FAIL` line with the log
 for one that fails. If one fails, run it alone with `make -C sim <name>`,
-such as `make -C sim tb_kbd`. `make -j test` runs all the tests side by
-side, in the time of `tb_text`, and then runs the demo under the
-monitor, and the monitor, in `niceemu`. `make
--C sim test` runs them in turn. `make lint` checks the VHDL against
+such as `make -C sim tb_kbd`. `make -j test` runs all the testbenches
+side by side, in the time of `tb_basload`, the longest, and then runs
+the demo under the monitor, the monitor, and BASIC in `niceemu`. `make
+-C sim test` runs the testbenches in turn. `make lint` checks the VHDL against
 [CODING_STYLE.md](doc/CODING_STYLE.md) with vsg.
 
 The testbenches are these:
@@ -284,8 +287,7 @@ The testbenches are these:
   shows the cursor, selects the character ROM, and checks every pixel of
   the next frame; then it shows the page over the font RAM, which is in
   the character ROM,
-  and checks the first four rows of the third. It takes about a minute and a half, the longest of the
-  tests.
+  and checks the first four rows of the third. It takes about a minute and a half.
 - `sim/tb_dbg.vhd` tests the on-board debugger on the system, with
   `sim/dbg.nasm` in the ROM, a count to 0x800 and a halt. The strip
   after reset has no registers and NO LINK, and the debugger is Off,
@@ -911,8 +913,11 @@ RAM.
 ### What it prints
 
 It prints one line for each check, and last how many passed. With the
-pipelined core, all checks pass on both boards, and the Nexys4DDR has
-more of them, for its LEDs, display, buttons, and switches. A check that
+pipelined core, all checks pass on both boards. Each board has checks
+of its own: the Nexys4DDR for its LEDs, display, buttons, switches, and
+temperature sensor, and the MEGA65 for its real-time clock, its second
+SD card slot, and another BASIC in its ROM, which takes writes. A check
+that
 leaves the board in a state in which every later check would fail stops
 the run. Even then the script starts the core from the ROM again, so
 that the board is left with BASIC at `READY.`, as the reset
@@ -992,8 +997,11 @@ bitstream has one. Then it hides the ROM and uses the link:
   the link, at a low word and at the top word of the RAM, and runs
   `sim/bytewin.nasm`, whose registers, words, and steps must be
   `niceemu`'s.
-- It writes and reads the screen's registers, and checks the fonts: the
-  character ROM holds Spleen's `A` and drops a write, the font RAM keeps
+- It writes and reads the screen's registers, and checks the mode word
+  at `0xFFFFFF87`, which keeps 1 on the MEGA65 and 0 on the Nexys4DDR,
+  and is 0 after a clear and for any other mode. It checks the fonts: the
+  character ROM holds Spleen's `A`, has the blocks, as row 0 of `0x80`
+  reads `0xFFFF`, and drops a write, the font RAM keeps
   bits 15..0 of a glyph's words, the font base is kept, and a clear
   makes the font RAM and the base 0.
 - It writes and reads the board's registers:
@@ -1019,7 +1027,10 @@ bitstream has one. Then it hides the ROM and uses the link:
   return its status, 42. It runs a BASIC program's text with
   `nicemon.py run --bas --rom build/rom_test.bin` against `niceemu` with
   the lines and `RUN` in its input, and with `nicemon.py run --bas` and
-  `load --bas` under the board's ROM. `nicemon.py load` must refuse a
+  `load --bas` under the board's ROM. `load --bas` must refuse a line
+  without its number, and drop the blanks before a line's number, and
+  all but one after it, as BASIC's `LOAD` does, so that they do not
+  count toward its 254 characters. `nicemon.py load` must refuse a
   word beyond the RAM that `0xFFFFFF9E` gives, under the monitor and
   without it.
 - Then it runs the demo's self-test, F11, with `nicemon.py run`, and checks that
@@ -1098,7 +1109,8 @@ and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
 station's counts. Then it starts `nicemon.py tftpd --write` on this
 computer, and types BASIC's `SAVE "HWTEST", "IP:PORT"` of a program of
-10 lines, 681 bytes, whose file must be the program's text, and `LOAD`
+10 lines, whose file must be the program's text as `LIST` shows it,
+690 bytes with the numbers right-aligned, and `LOAD`
 reads it back, which `LIST` must show. `BSAVE` writes 300 words that a
 pause wrote at `0x9000`, whose file must be their lines, and `LOAD`
 reads them back over the words cleared, which a pause reads (#155).
@@ -1106,7 +1118,7 @@ A firewall of this computer that blocks UDP from the board fails these
 checks. It pauses the monitor over the link on TCP and reads the address again.
 `sim/udp.nasm`, loaded over TCP, must answer a UDP datagram to port 4511
 through the port for Ethernet frames. Then it runs the programs above,
-and the monitor's, with `nicemon.py run --eth`.
+the monitor's, and the BASIC program, with `nicemon.py run --eth`.
 Then `monitor/test/tcphw.nasm`, under the monitor, connects to a socket
 of this computer, which echoes 16 KB; then it listens on port 4600,
 where this computer connects, and the same echo runs. Last, it types
@@ -1206,10 +1218,21 @@ images, each checked with `fsck.fat -n`, `mdir`, and `mtype`: new files,
 an empty one, one of 60 clusters, a file truncated shorter and longer,
 deletions with long names, 20 files that grow the folder by a cluster,
 freed clusters taken again, a full card, and a write-protected one, and
-the errors of names and of read-only files. On a running core, `put`
+the errors of names and of read-only files. `mkdir` makes `NICE` on the
+card without it, and says that it is there the next time. `format`
+writes one FAT32 partition with the folder and the label on a blank
+image, which `fsck.fat` checks, and is refused on a card that has a
+file system unless `--force` is given. It refuses, and leaves as it
+was, a card with the MEGA65's system partition unless `--system` is
+given, one that is too small, and a write-protected one. On a running
+core, `put`
 must start it again from reset. Last, the monitor of the tests lists the
 card, the tool puts a `.bin` file, which the monitor, started again,
-lists and loads, and deletes it. Then `nicemon.py nbd` serves a card while
+lists and loads, and deletes it. Then come the paths to the folders
+inside `NICE`: `ls` of a folder, `get`, `put`, and `del` through a
+path, `mkdir` of a folder inside `NICE`, the errors of each kind of bad
+path, and the monitor of the tests, which lists the folder that the
+tool made, and loads and saves files in it. Then `nicemon.py nbd` serves a card while
 `sim/sdhold.nasm` runs, to a client of NBD in the script: an
 `NBD_OPT_GO` whose list of requests is cut short, which is refused, the
 handshake with `NBD_OPT_GO` and with `NBD_OPT_EXPORT_NAME`, reads of
@@ -1239,7 +1262,13 @@ of its console, which must run the monitor's line; that check runs
 Last, it runs `hello.nasm` with `nicemon.py run --tcp 127.0.0.2:PORT` on
 `niceemu --link 127.0.0.2:0`, the form for a `niceemu` on another
 computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is
-skipped. Its check of "keep" runs `tools/run.py` and `tools/load.py`,
+skipped. Then it checks the flag "keep" of BASIC's image
+([doc/BASIC_ROM.md](doc/BASIC_ROM.md#the-tools)), with a card in
+`niceemu`'s slot 0 that holds BASIC's image of `build/rom.bin` as
+`NICE/BASIC-T.ROM`: `niceemu` alone loads the card's BASIC at the cold
+start, a run with `--tcp` loads `build/rom.bin` with "keep" set, so
+that its monitor loads none, and `load --basic` refuses `niceemu`, which
+has no ROM. This check runs `tools/run.py` and `tools/load.py`,
 the old names that call `nicemon.py run` and `load` until V3.1, so that
 they stay tested while they exist; `run.py` must take run's old `-i`
 with a warning, which `nicemon.py run` must refuse. CI runs it.
@@ -1298,9 +1327,9 @@ network's entries from C. `make weathertest` checks it in two parts:
   host's `cc`, and checks the parse of `weather_parse.c` with the
   answers of `examples/test/*.http`, two of which wttr.in gave (a good
   one, and a place it does not know), and the others written by hand:
-  a redirect, lines that end in LF alone, a body shorter than its
-  `Content-Length`, no end of the headers, and a text that is not the
-  weather. It checks the settings, the request, and the UTF-8 too.
+  a place with a `ü`, a redirect, lines that end in LF alone, a body
+  shorter than its `Content-Length`, no end of the headers, a text that
+  is not the weather, and an answer that is not HTTP. It checks the settings, the request, and the UTF-8 too.
   Then it runs `examples/sieve.bas`, which loads `sieve.bin` above its
   `HIMEM`, under the monitor of the tests in `niceemu`, with a card that
   holds both, and compares its output with `examples/test/sieve.expected`.
@@ -1323,8 +1352,10 @@ network's entries from C. `make weathertest` checks it in two parts:
   program, type its line of the server, and `RUN` it. It checks the
   same screens as for `weather.bin`, with `DS$` as the error's text,
   and `HTTP$`'s request, the answers cut short and not HTTP too, a body
-  too long for a string, a place in UTF-8 with the units `u`, another
-  port, and Q back to BASIC. It takes
+  too long for a string, a server's name with no DNS server, for which
+  the program runs `DHCP`, the answers with lines that end in LF alone
+  and with a `ü` in the place, a place in UTF-8 with the units `u`,
+  another port, and Q back to BASIC. It takes
   about 100 seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's

@@ -188,10 +188,10 @@ display, and `src/rgb_pwm.vhd` dims the RGB LEDs with 16 levels; both drive
 registered outputs in the IOBs. The CPU RESET button resets the system. The
 board differs from the MEGA65 in three ways:
 
-- Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
-  RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
-  the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16, not 64. With the fonts, the debugger's overlay, and the
+- Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. So
+  the RAM is 64K words, half the MEGA65's, and the ROM takes no writes
+  (`G_ROM_WRITE`); the two take 96 of them. The screen is 8K words, not
+  32K, so that it and its copy in `text.vhd` take 16, not 64. With the fonts, the debugger's overlay, and the
   smaller memories of the table of [Block RAM](#block-ram), that is 134
   of 135 with the ROM. 8K words are still more than three screens of 80×28 for
   scrolling.
@@ -251,8 +251,9 @@ MIT; and `src/video/font_pkg.vhd`, the
 ## Build times and size
 
 The pipelined builds are those of the release V2.0, of 2026-11-11, each
-with the ROM of the monitor and the demo and with `FLOW=timing`, as
-`make release` builds them; the multi-cycle ones are older. The history of
+with that release's ROM, the monitor and the demo, and with
+`FLOW=timing`, as `make release` builds them; the multi-cycle ones are
+older. The history of
 these numbers, and what the builds before taught, is in
 [HISTORY.md](HISTORY.md).
 
@@ -294,10 +295,12 @@ flip-flops:
 | The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
 | The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
 | The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 719 / 552 | 746 / 530 | 733 / 637 | 629 / 631 |
-| Total | 33626 / 19832 | 19767 / 13446 | 32621 / 18142 | 21819 / 12059 |
-| Total, of the FPGA | 25.1 % / 7.4 % | 14.8 % / 5.0 % | 51.5 % / 14.3 % | 34.4 % / 9.5 % |
+| Total | 34085 / 19989 | 19767 / 13446 | 34585 / 18408 | 21819 / 12059 |
+| Total, of the FPGA | 25.5 % / 7.5 % | 14.8 % / 5.0 % | 54.6 % / 14.5 % | 34.4 % / 9.5 % |
 
-In the pipelined columns, the devices, the FPU, and the totals are from
+In the pipelined columns, the totals are from the builds of 2026-11-23,
+the R6's with nice_cpu V2.6 and the Nexys4DDR's with V2.5, so the rows
+above do not add up to them. The devices and the FPU are from
 the builds of 2026-11-15 with the FPU (issue #136), and the other rows
 from the builds of 2026-11-10, with `FLOW=timing`, which have the 4
 watchpoints of the debug link (issue #99) and the clock of the time of
@@ -306,8 +309,8 @@ watchpoints take about 900 to 1000 LUTs of the core, and the FPU about
 9300 LUTs, 2700 flip-flops, and 5 DSPs, in those builds, which were
 before its functions and their block RAMs (see
 [Block RAM](#block-ram)). The R3's
-pipelined build with `FLOW=timing` takes 33673 LUTs and 19964
-flip-flops, 25.2 % and 7.5 % of the FPGA.
+pipelined build of 2026-11-23, with nice_cpu V2.5 and `FLOW=timing`,
+takes 34196 LUTs and 20101 flip-flops, 25.6 % and 7.5 % of the FPGA.
 
 The pipelined core is 6.4 % of the LUTs of the R6's FPGA, and 13.4 % of
 the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
@@ -331,28 +334,32 @@ These are the worst setup and hold slacks, in ns:
 |---|---|---|---|
 | R6, pipelined | 100 MHz | 0.290 | 0.056 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
-| R3, pipelined | 100 MHz | 0.178 | 0.048 |
-| Nexys4DDR, pipelined | 90 MHz | 0.028 | 0.036 |
+| R3, pipelined | 100 MHz | 0.109 | 0.060 |
+| Nexys4DDR, pipelined | 90 MHz | 0.001 | 0.019 |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-The pipelined builds of the R6 and the Nexys4DDR are those of
-2026-11-21, with nice_cpu V2.5, the screen of 80×28 characters, and
-`FLOW=timing`; the R3's is of 2026-11-20, with nice_cpu V2.4 and
-BASIC's part of the ROM from `0x3000`. The multi-cycle ones are older
+The pipelined builds are those of 2026-11-23, with `FLOW=timing`: the
+R6's with nice_cpu V2.6 and the font's blocks and arrows, and the R3's
+and the Nexys4DDR's with nice_cpu V2.5, as the release V2.5.1 has
+them. The multi-cycle ones are older
 and have no FPU. The pipelined core meets its clock on
-every board with `FLOW=timing` only, and the R6 and the Nexys4DDR with
-little to spare. In the default flow, the R6 misses by about 0.15 ns
+every board with `FLOW=timing` only, and the Nexys4DDR with next to
+nothing to spare. In the default flow, the R6 misses by about 0.15 ns
 inside the core, in the check of a store into fetched code (issue #107).
 
-The R6's worst path is out of the core, from FETCH's request to the
-RAM's enable, and the paths into the core have 0.335 ns. Before
+The R6's worst path is inside the core, from WRITE's register file to
+PREPARE's register of the instruction's constant words. Its paths out
+of the core have 0.366 ns, from DBUS to the timer's count, and those
+into it 0.448 ns, from the SD card controller's buffer. Before
 issue #107, the RAM's cascaded block RAMs made the read data of the RAM into
 WRITE's register file the worst path of the R6. The R3's worst path is
-from the core's stores to the timer's register of the interrupt
-vector, and its paths into the core have 0.428 ns. The Nexys4DDR's
-worst path is inside the core, in FETCH; its paths out of the core
-have 0.151 ns, to that register of the timer too, and those into it
-0.234 ns. A write to BASIC's part of the ROM, which only the MEGA65
+inside the core too, within WRITE, from its register file to the
+register of its micro-operation. Its paths out of the core have
+0.399 ns, to the timer's register of the interrupt vector, and those
+into it 0.378 ns, from the RAM. The Nexys4DDR's
+worst path is out of the core, from DBUS to the timer's count, and its
+paths into the core have 0.025 ns, from the math unit's
+acknowledge. A write to BASIC's part of the ROM, which only the MEGA65
 has, is far from the limit: the paths to the ROM's write enables and
 to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3,
 with the part's start a comparison of the address with `G_ROM_BASIC`. With
@@ -367,8 +374,9 @@ than the watchpoints. `verified.json` records
 the build of the latest release's bump, and the badge shows it.
 
 Every build writes the five worst paths into the TCP server, within it,
-and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.639 ns on
-the R6 and 1.994 ns on the Nexys4DDR.
+and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.397 ns on
+the R6, 1.468 ns on the R3, and 0.944 ns on the Nexys4DDR, in the
+builds of the table above.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's
@@ -413,7 +421,7 @@ Vivado's preliminary report of ROMs shows it in block RAM.
 On the Nexys4DDR, Vivado makes distributed RAM of a memory that has no
 `ram_style` or `rom_style` attribute, though block RAMs are free: it did
 with the screen of `mem.vhd`, its font, and the UART's FIFO (issue #70),
-and with the five memories of the last four rows above, about 2500 LUTs, of which the port's queue of frames alone took 352 RAM64M (issue
+and with the five memories of the four rows before the FPU's above, about 2500 LUTs, of which the port's queue of frames alone took 352 RAM64M (issue
 #103). The local memories have the attribute. The two in nice_cpu's
 `eth_regs.vhd` and `sd_regs.vhd` get `RAM_STYLE` from
 `nexys4ddr/nexys4ddr_synth.xdc`, which only synthesis reads, as its

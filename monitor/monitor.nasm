@@ -88,8 +88,8 @@
 ; the history, a ring of rows in the rest of the screen's memory, from its
 ; top down. The cold start finds the size of the memory from the display
 ; offset, which keeps only the bits that address it on a board, and all of
-; them in niceemu, where it is plain memory: 32768 words at most, 384 rows
-; of history, 77 on the Nexys4DDR. Before a line is typed,
+; them in niceemu, where it is plain memory: 32768 words at most, 381 rows
+; of history, 74 on the Nexys4DDR. Before a line is typed,
 ; the cursor keys up and down, ESC [ A and ESC [ B, show the history a row
 ; further back or forward, and Page Up and Page Down a page, through the
 ; display offset: k rows back is the offset 32768 - 80 k, which wraps to

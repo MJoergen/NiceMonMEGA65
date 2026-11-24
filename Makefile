@@ -84,7 +84,7 @@ help:
 	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
-	@echo "  make sdcard CMD='ls | get NAME [DEST] | put SRC [NAME] | del NAME | mkdir | --slot N format' (ETH=IP | PORT=/dev/ttyUSB1)"
+	@echo "  make sdcard CMD='ls [PATH] | get NAME [DEST] | put SRC [NAME] | del NAME | mkdir [PATH] | --slot N format' (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  list, copy, write, or delete the files of the folder NICE"
 	@echo "                  of the board's SD card, over the debug link"
 	@echo "  make sdnbd (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='--read-only --slot 1']"
@@ -120,8 +120,9 @@ help:
 	@echo "  make tcptest    check the monitor's TCP in niceemu against tools/lib/tcppeer.py,"
 	@echo "                  and its timers with --step-time, without a board"
 	@echo "  make weathertest  check examples/weather.c, its parse on the host and the"
-	@echo "                  program in niceemu against tools/lib/tcppeer.py, and"
-	@echo "                  examples/sieve.bas in niceemu, without a board"
+	@echo "                  program in niceemu against tools/lib/tcppeer.py, and so"
+	@echo "                  examples/weather.bas, and examples/sieve.bas in niceemu,"
+	@echo "                  without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"
@@ -271,7 +272,7 @@ mon:
 
 # The files of the board's SD card over the link (tools/nicemon.py sd)
 sdcard:
-	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', CMD='del NAME', CMD=mkdir, or CMD='--slot N format'"; exit 1)
+	@test -n "$(CMD)" || (echo "Give the command with CMD='ls [PATH]', CMD='get NAME', CMD='put SRC', CMD='del NAME', CMD='mkdir [PATH]', or CMD='--slot N format'"; exit 1)
 	$(PYTHON) tools/nicemon.py sd $(LINK) $(ARGS) $(CMD)
 
 # The board's SD card as a block device of the host, for nbd-client and a

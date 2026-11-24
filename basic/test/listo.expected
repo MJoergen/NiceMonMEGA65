@@ -132,7 +132,7 @@ READY.
 940 CLS: DUMP 0x3000, 1: DIS 0x3000, 1: S = 0xFFFF0000
 950 PRINT HEX$(PEEK(S)); " "; HEX$(PEEK(S + 9)); " "; HEX$(PEEK(S + 80)); " "; HEX$(PEEK(S + 89)); " "; HEX$(PEEK(S + 126)): END
 960 HELP: RCURSOR C, R: S = 0xFFFF0000 + 80 * R
-970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 240)); " "; HEX$(PEEK(S - 307))
+970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 320)); " "; HEX$(PEEK(S - 387))
 980 END
 985 CLS: LIST 50: S = 0xFFFF0000
 990 PRINT HEX$(PEEK(S + 10)); " "; HEX$(PEEK(S + 14)); " "; HEX$(PEEK(S + 19)); " "; HEX$(PEEK(S + 28)); " "; HEX$(PEEK(S + 36))
@@ -242,6 +242,7 @@ RESUME [NEXT | N]   after TRAP: the statement again, the one after it, or line N
 ER, EL, ERR$(N)     the last error's number and line, and the text of error N
 DS, DS$             the last file or network failure: its number and text
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
+CRSR up at the top  scroll back a row; CRSR up and down then move it by a row
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 00099F50 000FFF73 000FFF44 00099F4E
 READY.

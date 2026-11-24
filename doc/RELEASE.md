@@ -48,7 +48,10 @@ and keep their names.
     with the tag in its title bar.
   - `weather.bin`, the weather display of `examples/`, a program under
     the monitor ([examples/README.md](../examples/README.md)).
-  - `examples-V1.0.zip`, the C examples as `.bin` files.
+  - `examples-V1.0.zip`, the examples as `make examples` builds them:
+    the C examples as `.bin` files, `sieve.bas` with its routine of
+    machine code, `sieve.bin`, and the weather display in BASIC,
+    `weather.bas` ([examples/README.md](../examples/README.md)).
   - `verified.json`, the timing record of the MEGA65 R6 and the
     Nexys4DDR from `make bump`.
 - The release notes: the tag's section of
@@ -97,6 +100,14 @@ and keep their names.
    It builds the R6 and the Nexys4DDR, and writes a badge for each. If
    a badge is red (timing missed), stop. The red badge is still pushed,
    as the honest result, but no release is made.
+
+   The bump runs `make test` with nice_cpu at the tag. A tag that needs
+   a change here fails it, such as one with a new font, whose
+   `check-font` fails until `font/gen_font_pkg.py` has made
+   `src/video/font_pkg.vhd` again, and the bump puts the submodule back.
+   Then move the submodule to the tag by hand, make the change, and
+   commit the two together. `make bump` then finds the submodule at the
+   tag, and commits only the record of the timing.
 
 2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
    bitstreams, the boards, or the tools can see changed since the release

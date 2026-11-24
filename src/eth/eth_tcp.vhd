@@ -31,7 +31,8 @@
 -- out, the new connection opens, and gets the output after it; an ACK
 -- that the old one still owes the host goes first (fin_ack). The link
 -- stays with it (keep) while it waits for the host's ACK. That is what the
--- host tools do at the end of a program's input (tools/nicelink.py), after
+-- host tools do at the end of a program's input (nice_cpu's
+-- debugger/nicelink.py), after
 -- their FIN, and what a tool that starts again after a crash does,
 -- without one. The old connection takes data and a FIN until its end, and
 -- if its FIN has not come by then, the end is a break. A SYN from

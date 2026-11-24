@@ -201,8 +201,8 @@ LINKS = sys 0x8000\rdump 0xFFFFF004, 1\rsys 0x8020\rdump 0xFFFFF004, 1\rsys 0x80
 RESET = sys 0\rsys 0x8000\rhalt\r
 # scroll: Page Up and Page Down with no history, which do nothing; dump
 # 0x8000, 0x700, the zeros of the empty RAM, 448 rows, which fill the
-# history of 384 rows and go round its ring; two Page Ups and a Page
-# Down, which turn the ring and show 24 rows back; and ver, which shows
+# history of 381 rows and go round its ring; two Page Ups and a Page
+# Down, which turn the ring and show 27 rows back; and ver, which shows
 # the screen again.
 SCROLL = \033[5~\033[6~dump 0x8000, 0x700\r\033[5~\033[5~\033[6~ver\rhalt\r
 # fpu: sys 0x8000 runs test/fpu.nasm three times, which leaves values
@@ -356,16 +356,14 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # VBASE 0x80, and so tests that a program returns to mon_exit.
 # test/ring.py checks the ring of the history at the
 # sizes of the screen's memory of niceemu and the boards first, and
-# test/dis.py the rows of u against nicedis.py and niceasm, and
-# test/dhcp.py runs i dhcp against the frames that it builds, and so
-# does test/dns.py for dns_lookup, and test/ntp.py for time ntp, with
-# i dhcp and DNS before it, and test/lease.py for the lease's
+# test/dhcp.py runs BASIC's DHCP against the frames that it builds, and
+# so does test/dns.py for dns_lookup, and test/lease.py for the lease's
 # renewal, and test/bgdhcp.py the DHCP exchange in the background,
-# and
-# test/tftp.py tftp, and test/rtc.py the cold start and time on the words
+# and test/rtc.py the cold start and TIME on the words
 # of an I2C master that it sets, as a real-time clock, and on the chips
 # that it answers for over niceemu --link, and test/fat_runs.py the
-# suites of FAT_SUITES. arp and udp run
+# suites of FAT_SUITES, and test/basload.py the load of BASIC's image
+# from a card. arp and udp run
 # with --step-time, as their timeouts
 # count, and so does net, and the frames they send are added to their
 # output. A test that writes to a card has the card's image in base0 or

@@ -91,7 +91,9 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
 - **The network is on** while the endpoint is open, or `net_dhcp` or
   `dns_lookup` runs, and while `getline` waits for the first key of a
   line with DHCP in the background or a lease kept. `getline` disables
-  the port again when the key comes.
+  the port again when the key comes. `con_key` enables it too, with
+  DHCP in the background or a lease kept, at a call that finds no key,
+  and leaves it enabled, so that no frame is lost between two calls.
   `net_on` enables the port only if it is disabled, so it does not empty
   the queue of an open endpoint, and `net_off` disables it only when the
   endpoint is closed. The cold start and `mon_exit` close it all with
@@ -125,8 +127,12 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
   with `bg_start` when `NET_IP` is 0, with a transaction of its own.
   `getline_wait`, while it waits for the first key of a line, enables
   the port, polls with `V_NWAIT` at 68, and gives the frame to
-  `bg_step`. `V_BSTATE` is the reply that it waits for, an OFFER or an
-  ACK, and `V_BDUE` the time of the next DISCOVER on the fine clock,
+  `bg_step`. `con_key` does the same at each call that finds no key,
+  once without a wait, and BASIC calls it for the keys of its line and
+  every 64 statements of a program, so the exchange goes on while a
+  BASIC program runs too. `V_BSTATE` is the reply that it waits for,
+  an OFFER or an ACK, and `V_BDUE` the time of the next DISCOVER on
+  the fine clock,
   which waits `V_BWAIT` microseconds after it, doubled each time. It
   shares `dhcp_send`, `dhcp_parse`, and `dhcp_commit` with `net_dhcp`.
   An ACK sets the address and keeps the lease, and `bg_show` prints the
@@ -250,8 +256,10 @@ the tests pin it (The tests, below).
   `fat_reset`, so a program's return keeps the mount and the open
   files.
 - **The stack.** The entries run on the caller's stack. The deepest
-  takes 27 words of it with the return address: 21 as measured in the
-  tests in `niceemu`, and the 6 that `fat_call` keeps for a retry.
+  of the file entries, `fs_open` of a name down a path, takes 28 words
+  of it with the return address, as measured in `niceemu`, the 6 that
+  `fat_call` keeps for a retry among them. TAB, `fs_complete`, takes
+  36 for a name down a path.
 
 ## The ROM's words
 
@@ -266,8 +274,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2A6C` | 10861 |
 | Free | `0x2A6D`–`0x2FFF` | 1427 |
-| BASIC | `0x3000`–`0x74F0` | 17649 |
-| Free | `0x74F1`–`0x7FFF` | 2831 |
+| BASIC | `0x3000`–`0x7505` | 17670 |
+| Free | `0x7506`–`0x7FFF` | 2810 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -354,7 +362,8 @@ BASIC's, in this order:
 1. `../basic/basic.nasm`, which starts with the two vectors at
    `0x3000`, `basic_expr.nasm`, `basic_prog.nasm`, `basic_cmd.nasm`,
    `basic_net.nasm`, `basic_time.nasm`, `basic_dis.nasm`,
-   `basic_edit.nasm`, `basic_str.nasm`, and `basic_struct.nasm`, then
+   `basic_edit.nasm`, `basic_str.nasm`, `basic_struct.nasm`,
+   `basic_mach.nasm`, and `basic_trap.nasm`, then
    `common.nasm`, `monlib.nasm`, and `mon.nasm`.
 2. `../basic/build/basic_folder.nasm`, the texts with the folder's name,
    of `DIR` and of error 29.
@@ -534,7 +543,7 @@ The suites of `test/fat_runs.py`, step 7:
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
 | `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |
 | `fatlfn` | Long names of 13 and 26 characters; damaged entries (`lfnx.img`): 0x05, orphans, a label, a broken set, a name of 256 characters; and deletes of long names across a sector and a cluster. |
-| `fatmount` | `DIR` of 28 cards that are not FAT32 or are damaged (`m_*.img`), each check of the MBR and the boot sector, the bounds of FAT12, FAT16, and FAT32, FATs whose count of entries wraps to 0, an empty folder, a folder whose chain breaks, no card, and slots from 2^31. |
+| `fatmount` | `DIR` of 31 cards that are not FAT32 or are damaged (`m_*.img`), each check of the MBR and the boot sector, the bounds of FAT12, FAT16, and FAT32, FATs whose count of entries wraps to 0, an empty folder, a folder whose chain breaks, no card, and slots from 2^31. |
 | `fatgeo` | `SAVE`, `LOAD`, `DIR`, and `DELETE` on clusters of 8 and 64 sectors, and on a card with one FAT. |
 | `fatinfo` | FSInfo: its hint, at the last cluster, free and in use, and 0xFFFFFFFF; no signature; no FSInfo in the boot sector; free entries with their top 4 bits set; and a volume larger than its FATs. |
 | `fatfull` | `fs_write` on a card with 3 free clusters, and a folder of 65536 entries. |
@@ -606,7 +615,7 @@ run with `SOURCE_DATE_EPOCH` and `TZ=UTC`, so that every date is
 The suites of `test/fat_runs.py` have more images, which
 `test/fat_image.py` makes from those with `test/fat_tool.py`, by
 changing bytes: `lines.img`, `tab1.img`, `chains.img`, `lfnx.img`,
-`rows.img`, `bigdir.img`, `path.img`, the 28 `m_*.img` of `fatmount`, the `i_*.img`
+`rows.img`, `bigdir.img`, `path.img`, the 31 `m_*.img` of `fatmount`, the `i_*.img`
 of `fatinfo`, and `spc8.img`, `spc64.img`, and `fat1.img`, which
 `mkfs.fat` makes with those geometries. The comments in
 `test/fat_image.py` say what each holds.

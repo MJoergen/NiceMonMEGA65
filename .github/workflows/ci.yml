@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   # The GHDL tests on both cores. Ubuntu 24.04 has GHDL 4.1.0, the version
-  # of README.md. niceemu is built so that check-steps compares the step
+  # of CONTRIBUTING.md. niceemu is built so that check-steps compares the step
   # counts that tb_nicemon checks with the emulator.
   sim:
     runs-on: ubuntu-24.04

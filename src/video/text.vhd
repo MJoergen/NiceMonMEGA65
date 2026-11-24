@@ -49,7 +49,7 @@
 --
 -- The characters are 16x32 pixels, from a font of 256 glyphs (font.vhd):
 -- the character ROM, Spleen (font_pkg.vhd) with the codes of ISO 8859-1, or
--- the font RAM, which a program writes (nice_cpu's doc/SYSTEM.md §1.8).
+-- the font RAM, which a program writes (nice_cpu's doc/DEVICES.md §1.8).
 -- fnt_ram_i, from the font base of scr_regs.vhd, selects the RAM, and it
 -- crosses to the VGA clock with the cursor's registers. The overlay is
 -- always drawn from the ROM, so that the debugger stays readable whatever a
@@ -60,7 +60,7 @@
 -- that nothing moves when the strip appears. The color of a word is two
 -- colors of 12 bits, red, green, and blue with 4 bits each: the
 -- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
--- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
+-- doc/DEVICES.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
 -- is full intensity and 0x0 is none. Unlike in NICE's original IDE of 2004,
 -- the foreground is not inverted, so a word with only a character, such as
 -- 0x41, is black on black.

@@ -56,7 +56,7 @@ There are three ways to use the system:
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
    `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
-   and R3A, where TAG is the release, such as `V2.5.1`. A core file holds
+   and R3A, where TAG is the release, such as `V2.6`. A core file holds
    its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
@@ -76,9 +76,10 @@ With nothing connected but a screen, the MEGA65 starts the
 `READY.`, and takes a statement of its BASIC on each line. BASIC has
 numbers and strings, arrays, and programs with loops, functions, and
 procedures, which a card keeps, and a screen editor
-([basic/README.md](basic/README.md)). A program cannot catch its
-errors yet, and has no statements for the colors and the cursor
-([doc/BASIC.md](doc/BASIC.md#stages)).
+([basic/README.md](basic/README.md)). A program catches its errors
+with `TRAP`, and sets the colors and the cursor. `LIST` shows a
+program indented and in colors, and `HTTP$` reads a page from a web
+server ([Reading a web page](#reading-a-web-page)).
 
 | Statement | What it does |
 |---|---|
@@ -94,6 +95,11 @@ errors yet, and has no statements for the colors and the cursor
 Keywords are in either case, and numbers in decimal, or in hex after
 `0x`. [basic/README.md](basic/README.md#the-statements) has the others, such
 as `DUMP`, which shows memory, and `DIS`, which disassembles it.
+
+The rows that leave the top of the screen are kept. CRSR up at the top
+row brings them back a row at a time, and CTRL and MEGA with CRSR up a
+page at a time; any other key shows the screen again
+([basic/README.md](basic/README.md#the-statements)).
 
 The monitor loads a program at address `0x8000`, above the ROM. The
 program has 90K words of RAM on the MEGA65, `0x8000` to `0x1E7FF`, and
@@ -116,7 +122,9 @@ Each release also has `weather.bin`, a weather display for the monitor:
 the weather of a place from the Internet, with the date and the time,
 fetched again every 10 minutes. It needs the Ethernet port on a network
 with a DHCP server. [examples/README.md](examples/README.md#the-weather-display)
-says how to choose the place.
+says how to choose the place. The release's `examples-TAG.zip` has the
+same display written in BASIC, `weather.bas`, and the other
+[examples](examples/README.md).
 
 The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
@@ -131,7 +139,7 @@ program from a card:
    `.bin` file into it. The monitor never makes the folder, and fails
    on a card without it, as a card may be shared with other cores, each
    with a folder of its own. With no PC slot, `make sdcard CMD=mkdir`
-   makes it over the link, on a card that has FAT32, and
+   makes it by remote control, on a card that has FAT32, and
    `make sdcard CMD="--slot 0 format"` formats a card as FAT32 with
    the folder, erasing all of it.
 2. Put the card in the board, and type `LOAD "NAME.BIN"` and then
@@ -153,8 +161,19 @@ After a write, the monitor starts again from reset
 ([tools/README.md](tools/README.md#nicemonpy-sd)). On Linux,
 `make sdnbd ETH=192.168.1.65` serves the whole card as a disk, which
 `nbd-client` connects and the PC mounts as a folder, for the file
-manager, while the core is held
+manager, while the processor is held in reset
 ([tools/README.md](tools/README.md#nicemonpy-nbd)).
+
+Files may be in folders inside `NICE` too: `LOAD "GAMES/CHESS.BIN"`
+loads one, and `DIR "GAMES"` lists the folder. The monitor makes no
+folder. A PC makes one, or `make sdcard ETH=192.168.1.65
+CMD="mkdir GAMES"`.
+
+A program reads and writes files through the monitor's routines
+([monitor/README.md](monitor/README.md#files)), or drives the SD card
+controller itself, a sector of 512 bytes at a time.
+[SYSTEM.md](doc/SYSTEM.md#the-sd-card-slots) has the details, and the
+limits of the R3.
 
 ### A new BASIC
 
@@ -168,14 +187,16 @@ from V2.5 on. The monitor passes over a file that does not fit, and runs
 the BASIC of its core. A name with a path, such as
 `LOAD "GAMES/CHESS.BIN"`, also needs a core from V2.5.1 on, as the
 monitor walks the path: on the core of V2.5 it is `File error 20, not a
-valid name`. Each release has its BASIC as a file of its
-own, such as `BASIC-V2.5.1.ROM`. To use it:
+valid name`. The blocks and arrows of the screen's font are in the
+core, from V2.6 on: on an older core they are blank, also in a newer
+BASIC. Each release has its BASIC as a file of its
+own, such as `BASIC-V2.6.ROM`. To use it:
 
 1. Copy the file into the folder `NICE` of a card. Older ones may stay
    there, as the monitor takes the highest version.
 2. Switch the board off and on. The monitor loads the file and names
-   it, `BASIC-V2.5.1.ROM from card 0`, before the banner, which shows
-   both versions: `NiceMon V2.5.1, BASIC V2.5.1`.
+   it, `BASIC-V2.6.ROM from card 0`, before the banner, which shows
+   both versions: `NiceMon V2.6, BASIC V2.6`.
 
 The monitor checks the file first. One that fails, such as a file cut
 short, gets a line that says why, and the next highest version is
@@ -185,17 +206,11 @@ is switched on: the reset button and `SYS 0` keep the BASIC that runs.
 
 If a BASIC from a card hangs at its start, take the card out and
 switch the board off and on, so that the core's own BASIC runs. Then put
-the card back, and remove the file with `DELETE "BASIC-V2.5.1.ROM"`.
+the card back, and remove the file with `DELETE "BASIC-V2.6.ROM"`.
 
 Over the network, `tools/nicemon.py load --eth 192.168.1.65 --basic
-BASIC-V2.5.1.ROM` puts a BASIC into the ROM at once, until the board is
+BASIC-V2.6.ROM` puts a BASIC into the ROM at once, until the board is
 switched off ([tools/README.md](tools/README.md#loading-basic-into-the-rom)).
-
-A program reads and writes files through the monitor's routines
-([monitor/README.md](monitor/README.md#files)), or drives the SD card
-controller itself, a sector of 512 bytes at a time.
-[SYSTEM.md](doc/SYSTEM.md#the-sd-card-slots) has the details, and the
-limits of the R3.
 
 ### The on-board debugger
 
@@ -296,9 +311,10 @@ is built with `make -C nice_cpu/emulator build`, which needs Zig (see
 ### Giving the board an address
 
 After a reset the board has no IP address. The monitor asks the
-network's DHCP server for one on its own, in the background, while it
-waits for a line. When the server answers, a few seconds after the
-reset, the monitor shows the address after `READY.`:
+network's DHCP server for one on its own, in the background, while
+BASIC waits for a line or runs a program. When the server answers, a
+few seconds after the reset, the monitor shows the address after
+`READY.`:
 
     READY.
     IP address 192.168.1.253 from DHCP
@@ -312,10 +328,11 @@ again, less and less often. BASIC's statements also set an address:
 | `DHCP` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, the DHCP server, and the time server, if the network has one |
 | `MAC "02:4E:49:43:45:01"` | Sets the MAC address; `MAC` alone shows it. A second board on the same network needs one of its own |
 
-The board renews a DHCP lease while BASIC waits for a line,
-and while a program uses the network. A program that does not use the
-network renews nothing, so if it runs longer than the lease, the server
-may give the address to another computer. A fixed address outside the
+The board renews a DHCP lease while BASIC waits for a line or runs a
+program, and while a program in machine code uses the network. One
+that does not use the network renews nothing, so if it runs longer
+than the lease, the server may give the address to another computer.
+A fixed address outside the
 server's range, or one that the server reserves for the MAC address,
 avoids that.
 
@@ -327,10 +344,12 @@ address:
 
 ### Loading a program from the network
 
-Once the board has an address, `LOAD "HELLO.BIN", "192.168.1.10"`
+Once the board has an address, `LOAD "WEATHER.BIN", "192.168.1.10"`
 loads a program from a TFTP server on the network, as `LOAD` loads one
-from the card. `make tftpd` on a PC is such a server: it serves
-`examples/build`, and `DIR "192.168.1.10", "*.BIN"` lists its programs
+from the card. TFTP is a simple protocol for fetching and sending
+files. `make tftpd` on a PC is such a server: it serves
+`examples/build`, the examples that `make examples` builds, and
+`DIR "192.168.1.10", "*.BIN"` lists its programs
 ([monitor/README.md](monitor/README.md#the-network), which also says
 how to serve without root). `make tftpd ARGS=--write` also takes
 files from the board: `SAVE "CHESS", "192.168.1.10"` writes the
@@ -353,6 +372,22 @@ On the MEGA65 the statement sets the real-time clock too, so the time
 stays over a power cycle. The Nexys4DDR has no real-time clock, so
 there `NTP` after each reset is the way to set the clock without a
 PC ([basic/README.md](basic/README.md#the-statements)).
+
+### Reading a web page
+
+BASIC's `HTTP$` fetches a page from a web server and gives its text
+as a string. After `DHCP`, which also gets the DNS server that finds
+a server by its name:
+
+    PRINT HTTP$("wttr.in", "/Copenhagen?format=3")
+
+shows the weather of Copenhagen in one line. The first string is the
+server, and the second the path of the page. It is plain HTTP, with no
+HTTPS, and the text has 255 characters at most. `URL$` encodes a part
+of a path, such as the name of a place with a blank in it
+([basic/README.md](basic/README.md#http)). `weather.bas`, in the
+release's `examples-TAG.zip`, is a weather display written with it
+([examples/README.md](examples/README.md#the-weather-display-in-basic)).
 
 ### Talking to a program
 

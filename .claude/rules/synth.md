@@ -7,16 +7,16 @@ paths:
 
 - Vivado 2025.1 is at `/opt/Xilinx/2025.1/Vivado` (`VIVADO_DIR` in
   `synth/Makefile.inc`); it is not on PATH. A build is `make r6`, `make r3`,
-  or `make nexys4ddr` in the top directory, with the monitor in the ROM,
-  `ROM=file.bin` for another ROM, `ROM=` for none, and `NICE=multi` for the multi-cycle core. `FLOW=timing` uses the
+  or `make nexys4ddr` in the top directory, with the monitor and BASIC in
+  the ROM (`build/rom.bin`), `ROM=file.bin` for another ROM, `ROM=` for none, and `NICE=multi` for the multi-cycle core. `FLOW=timing` uses the
   directives for timing, and every board's Makefile sets it (#107);
   `FLOW=default`, Vivado's defaults, misses 100 MHz on the MEGA65 since
   nice_cpu V2.0. Each board's bitstream is `build/top.bit`
   in its directory whichever core is built, so build one core at a time.
 - After a build, check `build/timing.rpt` for WNS. With `FLOW=timing`, the
-  pipelined core meets 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR's
-  -1 part by a few hundredths of a nanosecond or less; a nice_cpu change
-  can take that margin away. The
+  pipelined core meets 100 MHz on the MEGA65 by a tenth of a nanosecond
+  or a few, and 90 MHz on the Nexys4DDR's -1 part by as little as a
+  thousandth; a nice_cpu change can take that margin away. The
   worst paths are usually in nice_cpu's WRITE and FETCH stages, so a fix
   belongs there, not here.
 - `synth/README.md` records the build times, the utilization, and the slack

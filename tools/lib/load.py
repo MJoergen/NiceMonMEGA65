@@ -73,6 +73,7 @@ and nice_cpu's debugger/nicebin.py reads the files and writes the words.
 """
 
 import argparse
+import re
 import time
 
 from lib.boardlink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
@@ -212,10 +213,13 @@ def monitor_words(path: str, rom: str | None) -> Words:
 def read_bas(path: str) -> bytes:
     """The lines of the BASIC program in the file, each ended by CR, as
     they are typed. A line ends with CR LF, LF, or CR, a TAB is a blank,
-    and a line of blanks is passed over, as BASIC's LOAD "NAME" reads a
-    file. A line that LOAD would stop at is refused: one that does not
-    start with its number, one longer than BAS_LINE, and one with a
-    byte that is not printable ASCII. So is a file without a line."""
+    a line of blanks is passed over, and the blanks before a line's
+    number, and all but one after it, are dropped, as BASIC's LOAD
+    "NAME" reads a file: SAVE writes LIST's indent there, which does not
+    count toward BAS_LINE. A line that LOAD would stop at is refused:
+    one that does not start with its number, one longer than BAS_LINE,
+    and one with a byte that is not printable ASCII. So is a file
+    without a line."""
     try:
         with open(path, "rb") as f:
             data = f.read()
@@ -224,9 +228,12 @@ def read_bas(path: str) -> bytes:
     lines = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n").split(b"\n")
     typed = []
     for line_no, line in enumerate(lines, 1):
-        line = line.replace(b"\t", b" ")
-        if not line.strip(b" "):
+        line = line.replace(b"\t", b" ").lstrip(b" ")
+        if not line:
             continue
+        number = re.match(rb"\d+ +", line)
+        if number:
+            line = number.group().rstrip(b" ") + b" " + line[number.end():]
         bad = [b for b in line if not 0x20 <= b < 0x7F]
         if bad:
             fail(f"{path}:{line_no}: the byte {bad[0]:#04x} is no "
@@ -234,7 +241,7 @@ def read_bas(path: str) -> bytes:
         if len(line) > BAS_LINE:
             fail(f"{path}:{line_no}: the line has {len(line)} characters, "
                  f"more than the {BAS_LINE} of a line of BASIC")
-        if not line.lstrip(b" ")[:1].isdigit():
+        if not line[:1].isdigit():
             fail(f"{path}:{line_no}: the line does not start with its "
                  f"number; a program has only numbered lines")
         typed.append(line + b"\r")

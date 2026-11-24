@@ -79,7 +79,7 @@ ROM = os.path.join(REPO, "build", "rom.bin")
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
 WEATHER = os.path.join(REPO, "examples", "build", "weather.bin")
 # BASIC's image as a card's file (#153), an asset as BASIC-<tag>.ROM, which
-# the monitor of V2.4 and later loads from the folder NICE at power-up
+# the monitor of V2.5 and later loads from the folder NICE at power-up
 BASIC = os.path.join(REPO, "basic", "build", "basic.rom")
 
 

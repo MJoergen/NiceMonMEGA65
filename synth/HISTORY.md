@@ -26,6 +26,11 @@ V2.0 on:
 | V1.7 | 2026-11-06 | 0.019 | 0.044 |
 | V1.9 | 2026-11-08 | 0.062 | 0.042 |
 | V2.0 | 2026-11-11 | 0.196 | 0.049 |
+| V2.1 | 2026-11-14 | 0.055 | 0.051 |
+| V2.2 | 2026-11-15 | 0.054 | 0.035 |
+| V2.3 | 2026-11-17 | 0.116 | 0.086 |
+| V2.4 | 2026-11-20 | 0.353 | 0.040 |
+| V2.5 | 2026-11-22 | 0.090 | 0.067 |
 
 From V1.9 on, `verified.json` has the Nexys4DDR too, at 90 MHz: it
 missed by 0.27 ns in the default flow and met by 0.033 ns with
@@ -69,7 +74,8 @@ board that was not built then.
 | 2026-11-20 | nice_cpu V2.4, whose `DIGITS` rounds once (#154), with the ROM and `FLOW=timing` | 0.010 / 0.056 | 0.042 / 0.042 |
 | 2026-11-20 | BASIC's part of the ROM from `0x3000` (40e66f6), which takes writes on the MEGA65 from an address at or above `G_ROM_BASIC`, a comparison where it was address bit 14, with the ROM and `FLOW=timing`; the R3 0.178 / 0.048. The paths to the ROM's write enables and to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3 | 0.100 / 0.046 | 0.077 / 0.022 |
 | 2026-11-21 | nice_cpu V2.5 and the screen of 80×28 characters (#157), with the ROM and `FLOW=timing` | 0.290 / 0.056 | 0.028 / 0.036 |
-| 2026-11-23 | The Nexys4DDR's keyboard LEDs and keypad (#25, #165), with the ROM and `FLOW=timing`: the Nexys4DDR −0.010 placed with `ExtraTimingOpt`, on the path from DBUS to the timer; 0.001 with `AltSpreadLogic_high` | 0.290 / 0.056 | 0.001 / 0.019 |
+| 2026-11-23 | The Nexys4DDR's keyboard LEDs and keypad (#25, #165), with the ROM and `FLOW=timing`: the Nexys4DDR −0.010 placed with `ExtraTimingOpt`, on the path from DBUS to the timer; 0.001 with `AltSpreadLogic_high`; the R3 0.109 / 0.060 | 0.290 / 0.056 | 0.001 / 0.019 |
+| 2026-11-23 | nice_cpu V2.6, with the blocks and arrows in the character ROM (#171), with the ROM and `FLOW=timing` | 0.290 / 0.056 | – |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.

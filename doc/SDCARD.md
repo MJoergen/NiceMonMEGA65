@@ -390,8 +390,8 @@ program cannot do without it, as for state that the monitor keeps. So:
   the buffer, and the card behind FAT32's back, and calls `fs_mount`
   before it uses the file API again, which drops the caches. Entries for
   the sectors would be kept for ever, by the table's rule, for programs
-  that do not need them. The routines are in the C ABI, so that FAT32 can
-  be in assembly or C, poll busy, and return 0 or the negative of
+  that do not need them. The routines are in the C ABI, which FAT32's
+  assembly keeps (issue #149), poll busy, and return 0 or the negative of
   `SD_ERROR`, as the file API does:
 
 | Routine | Arguments | Result |
@@ -437,12 +437,14 @@ program cannot do without it, as for state that the monitor keeps. So:
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
   after reset mounts slot 0, or slot 1 when slot 0 has no card and the
   board has a slot 1.
-- **The monitor's commands**, BASIC's `DIR`, `LOAD`, `SAVE`, and
+- **The monitor's commands**, BASIC's `DIR`, `LOAD`, `BSAVE`, and
   `DELETE` since #112: `dir`, which shows the long names;
   `load NAME` reads a program in the
   `.bin` text format, address and word pairs, which is what the tools
   build, so a program goes to the card by a copy on a PC; `save NAME
-  ADDR N` writes N words from ADDR in the same format; and `del NAME`.
+  ADDR N`, BASIC's `BSAVE "NAME", ADDR, N`, writes N words from ADDR in
+  the same format; and `del NAME`. BASIC's `SAVE` writes a program's
+  text (below).
 
 ## BASIC
 
@@ -538,5 +540,9 @@ ROM is developed in niceemu and needs no board.
 | The folder `NICE`, set at build time | Done in V1.9 |
 | FAT32 writing, `save`, and `del` | Done in V1.9.1 |
 | `tools/lib/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
+| Long names (#102), and the dates of files from the clock (#109) | Done in V2.0.1 |
+| `nicemon.py sd mkdir`, which makes the folder `NICE` (#140) | Done in V2.2 |
+| `nicemon.py sd format`, which writes a new FAT32 to a card (#142) | Done in V2.4 |
+| Paths to the folders inside `NICE`, in the ROM and the tools (#168) | Done in V2.5.1 |
 | `tools/lib/sdnbd.py`, the whole card as a block device of a Linux host over NBD, for a mount, while the core is held | Done |
 | BASIC's `SAVE`, `LOAD`, and `DIR` | Done in V2.3.2 |

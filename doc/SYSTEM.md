@@ -36,12 +36,12 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 | Address | What it is |
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | RAM, wherever nothing below is: 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space (see [Stack, heap, and variables](#stack-heap-and-variables)). `0xFFFFFF9E` reads the number of words. |
-| `0x00000000`–`0x00007FFF` | The ROM, 32K words, in a bitstream built with one, in front of the RAM and repeating with it. The core boots from it at reset, instead of waiting held for a host. Its lower part, `0x0000`–`0x2FFF`, the monitor's, drops a write. Its upper part, `0x3000`–`0x7FFF`, BASIC's, takes the link's writes, and the core's until the core first writes to the lower part, which locks it until the FPGA is configured again; then the core's are dropped ([BASIC_ROM.md](BASIC_ROM.md#the-rom), #153). On the Nexys4DDR, whose block RAMs are too few for a ROM that takes writes, the upper part drops them too. A reset, a start, or a clear does not open the lock, and a clear does not touch the ROM. Bit 3 of the control register hides it, and the RAM under it keeps its words meanwhile ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)). [PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom) has what a program in the ROM must do. |
+| `0x00000000`–`0x00007FFF` | The ROM, 32K words, in a bitstream built with one, in front of the RAM and repeating with it. The core boots from it at reset, instead of waiting held for a host. Its lower part, `0x0000`–`0x2FFF`, the monitor's, drops a write. Its upper part, `0x3000`–`0x7FFF`, BASIC's, takes the link's writes, and the core's until the core first writes to the lower part, which locks it until the FPGA is configured again; then the core's are dropped ([BASIC_ROM.md](BASIC_ROM.md#the-rom)). On the Nexys4DDR, whose block RAMs are too few for a ROM that takes writes, the upper part drops them too. A reset, a start, or a clear does not open the lock, and a clear does not touch the ROM. Bit 3 of the control register hides it, and the RAM under it keeps its words meanwhile ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)). [PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom) has what a program in the ROM must do. |
 | `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
 | `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×28 screen and room for scrolling. The 2240 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
-| `0xFFFF8000`–`0xFFFFFEFF` | RAM: the top words of the RAM, as it repeats, from `0xFFFF2000` on the Nexys4DDR. The stacks and the monitor's variables are here (see [Stack, heap, and variables](#stack-heap-and-variables)). |
+| `0xFFFF8000`–`0xFFFFFEFF` | RAM: the top words of the RAM, as it repeats. The stacks and the monitor's variables are here (see [Stack, heap, and variables](#stack-heap-and-variables)). On the Nexys4DDR the screen ends at `0xFFFF1FFF`, and `0xFFFF2000`–`0xFFFF7FFF` are RAM too while the ROM is hidden; while it is shown, they are the ROM's words `0x2000`–`0x7FFF`, as the ROM repeats with the RAM. |
 | `0xFFFFFF00`–`0xFFFFFFFF` | The I/O page: nice_cpu's devices, the board's registers, and the link's debug registers (see [I/O registers](#io-registers)). |
 
 ### The byte windows
@@ -134,10 +134,10 @@ and its data from 0 up, and the runtime's start-up code sets SP to
 
 A program under the monitor starts at `0x8000`, as the ROM is at
 `0x0000`–`0x7FFF`, with the monitor's image at `0x0000` and BASIC's at
-`0x3000` (#152), and shares the monitor's stack, which grows down
-from `0xFFFFE800`. The monitor keeps the top 4K words for itself, and
-BASIC the 2K below them (#152,
-[monitor/README.md](../monitor/README.md)):
+`0x3000`, and shares the monitor's stack. The monitor keeps the top 4K
+words for itself, and BASIC the words below them, as many as its image
+says, 2K for the core's own BASIC. So the stack grows down from
+`0xFFFFE800` ([monitor/README.md](../monitor/README.md)):
 
 | RAM words, MEGA65 | Nexys4DDR | Address | What |
 |---|---|---|---|
@@ -164,7 +164,11 @@ below `0xFFFF8000` are the screen's, not the RAM's, so a stack from
 `0xFFFFFF00` has `0x7F00` words, nearly 32K, and one under the monitor,
 from `0xFFFFE800`, has 26K. A deeper stack writes into the screen's
 memory. On the Nexys4DDR the screen ends at `0xFFFF2000`, so a stack
-from `0xFFFFFF00` has `0xDF00` words, nearly 56K.
+from `0xFFFFFF00` has `0xDF00` words, nearly 56K, while the ROM is
+hidden. While the ROM is shown, the words below `0xFFFF8000` are the
+ROM's there, which drops a write. Then a stack from `0xFFFFFF00` has
+`0x7F00` words, and one under the monitor, from `0xFFFFE800`, has the
+26K words that it shares with the program.
 
 In the emulator the memory has 2^32 words and does not repeat, so the
 same addresses work there, but each is a word of its own.
@@ -348,8 +352,10 @@ The monitor writes 0 to the base at its start and when a program returns
 to it, so its text is in Spleen whatever the program did, and the
 program's font stays in the RAM. The font RAM is 0 at power-up and after
 a clear, and a start keeps it, as it keeps the screen. An instruction
-fetch in `0xFFFE0000`–`0xFFFE3FFF` reads the RAM there, which these
-words alias, and not the fonts, so a program does not run from its font
+fetch in `0xFFFE0000`–`0xFFFE3FFF` reads the memory that these addresses
+alias, and not the fonts: the ROM's words `0x0000`–`0x3FFF` while the
+ROM is shown, and the RAM's while it is hidden. So a program does not
+run from its font
 ([nice_cpu's DEVICES.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#8-systems-built-on-the-fpga-core), and [EMULATOR.md](EMULATOR.md)).
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
@@ -383,7 +389,8 @@ the MEGA65's keys:
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
 A held key repeats after half a second, 20 times a second. F13, HELP,
-and the modifiers give nothing, and MEGA changes no key on its own: with
+NO SCROLL, RESTORE, and the modifiers give nothing, and MEGA changes no
+key on its own: with
 CTRL it makes the cursor keys up and down Page Up and Page Down, and
 without CTRL they stay the cursor keys. MEGA and HELP together toggle the
 on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it has the
@@ -601,7 +608,8 @@ The SD card controller of [nice_cpu's DEVICES.md §5](https://github.com/MJoerge
   and 500 ms for a block to be written.
 - A command takes time: busy reads 1 until it ends, as on any board of
   [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card), where the emulator ends it at once. A Read
-  takes up to about a millisecond, and an Init tens of milliseconds.
+  takes about a millisecond, and an Init from tens to hundreds of
+  milliseconds, each within its timeout above.
 - Every slot but the R3's slot 1 (below) has card detect, and the
   R6's slot 1 also has write protect. A card that is put in or taken
   out counts after 10 ms, but

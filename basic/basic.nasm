@@ -900,7 +900,7 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_
                 .DAT    H_DATA, H_READ, H_REST, H_STR, H_HTTP, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
                 .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_SLEEP, H_FG, H_BG, H_CUR, H_CURP, H_RCUR
                 .DAT    H_TRAP, H_RESUME, H_ER, H_DS
-                .DAT    H_P, H_PG, 0
+                .DAT    H_P, H_PU, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -1004,5 +1004,6 @@ H_RESUME
 H_ER            .ASCII_B "ER, EL, ERR$(N)     the last error's number and line, and the text of error N"
 H_DS            .ASCII_B "DS, DS$             the last file or network failure: its number and text"
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
+H_PU            .ASCII_B 'CRSR up at the top  scroll back a row; CRSR up and down then move it by a row'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

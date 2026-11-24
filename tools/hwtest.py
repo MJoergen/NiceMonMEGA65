@@ -264,9 +264,9 @@ from lib.sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
                         Entry, FolderError, Volume, read_buffer, sd_command,
                         to_bytes)
 import basic_rom
-from lib.load import (BAS_RUN, MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE,
-                      basic_image, load_basic, load_words, read_bas, read_bin,
-                      read_part, start)
+from lib.load import (BAS_LINE, BAS_RUN, MAX_RAM_WORDS, MON_VARS, PROGRAM,
+                      RAM_SIZE, basic_image, load_basic, load_words, read_bas,
+                      read_bin, read_part, start)
 from lib.boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL,
                            DEFAULT_BAUD, ETH_PORT,
                            FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
@@ -2701,10 +2701,11 @@ def test_bas(link_args: list[str], tmp: str, in_rom: bool = False,
     must print the same and exit with the same status, but for the steps,
     as BASIC waits for input in a loop. load.py --bas must type it, and
     wait until BASIC has read it all, and refuse a line without its
-    number. With in_rom, both run under the board's ROM, unless the
-    bitstream has none. link_args are run.py's options for the link, and
-    via names it in the checks, as for test_run. The port must be closed
-    meanwhile."""
+    number, and read_bas() must drop the blanks around a line's number,
+    as BASIC's LOAD does. With in_rom, both run under the board's ROM,
+    unless the bitstream has none. link_args are run.py's options for
+    the link, and via names it in the checks, as for test_run. The port
+    must be closed meanwhile."""
     subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     monitor = f"{REPO}/build/rom_test.bin"
     prog = os.path.join(tmp, "prog.bas")
@@ -2720,6 +2721,20 @@ def test_bas(link_args: list[str], tmp: str, in_rom: bool = False,
           "bad.bas:2: the line does not start" in refused.stderr)
     check("load.py --bas refuses a line without its number", ok,
           "" if ok else f"exit {refused.returncode}: {refused.stderr!r}")
+    # A file as SAVE writes it with LIST's indent, whose second line has
+    # BAS_LINE characters without the blanks around its number
+    long_line = b"20 REM " + b"X" * (BAS_LINE - 7)
+    indented = os.path.join(tmp, "indented.bas")
+    with open(indented, "wb") as f:
+        f.write(b"  10   PRINT 1\n 20    " + long_line[3:] + b"\n")
+    try:
+        typed = read_bas(indented)
+    except SystemExit as e:
+        typed = str(e).encode()
+    ok = typed == b"10 PRINT 1\r" + long_line + b"\r"
+    check("load.py --bas drops the blanks before a line's number, and all "
+          "but one after it, as LOAD does, so that they do not count toward "
+          f"its {BAS_LINE} characters", ok, "" if ok else repr(typed[:60]))
     run_py = [*NICEMON, "run"] + link_args + [
         "--timeout", f"{RUN_TIMEOUT:g}", "--bas"]
     if os.path.exists(NICEEMU):

@@ -2,10 +2,10 @@
 
 The design of the BASIC interpreter in the ROM, issue
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54), and the
-stages of the work. **The stages 1 to 8 are written: the shell
+stages of the work. **All ten stages are written: the shell
 (#112), the numbers (#113), the programs (#114), the files (#60), the
-strings (#116), the functions (#117), the screen editor (#118), and
-the structure (#119). The stages 9 and 10 are not.**
+strings (#116), the functions (#117), the screen editor (#118), the
+structure (#119), the errors (#120), and the machine (#121).**
 [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey behind it. #54 lists
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
@@ -738,8 +738,7 @@ program that reads a web service would have had them again.
   which is `0xFFFF` in a ROM that has them, and 0 in one that has
   not: `IF PEEK(0xFFFE3000) = 0 THEN PROCFONT`. A BASIC with `HTTP$`
   fixes the codes for good. nice_cpu#204 decided them on 2026-11-23,
-  and no tag of nice_cpu has them yet, so a BASIC that ships before
-  that tag relies on the decision.
+  and nice_cpu's `V2.6` has them.
 - **At most 255 characters**, a string's limit. A longer body is an
   error, `String too long`, as `+` past 255 is. `HTTP$` keeps 257
   characters, as a body of 255 may end with a CR LF, which is dropped,
@@ -814,26 +813,26 @@ and `INSTR` on its `|`s, with `DS$` in the handler at line 900.
 `wfetch.nasm`, the request, the parse, and the table of the errors
 went, and the program dropped to 255 lines, with its screen by `POKE`
 and its font code for an older core kept, behind the probe of
-`0xFFFE3000` (measured 2026-11-23). For a core that has the glyphs
-alone, without the font code, and with `CURSOR` and `PRINT` in place
-of its `POKE`s, it would be about 120.
+`0xFFFE3000` (measured 2026-11-23). The font code went when the
+board's font had the glyphs (#171), which left 217 lines. With
+`CURSOR` and `PRINT` in place of its `POKE`s, it would be about 120.
 
 The glyphs are a change of nice_cpu first,
 [nice_cpu#204](https://github.com/MJoergen/nice_cpu/issues/204), as
 the emulator's character ROM is there. As decided there on
 2026-11-23, a glyph's code is the low byte of its code point: the 16
 blocks U+2580 to U+258F at `0x80` to `0x8F`, and the 10 arrows U+2190
-to U+2199 at `0x90` to `0x99`, blank in Spleen today. The proposal
+to U+2199 at `0x90` to `0x99`, which were blank in Spleen. The proposal
 had 11 glyphs at `0x80` to `0x8A`, the codes that `weather_parse.h`
-uses. So the weather display's codes change, in `weather_parse.h`,
+used. So the weather display's codes changed, in `weather_parse.h`,
 `weather.c`, `weather.bas`, and `weathertest.py`: the lower half
 block from `0x81` to `0x84`, the whole block from `0x82` to `0x88`,
 and the arrows from `0x83`–`0x8A` to `0x90`–`0x93` and `0x96`–`0x99`.
-The programs draw their own glyphs today, so that change needs no
-tag of nice_cpu. It comes with `HTTP$` at the latest, whose decode
-gives the new codes. The board's font follows with the bump to
-nice_cpu's tag, in new bitstreams, as the font is in the FPGA
-(#171).
+The programs drew their own glyphs then, so that change needed no
+tag of nice_cpu. It came with `HTTP$`, whose decode gives the new
+codes. The board's font followed with the bump to nice_cpu's `V2.6`,
+in new bitstreams, as the font is in the FPGA (#171), and the
+programs' own glyphs went.
 
 Its questions, which the review of 2026-11-23 settled:
 
@@ -918,8 +917,9 @@ entries alone (#152). Its workspace is the program's RAM:
 - The variables are 6K words, `MON_VARS` and `BASIC_WORDS`: the
   monitor's 4K and BASIC's 2K, of which its stage 3 uses 1585, and leaves 463
   (measured 2026-11-18), and stage 4 uses 8 words more, and leaves 455.
-  Since stage 5 the two strings of a statement end it, at
-  `0xFFFFEFE1`, 30 words below its end. BASIC's state,
+  Since stage 5 the two strings of a statement go up to
+  `0xFFFFEFE1`, and since stage 9 the state of `TRAP` and the text of
+  `DS$` fill the 30 words from there to its end. BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo
   tested on the Nexys4DDR, up to `0xDFFF`. From nice_cpu's `V2.4` on,
@@ -1022,7 +1022,8 @@ as #54 says:
   a constant in hex keeps a kind of its own, for `LIST` to write it in
   hex.
 - A line number after `GOTO`, `GOSUB`, `THEN`, `ELSE`, `RESTORE`,
-  `TRAP`, and `RUN` is a token of its own, with a word after it for the
+  `TRAP`, `RESUME`, and `RUN`, and one in `ON`'s list, is a token of
+  its own, with a word after it for the
   address of the line, 0 until the first jump finds it. An edit of the
   program clears those words in one pass. `RENUMBER` changes the tokens.
 - A name is looked up when the line is entered, not when it runs, so
@@ -1302,9 +1303,9 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   which stage 9 lets a program trap.
 - `DELETE` takes a string, a file, or a range of lines, such as
   `DELETE 10-50`, so the two share the keyword.
-- `RENUMBER` changes the targets that are numbers in the line, which
-  all of them are but those of `GOTO` and `GOSUB` of an expression.
-  It leaves those, and the README says so.
+- `RENUMBER` changes the targets, which are all numbers in the line,
+  as `GOTO` and `GOSUB` take no expression. A number of no line is
+  kept.
 - A host on the line sees what is typed at the end of a line, as
   today. After a move of the cursor, RETURN sends the line it takes,
   and the redraws go to the screen alone, so that a host's transcript

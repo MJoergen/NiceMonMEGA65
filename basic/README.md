@@ -14,12 +14,12 @@
 - [Its words](#its-words)
 
 The BASIC of the ROM, whose `READY.` the boards show at power-up. Its
-design, with the stages to come, is in [doc/BASIC.md](../doc/BASIC.md),
+design is in [doc/BASIC.md](../doc/BASIC.md),
 and the monitor that it runs on, with the files, the network, and the
 programs at `0x8000`, in [monitor/README.md](../monitor/README.md).
 
 BASIC is an image of its own in the ROM, at `0x3000`, assembled apart
-from the monitor's at `0x0000` (#152). It calls the monitor through the
+from the monitor's at `0x0000`. It calls the monitor through the
 entries of the dispatch table alone, as a program at `0x8000` does, so
 everything that BASIC does, a program can do too. The monitor knows of
 BASIC only its two vectors, at `0x3000`, the cold start, and `0x3002`,
@@ -30,15 +30,14 @@ the program's RAM, from `0x8000` (Programs below).
 
 ## The statements
 
-The ROM's user interface is BASIC (issue #54,
-[doc/BASIC.md](../doc/BASIC.md)). Stage 1 (issue #112) is the shell:
-the monitor's commands as statements. Stage 2 (issue #113) adds the
-numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
-Stage 3 (issue #114) adds the programs: lines with numbers, which
-BASIC keeps and runs (Programs below), stage 5 (issue #116) the
-strings (Strings below), and stage 8 (issue #119) the structure:
-`ON`, the functions and procedures of `DEF FN` and `DEF PROC`, with
-`LOCAL`, `DO` and `LOOP`, and the block `IF` (Programs below).
+The ROM's user interface is BASIC. This section has the statements
+that are typed at `READY.`: those for the files, the memory, the
+network, and the clock. The sections below have the rest: the numbers,
+with expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`
+(Numbers); the lines with numbers, which BASIC keeps and runs, with
+loops, functions, and procedures (Programs); the errors and `TRAP`
+(Errors in a program); the strings, with `HTTP$` (Strings); and the
+colors, the cursor, and the time (The screen and the time).
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -80,7 +79,7 @@ The line is read from the left, and the first error decides:
 takes nothing after it, but `SYS 1/0` is a `Division by zero`. `0x`
 without digits is no number.
 
-The screen editor works as the C64's (issue #118). The cursor keys
+The screen editor works as the C64's. The cursor keys
 move the cursor over the whole screen, and HOME moves it to the top
 left. The cursor key down at the last row scrolls the screen. A key
 inserts its character at the cursor, and DEL and backspace delete the
@@ -120,15 +119,15 @@ one after the other, and the next would land in this one, so they get
 the error alone. The errors that only running a line finds are shown
 when it runs.
 
-A terminal on the line sees what is typed at the end of a line, as
-before. After a move of the cursor, or a RETURN on a line that was on
+A terminal on the line sees what is typed at the end of a line. After
+a move of the cursor, or a RETURN on a line that was on
 the screen already, it gets the whole line again, after a CR, as BASIC
 takes it.
 
 Page Up and Page Down scroll back through the rows that left the top
 of the screen, 27 rows at a time. On the MEGA65 Page Up and Page Down
 are CTRL and MEGA with CRSR↑ and CRSR↓. CRSR↑ at the top row scrolls
-back one row (issue #173). While the rows are shown, CRSR↑ goes one row
+back one row. While the rows are shown, CRSR↑ goes one row
 further back, and CRSR↓ one row forward, up to the screen again, with
 the cursor where it was. Any other key shows the screen again, and goes
 on to the line. The history has 381 rows on
@@ -137,8 +136,8 @@ terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
 
 TAB completes the name of a file of the card's folder `NICE`, as Bash
-does, in the word before the cursor when it is not the keyword itself
-(issue #137). A name not yet in quotes gets its opening quote. When one
+does, in the word before the cursor when it is not the keyword
+itself. A name not yet in quotes gets its opening quote. When one
 file matches, the rest of its name follows, then the closing quote and
 a blank. When several match, the word goes on to the start that they
 all share, and a TAB that adds nothing lists them and shows the line
@@ -153,7 +152,7 @@ fails, TAB does nothing.
 | `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. The address and the words have colors of their own (How listings look below). |
 | `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. The address, the numbers, and the registers have colors of their own (How listings look below). |
 | `CLS` | Clears the screen. |
-| `VER` | The versions of the monitor and of BASIC, and of the dispatch table: `NiceMon V2.5.1, BASIC V2.5.1, dispatch table 1.8`. |
+| `VER` | The versions of the monitor and of BASIC, and of the dispatch table: `NiceMon V2.6, BASIC V2.6, dispatch table 1.8`. |
 | `IP ["A.B.C.D"]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `IP "192.168.1.65"`. Anything else is no address, and `IP` says so and writes nothing. It sets the address with `net_set`, with no mask, no gateway, and no DNS server, and writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), when the address is another, so a host connected over TCP loses its connection; the same address again changes nothing there. In `niceemu` it is a register that keeps what is written. |
 | `DHCP` | Gets the IP address from the network's DHCP server and writes it, as `IP` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each ([The network](../monitor/README.md#the-network)). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `MAC ["MAC"]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `MAC "02:4E:49:43:45:01"`. The first byte must be even, as an odd one makes a group address. Anything else, an empty string too, is no address, and `MAC` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
@@ -166,7 +165,7 @@ fails, TAB does nothing.
 | `LOAD "NAME.BIN" [, SLOT]` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. A line with a byte that is not printable ASCII, a control code other than TAB, CR, or LF, DEL, or a byte from `0x80`, is skipped, as `niceemu` rejects it, so that no byte is dropped from the middle of a number. An error in the middle of the file, such as `File error 26, the FAT is damaged`, comes after the summary of the lines before it, whose words are in the RAM. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. Any other name is a BASIC program, `LOAD "NAME"` below. |
 | `LOAD "NAME" [, SLOT]` | Loads the BASIC program `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, such as `LOAD "CHESS"` or `LOAD "game.txt"`. It reads the lines as if they were typed, after a `NEW` at the first, so a program written on a PC loads too: CR LF, LF, and CR end a line, a TAB is a blank, the keywords are in either case, and a line of blanks is passed over. The blanks before a line's number, and all but one after it, as `SAVE` writes the indent of `LIST`, do not count toward its 254 characters. The first line that cannot be stored ends the load, with its error and the line itself, and the lines before it stay: `Line without a number`; `Line too long`, of more than 254 characters, or with more tokens than the 160 words of a line; `A byte that is no character`, a control code or a byte from `0x80`; and the tokenizer's `Syntax error`. A file that is not there, or that has no line, keeps the program, as the `NEW` comes only with the first line stored. It ends at `READY.`, also in a program. |
 | `SAVE "NAME" [, SLOT]` | Writes the program to the file `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, as the text that `LIST` shows, with its indent but no colors, each line ended by LF, so that `LOAD "NAME"` reads it back and an editor on a PC opens it. The text of a line may be longer than the line typed, as `LIST` adds blanks and writes `?` as `PRINT`; `LOAD` takes 254 characters. It makes the file, or truncates it, as `BSAVE` does, and prints nothing. When the card fills up, it prints error 30. CTRL-C stops it, and the file keeps the lines before. `SAVE "NAME", "IP"` writes it to a TFTP server instead, below. |
-| `BSAVE "NAME", A, N [, SLOT]` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `BSAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `BSAVE` prints error 30. It was `SAVE "NAME", A, N` before V2.4, which is now a `Syntax error`. |
+| `BSAVE "NAME", A, N [, SLOT]` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `BSAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `BSAVE` prints error 30. |
 | `DELETE "NAME" [, SLOT]` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `LOAD`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
 | `LOAD "NAME", "IP"` | Loads the `.bin` file `NAME.BIN`, or the BASIC program `NAME.BAS`, from the TFTP server at the IP address `IP`, such as `LOAD "HELLO.BIN", "192.168.1.10"`, as `LOAD` loads one from the card, and prints the same summary for a `.bin` file ([The network](../monitor/README.md#the-network)). `"IP:PORT"` sends the request to `PORT` instead of 69. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. A file that is not there keeps the program, as from the card. |
 | `SAVE "NAME", "IP"`, `BSAVE "NAME", A, N, "IP"` | Writes the program's text, or the words, as to the card, to the file `NAME.BAS`, or `NAME.BIN`, of the TFTP server at `IP`, such as `SAVE "CHESS", "192.168.1.10"`, with `"IP:PORT"` as for `LOAD` ([The network](../monitor/README.md#the-network)). `BSAVE` prints the same summary as to the card. The server must take writes, as `tools/nicemon.py tftpd --write` does; without `--write` it answers `TFTP error 2, Writing is not allowed: tftpd --write allows it`. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds, and an error of the server ends it with its code and its message. CTRL-C stops `SAVE`, and sends the server an ERROR, so that it drops the file. `tools/nicemon.py tftpd` writes a file only when all of it came, so a write that fails leaves the file that was there. |
@@ -180,7 +179,7 @@ fails, TAB does nothing.
 The `NAME` of `LOAD`, `RUN`, `SAVE`, `BSAVE`, and `DELETE` on the card
 may be a path of the folders inside `NICE`, such as
 `LOAD "GAMES/CHESS"` or `DELETE "GAMES/OLD/PONG.BIN"`, as
-[Files](../monitor/README.md#files) has it (issue #168). The `.BAS` or
+[Files](../monitor/README.md#files) has it. The `.BAS` or
 `.BIN` that they add goes on its last part, when that part has no dot:
 `SAVE "V2.0/PROG"` writes `PROG.BAS` in the folder `V2.0`. A name with
 nothing after its last `/`, such as `SAVE "GAMES/"`, and an empty name
@@ -308,9 +307,9 @@ program's text into BASIC and runs it, with no card
 | `RUN [N]` | Runs the program, from line `N` or from its first, after a `CLR`. |
 | `RUN "NAME" [, "IP"]`, `RUN "NAME", SLOT` | Loads `NAME` as `LOAD "NAME"` does, from the card, the one in `SLOT`, or from the TFTP server at `IP`, and runs it: a BASIC program as `RUN` runs it, and a `.bin` file as `SYS 0x8000` calls it, so `RUN "CHESS.BIN"` starts nice_chess. A program may load and run the next this way. A file that is not there, or that has no line, runs nothing and keeps the program. |
 | `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. The lines in a loop or a block are indented, and the parts of a line have colors (How listings look below). CTRL-C stops it. |
-| `LISTO N` | Sets how `LIST` shows the lines, `N` 0 to 3: 1 indents them, 2 colors them, and 3, the default, does both. 0 shows them plain. Any other `N` is an `Illegal quantity`. |
+| `LISTO N` | Sets how `LIST` shows the lines, `N` 0 to 3: 1 indents them, 2 colors them, and the output of `DIS`, `DUMP`, and `HELP`, and 3, the default, does both. 0 shows them plain. Any other `N` is an `Illegal quantity`. |
 | `NEW` | Deletes the program and its variables and arrays. |
-| `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (Files above). |
+| `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (The statements above). |
 | `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, `ELSE`, `RESTORE`, `TRAP`, and `RESUME`, and those of `ON`'s lists, with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
 | `AUTO [N] [, S]` | Types the number of each line before it: `N` first, then that of the line stored last plus `S`, 10 and 10 when not given. A line with nothing after its number ends `AUTO` and deletes no line, and so does CTRL-C, an empty line, a statement typed with no number, and an error. |
 | `CLR` | Clears the variables, drops the arrays, and ends the loops and subroutines. |
@@ -452,8 +451,9 @@ CTRL-C or an error in one, the colors are those of `FOREGROUND` and
 and a file of `SAVE`, get the text alone.
 
 `LISTO N` turns the two off and on: 1 indents, 2 colors, 3, the
-default, does both, and 0 neither. A cold start sets 3, and `NEW` keeps
-it.
+default, does both, and 0 neither. The colors of `DIS`, `DUMP`, and
+`HELP` go off and on with those of `LIST`. A cold start sets 3, and
+`NEW` keeps it.
 
 ## Errors in a program
 
@@ -645,7 +645,8 @@ and gives its text, the body of the answer:
 
 - `H$` is the server: a name, such as `"wttr.in"`, or an IP address,
   with `:PORT` after it or not, 80 when not. A name needs a DNS server,
-  as `NTP` does, so `DHCP` or `IP` first.
+  as `NTP` does, which `DHCP` gets; `IP` sets none, and is enough for
+  an IP address.
 - `P$` is the path, with its query, and goes as it is. It starts with
   a `/`, or it is an `Illegal quantity`. `URL$` encodes a part of it,
   such as a name with blanks.
@@ -693,7 +694,7 @@ names are those of BASIC 65, the MEGA65's own BASIC.
 | Statement | What it does |
 |---|---|
 | `FOREGROUND N` | Sets the color of the characters that are printed from now on, `N` one of the 16 colors below. |
-| `FOREGROUND R, G, B` | The same, with the color given as its red, green, and blue, each 0 to 15, so that any of 4096 colors is possible: `FOREGROUND 15, 8, 0` is orange. |
+| `FOREGROUND R, G, B` | The same, with the color given as its red, green, and blue, each 0 to 15, so that any of 4096 colors is possible: `FOREGROUND 15, 6, 0` is orange. |
 | `BACKGROUND N`, `BACKGROUND R, G, B` | Sets the background of the characters that are printed from now on, as `FOREGROUND` does. |
 | `CURSOR ON`, `CURSOR OFF` | Shows the cursor, or hides it. |
 | `CURSOR C, R [, S]` | Moves the cursor to column `C` and row `R`, both from 0, so that the next `PRINT` prints there. `CURSOR ON, C, R` and `CURSOR OFF, C, R` show or hide it too. A column past 79 is 79, and a row past 27 is 27. `S` is the cursor's style: 0 solid, 1 blinking, and 2 and 3 the same, but small. |
@@ -845,7 +846,8 @@ for a card too, `build/basic.rom`
 ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md), #153). The image is the cat of
 `basic.nasm`, `basic_expr.nasm`, `basic_prog.nasm`, `basic_cmd.nasm`,
 `basic_net.nasm`, `basic_time.nasm`, `basic_dis.nasm`,
-`basic_edit.nasm`, `basic_str.nasm`, and `basic_struct.nasm`, BASIC's copies of the monitor's `common.nasm`,
+`basic_edit.nasm`, `basic_str.nasm`, `basic_struct.nasm`,
+`basic_mach.nasm`, and `basic_trap.nasm`, BASIC's copies of the monitor's `common.nasm`,
 `monlib.nasm`, and `mon.nasm`, the version, and the texts with the
 card's folder. `basic.nasm`'s header says what each file has, and
 "Its words" below has the words of each.
@@ -884,14 +886,19 @@ the default. It runs these steps in order:
 
 1. **The layout.** nice_cpu's `nicefmt` checks the sources and
    `test/dis.nasm`.
-2. **The disassembler.** `test/dis.py` runs `DIS` over `test/dis.nasm`,
+2. **The header.** `tools/basic_rom.py check` reads the header of
+   the tests' image of BASIC, `build/basic_image_test.bin`, and must
+   show its version, 9.9.0, the layout, the 42 entries of the
+   dispatch table that it needs, its RAM of 2048 words, and the flag
+   "keep" ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
+3. **The disassembler.** `test/dis.py` runs `DIS` over `test/dis.nasm`,
    which has every opcode, operand mode, condition, and modifier, the
    control instructions, the reserved words, and each pseudo-instruction
    with its near-misses. It compares each row with the text of
    `nicedis.py`, rewritten by the rules of "The disassembler" above,
    for a pseudo-instruction. It assembles each row again
    and compares the words.
-3. **The numbers.** `test/print_numbers.py` types `?` with 515
+4. **The numbers.** `test/print_numbers.py` types `?` with 515
    numbers: 510 from a fixed seed, constants of 1 to 20 significant
    digits, with a point, an exponent, or neither, from 1E-300 to
    1E300; `+`, `-`, `*`, and `/` of two of them, with signs; the word
@@ -901,7 +908,7 @@ the default. It runs these steps in order:
    ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
    What `PRINT` shows must be Python's double of the number, as
    `%.15G` writes it, digit for digit.
-4. **The functions.** `test/functions.py` writes the bits of `X`, and
+5. **The functions.** `test/functions.py` writes the bits of `X`, and
    of `Y`, with `POKE`, computes `A = SIN(X)` or `A = X^Y`, and reads
    `A`'s two words with `PEEK`, for 431 cases from a fixed seed: each
    function, of numbers in the range it takes, and `^` of positive
@@ -910,7 +917,14 @@ the default. It runs these steps in order:
    FPU is within 1 ulp of the exact value. `PI` must be Python's
    `math.pi`, and `RND` the numbers of a model of its generator, bit
    for bit, after the cold start and after a negative argument.
-5. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
+6. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
+   benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
+   with strings until it is swept, in `bench/`, and checks their
+   output. Their steps, which it prints, are those of the instruction
+   counter, read by `PEEK` before and after `RUN`, less those of an
+   empty program. `make -C basic bench` prints them as the rows of the
+   table in [doc/BASIC.md](../doc/BASIC.md#the-benchmarks).
+7. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
    and learns the frames of each run as the monitor's `test/dns.py`
    does, with the frames of DHCP and DNS of the monitor's
    `test/dhcp.py` and `test/dns.py`. DHCP gives the DNS server and an
@@ -929,7 +943,7 @@ the default. It runs these steps in order:
    real-time clock: the master's last command is the cold start's read
    while no time is set, and the write of the chip's status after the
    times of the run.
-6. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
+8. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
    the same way, against `test/tftp.expected`. It covers a file of two
    blocks among packets of other hosts and ports, lost packets, an
    ERROR, an ERROR after the first block, whose summary comes first,
@@ -946,7 +960,7 @@ the default. It runs these steps in order:
    fails after a `LOAD` of a word below `HIMEM` keeps the program. A
    program's `TRAP` takes an ERROR 1, File not found, with a message
    of 116 characters, of which `DS$` keeps 87.
-7. **HTTP.** `test/web.py` runs `HTTP$` and `URL$` against the web
+9. **HTTP.** `test/web.py` runs `HTTP$` and `URL$` against the web
    server of `tools/lib/tcppeer.py`, which answers each path with an
    answer of its own, in real time, not with `--step-time`. A program
    typed before its `RUN` fetches them, as keys typed while `HTTP$`
@@ -959,29 +973,10 @@ the default. It runs these steps in order:
    and a port that are an `Illegal quantity`, each through a `TRAP`,
    and the request that the server got. Its 18 connections, more than
    the 4 handles of TCP, show that each frees its handle.
-8. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
-   benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
-   with strings until it is swept, in `bench/`, and checks their
-   output. Their steps, which it prints, are those of the instruction
-   counter, read by `PEEK` before and after `RUN`, less those of an
-   empty program. `make -C basic bench` prints them as the rows of the
-   table in [doc/BASIC.md](../doc/BASIC.md#the-benchmarks).
-
-`make -C basic ecma55`, or `make ecma55` at the top, runs the ECMA-55
-conformance suite, NBS SP 500-70, apart from `make test`, as it needs
-the network once. `test/ecma55.py` fetches bas55 2.0's 208 programs
-into `build/ecma55` the first time, and checks the tarball's SHA-256.
-It types each program after a `NEW`, runs it, and writes one line of
-`build/ecma55.out` for it: `same`, when the output is bas55's but for
-blanks and the digits of numbers, `differs`, `failed`, when it printed
-its own `TEST FAILED`, `error:` and BASIC's error, `refused:` and a
-line that BASIC did not take, or `noend`, when it waits for `INPUT`,
-with `; bas55 stops` after it when bas55 reports an error. It compares
-the lines with `test/ecma55.expected`, and prints those that changed.
-8. **The runs.** The ROM runs once for each test below, with its
-   keystrokes from an input file that ends with `HALT`, so that the run
-   halts. Each run's console output, a few memory words, and the screen
-   are compared with `test/NAME.expected`:
+10. **The runs.** The ROM runs once for each test below, with its
+    keystrokes from an input file that ends with `HALT`, so that the run
+    halts. Each run's console output, a few memory words, and the screen
+    are compared with `test/NAME.expected`:
 
 | Test | What runs | What it checks |
 |---|---|---|
@@ -1025,6 +1020,18 @@ alters an expected output, check the new output the same way before you
 copy it from `build/` to `test/`. `cmds` shows the addresses of the
 dispatch table, which change with the monitor's code.
 
+`make -C basic ecma55`, or `make ecma55` at the top, runs the ECMA-55
+conformance suite, NBS SP 500-70, apart from `make test`, as it needs
+the network once. `test/ecma55.py` fetches bas55 2.0's 208 programs
+into `build/ecma55` the first time, and checks the tarball's SHA-256.
+It types each program after a `NEW`, runs it, and writes one line of
+`build/ecma55.out` for it: `same`, when the output is bas55's but for
+blanks and the digits of numbers, `differs`, `failed`, when it printed
+its own `TEST FAILED`, `error:` and BASIC's error, `refused:` and a
+line that BASIC did not take, or `noend`, when it waits for `INPUT`,
+with `; bas55 stops` after it when bas55 reports an error. It compares
+the lines with `test/ecma55.expected`, and prints those that changed.
+
 ## Its words
 
 BASIC's image is at `0x3000`–`0x7FFF`, 20480 words, of which the
@@ -1040,7 +1047,7 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2516 | 1528 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2537 | 1548 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1914 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2382 | 52 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 300 |
@@ -1057,5 +1064,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 17649 | 2361 |
+| In all | | 17670 | 2381 |
 <!-- /romsize basic -->
