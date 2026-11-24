@@ -87,7 +87,7 @@ header is the authoritative address map.
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/nicemon.py tftpd for BASIC's LOAD and DIR, with listings for DIR "IP", "*.BIN"; ARGS=--write for SAVE and BSAVE (#155)
     make tftptest         # nicemon.py tftpd, and BASIC's TFTP in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/lib/tcppeer.py, and its timers with --step-time, no board
-    make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/lib/tcppeer.py, and so examples/weather.bas, and examples/sieve.bas in niceemu, no board
+    make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/lib/tcppeer.py, and so examples/weather.bas, examples/sieve.bas, and examples/chess.bas in niceemu, no board
     make sdcard CMD=ls    # the board's SD card over the link: ls [PATH], get NAME [DEST], put SRC [NAME], del NAME, mkdir [PATH], --slot N format (ETH= or PORT=); a NAME may be a path, GAMES/CHESS.BIN (#168)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # nicemon.py sd and nbd on niceemu --link with images that mtools made, no board
@@ -209,7 +209,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   and `sieve.bas`, a BASIC program that loads its routine of machine
   code, `sieve.nasm`, above its `HIMEM` and calls it with `SYS`, tested
   in niceemu, and `weather.bas`, the weather display in BASIC, which
-  fetches with BASIC's `HTTP$` (#170) (`examples/README.md`). `demo/`: nice_cpu's demo (`nice_cpu/demo`,
+  fetches with BASIC's `HTTP$` (#170), and `chess.bas`, a very simple
+  chess program in BASIC alone, after nice_chess, tested in niceemu
+  (`examples/README.md`). `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a
   program at 0x8000, `demo.bin`, which the release ships as an asset of
   its own and BASIC's `LOAD "DEMO.BIN"` and `SYS 0x8000` run; it left the ROM

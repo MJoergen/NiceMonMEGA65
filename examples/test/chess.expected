@@ -1,0 +1,87 @@
+CHESS IN BASIC
+PLAY WHITE, BLACK, OR NONE (W/B/N)? W
+
+8  r n b q k b n r
+7  p p p p p p p p
+6  . . . . . . . .
+5  . . . . . . . .
+4  . . . . . . . .
+3  . . . . . . . .
+2  P P P P P P P P
+1  R N B Q K B N R
+   a b c d e f g h
+YOUR MOVE? e2e4
+1. e2e4
+
+8  r n b q k b n r
+7  p p p p p p p p
+6  . . . . . . . .
+5  . . . . . . . .
+4  . . . . P . . .
+3  . . . . . . . .
+2  P P P P . P P P
+1  R N B Q K B N R
+   a b c d e f g h
+DEPTH 1, SCORE 10, b8c6, NODES 25, 1.9 S
+1... b8c6
+
+8  r . b q k b n r
+7  p p p p p p p p
+6  . . n . . . . .
+5  . . . . . . . .
+4  . . . . P . . .
+3  . . . . . . . .
+2  P P P P . P P P
+1  R N B Q K B N R
+   a b c d e f g h
+YOUR MOVE? e2e5
+NOT A LEGAL MOVE; TYPE IT AS e2e4, OR e7e8q
+YOUR MOVE? d2d4
+2. d2d4
+
+8  r . b q k b n r
+7  p p p p p p p p
+6  . . n . . . . .
+5  . . . . . . . .
+4  . . . P P . . .
+3  . . . . . . . .
+2  P P P . . P P P
+1  R N B Q K B N R
+   a b c d e f g h
+DEPTH 1, SCORE 20, g8f6, NODES 29, 2.3 S
+2... g8f6
+
+8  r . b q k b . r
+7  p p p p p p p p
+6  . . n . . n . .
+5  . . . . . . . .
+4  . . . P P . . .
+3  . . . . . . . .
+2  P P P . . P P P
+1  R N B Q K B N R
+   a b c d e f g h
+YOUR MOVE? g1f3
+3. g1f3
+
+8  r . b q k b . r
+7  p p p p p p p p
+6  . . n . . n . .
+5  . . . . . . . .
+4  . . . P P . . .
+3  . . . . . N . .
+2  P P P . . P P P
+1  R N B Q K B . R
+   a b c d e f g h
+DEPTH 1, SCORE 100, f6e4, NODES 30, 1.8 S
+3... f6e4
+
+8  r . b q k b . r
+7  p p p p p p p p
+6  . . n . . . . .
+5  . . . . . . . .
+4  . . . P n . . .
+3  . . . . . N . .
+2  P P P . . P P P
+1  R N B Q K B . R
+   a b c d e f g h
+YOUR MOVE? 

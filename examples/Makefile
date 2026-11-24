@@ -40,12 +40,20 @@
 # HTTP$, and is copied as sieve.bas is. tools/weathertest.py runs it in
 # niceemu against its server of HTTP (make weathertest at the top).
 #
+# chess.bas is a chess program in BASIC, and is copied as sieve.bas is.
+# The test types it into BASIC in niceemu, with no card, sets its time
+# limit to 2 seconds, which --step-time makes 2 million steps, and plays
+# three moves of white against it, one of them typed wrong first. The
+# output after RUN, up to the step limit, where it waits for the fourth
+# move, is compared with test/chess.expected.
+#
 # make          builds build/primes.bin, build/weather.bin, build/sieve.bin,
 #               and build/bench.bin and build/bench_win.bin
 #               from nice_cpu's benchmark, bench/bench.c, which
-#               tools/hwtest.py runs, and copies sieve.bas and weather.bas
-# make test     checks weather_parse.c on the host, with cc, and sieve.bas
-#               with sieve.bin in niceemu
+#               tools/hwtest.py runs, and copies sieve.bas, weather.bas,
+#               and chess.bas
+# make test     checks weather_parse.c on the host, with cc, sieve.bas
+#               with sieve.bin in niceemu, and chess.bas in niceemu
 # make clean    removes build/ and test/build/
 #
 # Needs clang with the wasm32 target, wasm-ld and llvm-ar (the lld and llvm
@@ -81,7 +89,7 @@ WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
 FLOAT_PROGRAMS = primes
 
 all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin $(BUILD)/sieve.bin $(BUILD)/sieve.bas \
-     $(BUILD)/weather.bas
+     $(BUILD)/weather.bas $(BUILD)/chess.bas
 
 MON      = ../monitor
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
@@ -105,6 +113,12 @@ test: test/build/weather_test test/build/sieve.img $(ROM_TEST)
 	  $(ROM_TEST) | sed -e '/^Halted/,$$d' > test/build/sieve.out
 	@if cmp -s test/sieve.expected test/build/sieve.out; then echo "PASS sieve"; \
 	else echo "FAIL sieve"; diff test/sieve.expected test/build/sieve.out; exit 1; fi
+	{ cat chess.bas; printf '30 TL = 2\nRUN\nW\ne2e4\ne2e5\nd2d4\ng1f3\n'; } | tr '\n' '\r' \
+	  > test/build/chess.in
+	$(EMU) --step-time -n 60000000 -i test/build/chess.in $(ROM_TEST) \
+	  | sed -e '1,/^RUN/d' -e '/Stopped at the step limit/{s/Stopped at.*//;q;}' > test/build/chess.out
+	@if cmp -s test/chess.expected test/build/chess.out; then echo "PASS chess"; \
+	else echo "FAIL chess"; diff test/chess.expected test/build/chess.out; exit 1; fi
 
 # sieve.bin, the routine, and sieve.bas, the program that calls it
 $(BUILD)/sieve.bin: sieve.nasm $(NICEASM) | $(BUILD)
@@ -115,6 +129,9 @@ $(BUILD)/sieve.bas: sieve.bas | $(BUILD)
 
 $(BUILD)/weather.bas: weather.bas | $(BUILD)
 	cp weather.bas $@
+
+$(BUILD)/chess.bas: chess.bas | $(BUILD)
+	cp chess.bas $@
 
 # The card of the test: FAT32 on the whole card, with both in NICE
 test/build/sieve.img: $(BUILD)/sieve.bin sieve.bas

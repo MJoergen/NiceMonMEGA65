@@ -1,6 +1,6 @@
 # The examples
 
-Programs in C for the NICE CPU, and two in BASIC, one of them with
+Programs in C for the NICE CPU, and three in BASIC, one of them with
 machine code. `make examples` at the top builds them to
 `examples/build/`. It needs clang with the wasm32 target, `wasm-ld`, and
 `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and `llvm`
@@ -14,6 +14,7 @@ reaches the board.
 | `weather.bin` | A weather display on the screen, below. It runs under the monitor. |
 | `sieve.bas`, `sieve.bin` | A BASIC program that counts primes in BASIC, and then again with a routine of machine code that it loads beside it, and compares the times (BASIC with machine code, below). |
 | `weather.bas` | The weather display again, in BASIC, which fetches with `HTTP$` (The weather display in BASIC, below). |
+| `chess.bas` | A chess program in BASIC alone, which plays a legal game against a player or against itself (Chess in BASIC, below). |
 
 ## The weather display
 
@@ -238,3 +239,90 @@ The clock stops while a fetch waits, for a second or so, where
 `make weathertest` runs it in `niceemu` against the same server of the
 test as `weather.bin`, with the same answers, and checks its screen
 and its requests (CONTRIBUTING.md, "The examples").
+
+## Chess in BASIC
+
+`chess.bas` plays chess, and is written in BASIC alone. It is a very
+simple version of [nice_chess](https://github.com/MJoergen/nice_chess),
+the chess program in C, `CHESS.BIN`: it keeps the negamax search with a
+time limit for each move, and a simple evaluation, and leaves out the
+rest, such as the opening book, the transposition table, the levels,
+and the remote play. It knows all the rules of a move: castling, en
+passant, and the promotions to each piece.
+
+### Running it
+
+1. Copy `chess.bas` to the folder `NICE` of the SD card. The examples'
+   zip of each release has it, and `make examples` copies it to
+   `examples/build/`.
+2. On the board, at BASIC's `READY.`, type `RUN "CHESS"`. `RUN
+   "CHESS.BIN"` starts nice_chess instead.
+3. Answer `W` to play white, `B` to play black, or `N` to watch the
+   program play itself.
+
+`make load FILE=examples/chess.bas ETH=IP ARGS=--bas` types the program
+from the PC instead (tools/README.md).
+
+A move is typed as its two squares, such as `e2e4`, in either case, and
+a promotion with its piece after them, `e7e8q`, or `n`, `b`, or `r`;
+with none it is a queen. Castling is the king's move, `e1g1`. A move
+that is not legal is asked for again. The board is shown after each
+move, white at the bottom, with white's pieces in upper case and
+black's in lower case. The game ends at a checkmate, a stalemate, the
+fifty-move rule, or when only the kings are left, or a king and one
+bishop or knight against a king. There is no draw by repetition.
+
+The program thinks 10 seconds on a move. Line 30 sets that:
+
+    30 TL = 10: REM THE SECONDS THAT THE COMPUTER THINKS ON A MOVE
+
+While it thinks, it prints a line for each depth that it has searched,
+with the score in centipawns for the side to move, the best move, the
+nodes, and the seconds so far:
+
+    DEPTH 2, SCORE 15, b8c6, NODES 412, 3.2 S
+
+### How it works
+
+The board is 10 by 12 squares, `B%(119)`, with a border of 7s around
+the 8 by 8, so that a knight's jump or a slide off the board finds a 7
+and stops. A piece is 1 to 6, pawn to king, positive for white and
+negative for black. The squares of each side's pieces are kept in a
+list, `PQ%`, so that the moves are generated from 16 squares and not
+from 64. A move is a number: its square from, plus 128 times its square
+to, plus 16384 times its piece of promotion.
+
+The moves are generated as a piece moves, without regard to its king,
+and the search makes each move and drops it when its own king is then
+in check. That test is the whole attack on the king only after a move
+of the king, en passant, or a move out of check; else it only looks
+along the line from the king through the square that the piece left,
+for a pin.
+
+The search is negamax with alpha-beta, by iterative deepening: depth 1,
+then 2, and so on, until half the time is gone, as the next depth would
+not end in time. A depth that the time stops is dropped, but for a
+better move than the last depth's that it has found already. Each node
+tries the captures first, the most valuable victim first, and at depth
+0 a quiescence search goes on with the captures alone. A position with
+no legal move is a mate or a stalemate. The search's recursion is
+`GOSUB`, with the state of each ply in arrays, as `FOR` loops and
+`PROC`s would take more of BASIC's 512 words of frames.
+
+The evaluation is Tomasz Michniewski's "simplified evaluation
+function": the material, 100 for a pawn, 320 for a knight, 330 for a
+bishop, 500 for a rook, and 900 for a queen, and a bonus for each piece
+by its square. The king has two tables, one for the middle game and one
+for the end game, which are mixed by the material left. The score is
+kept up to date as each move is made and taken back.
+
+BASIC is slow for this: a generation of the moves takes some 700
+statements, so the program searches a few hundred nodes a second on the
+MEGA65, and 2 or 3 moves deep in its 10 seconds. It plays a legal game,
+but a weak one, and it may not find the mate in a won end game before
+the fifty-move rule.
+
+`make -C examples test` types the program into BASIC in `niceemu`, sets
+its time to 2 seconds, which `--step-time` makes 2 million steps, plays
+three moves of white against it, one of them typed wrong first, and
+compares what it prints with `test/chess.expected`.

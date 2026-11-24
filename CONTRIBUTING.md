@@ -88,7 +88,8 @@ or, in an existing clone:
   board (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make weathertest` checks the weather display, `examples/weather.c`,
   on the host and in `niceemu`, and its BASIC version,
-  `examples/weather.bas`, and `examples/sieve.bas` in `niceemu`,
+  `examples/weather.bas`, `examples/sieve.bas`, and
+  `examples/chess.bas` in `niceemu`,
   without a board (see [The examples](#the-examples)).
 - `make sdtest` checks `tools/nicemon.py sd` and `tools/nicemon.py nbd` on
   `niceemu --link` with images of a card, without a board (see [The
@@ -1333,6 +1334,9 @@ network's entries from C. `make weathertest` checks it in two parts:
   Then it runs `examples/sieve.bas`, which loads `sieve.bin` above its
   `HIMEM`, under the monitor of the tests in `niceemu`, with a card that
   holds both, and compares its output with `examples/test/sieve.expected`.
+  Last it types `examples/chess.bas` into BASIC in `niceemu`, plays
+  three moves of white against it, and compares its output with
+  `examples/test/chess.expected`.
 - `tools/weathertest.py` checks first that the program ends 1K words
   below `0xE800`, the variables of the Nexys4DDR, so that it fits in the Nexys4DDR's memory with its
   page of wasm memory. Then it runs the program under the monitor of the
