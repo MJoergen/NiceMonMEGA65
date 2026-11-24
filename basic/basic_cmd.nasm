@@ -81,9 +81,14 @@ st_dump
                 MOVE[M] R8, R2          ; the words left
         ?Z      RET
                 MOVE    R7, @V_NEXT     ; the next word
+                CALL    hue_on
 dump_row
+                MOVE    R1, HUE_LINE
+                CALL    hue
                 MOVE    R1, R7
                 CALL    _io_puthex
+                MOVE    R1, HUE_NUM
+                CALL    hue
                 MOVE    R9, ROW_WORDS   ; the words left in the row
 :
                 MOVE    R1, 0x20
@@ -98,7 +103,8 @@ dump_row
                 JMP     dump_row
 :
                 MOVE    @V_NEXT, R7
-                JMP     _io_crlf        ; which returns to the caller
+                CALL    _io_crlf
+                JMP     hue_off         ; which returns to the caller
 
 ; IP ["A.B.C.D"]: R1 the string, or 0. The Ethernet station's IP
 ; address (doc/SYSTEM.md, "The Ethernet station"), written from four
@@ -395,7 +401,10 @@ bin_init
 ; the line at V_LPOS. CR, LF, or CR LF ends a line, which bin_eol takes.
 ; TAB is a blank, and a byte that is no character, any other control
 ; code, DEL, or one from 0x80, is kept as 0x7F, so that bin_line skips
-; its line, as niceemu rejects it, and the tokenizer fails it. The blanks
+; its line, as niceemu rejects it, and the tokenizer fails it. In a
+; program's text, the blanks before a line's number, and all but one
+; after it, which LIST puts there with LISTO's bit 0, are dropped, so
+; that they do not count toward the limit. The blanks
 ; after the line's limit, V_LLIM, are dropped, as niceemu ignores them,
 ; and the first other byte after it is kept as 0x7F at the limit, and
 ; the rest dropped. V_LEND is the byte before. A listing of TFTP, when
@@ -423,6 +432,27 @@ bin_char
         ?!Z     RET                     ; none, of a listing: dropped
                 MOVE    R1, 0x7F        ; no character: the line skipped
 :
+                TST     @V_LBAS
+        ?Z      JMP     bc_keep
+                CMP     R1, 0x20
+        ?!Z     JMP     bc_keep
+                MOVE    R6, @V_LPOS     ; a blank of a program's text:
+                MOVE    R2, @V_LBEG
+                CMP     R6, R2
+        ?Z      RET                     ; dropped first in the line,
+                CMP     @-1[R6], 0x20
+        ?!Z     JMP     bc_keep
+bc_digit
+                SUB     R3, @R2, 0x30
+                CMP     R3, 10
+        ?!C     JMP     bc_blank
+                MOVE    R2++, R2
+                JMP     bc_digit
+bc_blank
+                ADD     R2, R2, 1
+                CMP     R2, R6
+        ?Z      RET                     ; and after the blank after its number
+bc_keep
                 MOVE    R6, @V_LPOS
                 MOVE    R3, @V_LLIM
                 CMP     R6, R3

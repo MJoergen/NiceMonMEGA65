@@ -162,6 +162,8 @@ bas_start
                 MOVE    @V_EL, 0xFFFFFFFF
                 CLR     @V_DS           ; and no failure, DS 0
                 CLR     @V_RTAIL
+                MOVE    @V_LISTO, 3     ; LIST indented and in colors
+                CLR     @V_LCOL
                 MOVE    @V_POLL, POLL_EVERY
                 MOVE    @V_NEXT, PROGRAM
                 MOVE    @V_UNEXT, PROGRAM
@@ -186,6 +188,7 @@ main_auto
                 MOVE    @V_ELIM, STACK-EXPR_ROOM
                 CLR     @V_SSB
                 CALL    files_end       ; what an error or the break key left open
+                CALL    hue_off         ; and the colors of a listing
                 CLR     @V_CUR          ; direct mode
                 CLR     @V_SSP          ; no strings
                 CLR     @V_STORE
@@ -696,9 +699,85 @@ bas_delete
         ?!N     JMP     st_delete
                 JMP     io_fail
 
-; HELP: the lines of the statements
-st_help         MOVE    R1, HELP
-                JMP     puts_lines      ; which returns to the caller
+; HELP: the lines of the statements, in LISTO's colors
+st_help
+                CALL    hue_on
+                MOVE    R7, HELP
+:
+                MOVE[M] R1, @R7++
+        ?Z      JMP     hue_off         ; which returns to run_next
+                CALL    help_line
+                JMP     :-
+
+; help_line: the line of HELP at R1, packed, and CR LF. In LISTO's
+; colors, its syntax, up to two blanks, has the keywords in the user's
+; color, the other names in HUE_NAME, and the strings in HUE_STR, and the
+; text after it is in the user's color. Uses R1-R6 and R9-R11.
+help_line
+                TST     @V_LCOL
+        ?Z      JMP     puts_b_crlf     ; no colors
+                SHL     R9, R1, 2
+                ADD     R9, R9, TEXT_B  ; the next byte
+                CLR     R10             ; 0 in the syntax, 1 in a string, 2 after
+                CLR     R11             ; not 0 in a name
+hl_char
+                MOVE[M] R1, @R9
+        ?Z      JMP     hl_end
+                CMP     R10, 2
+        ?Z      JMP     hl_put
+                CMP     R1, 0x22        ; "
+        ?!Z     JMP     :+
+                CMP     R10, 1
+        ?Z      JMP     hl_put0         ; the string's end, put in HUE_STR
+                MOVE    R10, 1
+                CLR     R11
+                MOVE    R1, HUE_STR
+                CALL    hue
+                JMP     hl_put
+:
+                CMP     R10, 1
+        ?Z      JMP     hl_put
+                CMP     R1, 0x20
+        ?!Z     JMP     :+
+                ADD     R1, R9, 1
+                CMP     @R1, 0x20
+        ?Z      MOVE    R10, 2          ; two blanks: the text
+                JMP     hl_user
+:
+                CMP     R1, 0x24        ; $
+        ?Z      JMP     :+
+                CALL    dval
+        ?!C     JMP     hl_user         ; no name
+:
+                TST     R11
+        ?!Z     JMP     hl_put          ; more of the name
+                MOVE    R11, 1
+                MOVE    R3, TEXT_B+4*OPS+KEYWORDS
+:
+                MOVE    R5, R9
+                CALL    match
+        ?Z      JMP     hl_user0        ; a keyword
+                TST     @R3
+        ?!Z     JMP     :-
+                MOVE    R1, HUE_NAME
+                CALL    hue
+                JMP     hl_put
+hl_user
+                CLR     R11
+hl_user0
+                CLR     R1
+                CALL    hue
+                JMP     hl_put
+hl_put0
+                CLR     R10
+hl_put
+                MOVE    R1, @R9++
+                CALL    MON_PUTC
+                JMP     hl_char
+hl_end
+                CLR     R1
+                CALL    hue
+                JMP     _io_crlf        ; which returns to the caller
 
 ; The routines of the statements, a halfword each, in the order of
 ; KEYWORDS, which the halfword window reads
@@ -717,7 +796,7 @@ ACTS
                 .DAT    st_def+65536*st_on, st_do+65536*st_loop
                 .DAT    st_exit+65536*st_endif, st_endproc+65536*st_local
                 .DAT    st_sleep+65536*st_fg, st_bg+65536*st_cursor, st_rcursor+65536*st_trap
-                .DAT    st_resume
+                .DAT    st_resume+65536*st_listo
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -741,10 +820,12 @@ I_ON            .EQU    45              ; of ON,
 I_DO            .EQU    46              ; of DO,
 I_LOOP          .EQU    47              ; of LOOP,
 I_ENDIF         .EQU    49              ; of ENDIF,
+I_ENDPROC       .EQU    50              ; of ENDPROC,
 I_RCURSOR       .EQU    56              ; of RCURSOR,
 I_TRAP          .EQU    57              ; of TRAP,
 I_RESUME        .EQU    58              ; of RESUME,
-N_STMT          .EQU    59              ; and of AND, the first keyword that is no statement
+I_LISTO         .EQU    59              ; of LISTO,
+N_STMT          .EQU    60              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -791,7 +872,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    40              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"DS"DS$"HTTP$"URL$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"SLEEP"FOREGROUND"BACKGROUND"CURSOR"RCURSOR"TRAP"RESUME"LISTO"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"TI"OFF"ER"EL"ERR$"DS"DS$"HTTP$"URL$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -814,7 +895,7 @@ S_DOTBAS
 ; with the statement's keyword and a blank
 HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_TFTPB, H_DEL, H_DELL, H_DIR, H_DIRP, H_TFTPL, H_SLOT, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
-                .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
+                .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_LISTO, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
                 .DAT    H_DATA, H_READ, H_REST, H_STR, H_HTTP, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
                 .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_SLEEP, H_FG, H_BG, H_CUR, H_CURP, H_RCUR
@@ -830,7 +911,8 @@ H_SAVET         .ASCII_B 'SAVE "NAME" [, S]   save the program as the text NAME.
 H_SAVE          .ASCII_B 'BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME'
 H_TFTPS         .ASCII_B 'SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)'
 H_TFTPB         .ASCII_B 'BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP'
-H_DEL           .ASCII_B 'DELETE "NAME" [, S] delete the file NAME of the SD card'
+H_DEL           .ASCII_B 'DELETE "NAME" [, S]  delete the file NAME of the SD card'
+                .DAT    0
 H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
                 .DAT    0
 H_DIR           .ASCII_B 'DIR [S]             list the files of the card in slot S, or of the one mounted'
@@ -861,6 +943,7 @@ H_RUNF          .ASCII_B 'RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 
 H_RUNT          .ASCII_B 'RUN "NAME", "IP"    load NAME from the TFTP server at IP and run it'
 H_LIST          .ASCII_B 'LIST [N] [- M]      list the lines of the program, those from N to M'
                 .DAT    0
+H_LISTO         .ASCII_B 'LISTO N             1 indents LIST, 2 colors LIST, DIS, DUMP, and HELP; 3 both'
 H_NEW           .ASCII_B 'NEW                 delete the program and its variables'
                 .DAT    0
 H_CLR           .ASCII_B 'CLR                 clear the variables'
@@ -877,7 +960,7 @@ H_END           .ASCII_B 'END                 end the program'
 H_STOP          .ASCII_B 'STOP                stop the program, which CONT goes on with'
 H_CONT          .ASCII_B 'CONT                go on after STOP, END, or the break key'
 H_REM           .ASCII_B 'REM TEXT            a remark, the rest of the line'
-H_INPUT         .ASCII_B 'INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P'
+H_INPUT         .ASCII_B 'INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P'
 H_GET           .ASCII_B 'GET V               V the code of the next key typed, 0 when none; V$ the key'
 H_DIM           .ASCII_B 'DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1'
                 .DAT    0
@@ -890,7 +973,7 @@ H_REST          .ASCII_B 'RESTORE [N]         READ from the first DATA again, or
 H_STR           .ASCII_B 'A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$'
                 .DAT    0
 H_HTTP          .ASCII_B 'HTTP$(H$, P$)       the body of http://H$P$; URL$(S$) S$ encoded for a path'
-H_ON            .ASCII_B 'ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it'
+H_ON            .ASCII_B 'ON X GOTO N, M, ...  go on at the line of the X-th number, or GOSUB it'
 H_DEF           .ASCII_B 'DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string'
 H_DO            .ASCII_B 'DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X'
                 .DAT    0

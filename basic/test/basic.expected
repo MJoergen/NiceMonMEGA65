@@ -47,7 +47,7 @@ SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 READY.
 delete x
 Syntax error
-DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE "NAME" [, S]  delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 dhcp x
@@ -295,7 +295,7 @@ SD error 1 in slot 1, no card
 READY.
 delete "x", "y"
 Syntax error
-DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE "NAME" [, S]  delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 delete ""

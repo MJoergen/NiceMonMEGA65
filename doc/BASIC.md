@@ -447,6 +447,59 @@ these do not say otherwise.
   and above the RAM. The arrays do not count, as the `CLR` frees
   them.
 
+### Listings
+
+`LIST` indents the lines in a block and colors the parts of a line,
+#174, decided on 2026-11-24. The user's guide is in
+[basic/README.md](../basic/README.md#how-listings-look).
+
+- **`LISTO N`**, BBC BASIC's name, sets two bits: bit 0 indents and
+  right-aligns the line numbers, and bit 1 colors `LIST`, `DIS`,
+  `DUMP`, and `HELP`. The default is 3, which a cold start sets and
+  `NEW` keeps. `LISTO` is a new keyword, so a program with a variable
+  of that name breaks (#160), and the release notes say so.
+- **The indent is computed, never stored.** A line stores its tokens
+  alone, and the blanks typed before a line's number and after it are
+  dropped when it is entered. A level is one blank. `FOR`, `DO`, a
+  block's `THEN`, and the `DEF` of a `PROC` or of a `FN` over lines
+  open one. `NEXT`, and one more for each comma of its list, `LOOP`,
+  `ENDIF`, `ENDPROC`, and an `=` that starts a line, the end of a `FN`
+  over lines, close one, and a block's `ELSE` closes one and opens one.
+  A line's indent is the depth less the levels that it closes before
+  it opens one. The depth is never below 0, and the indent is at most
+  16 blanks.
+- **The numbers are right-aligned** to the digits of the last line's
+  number, when the indent is on, so that the indents line up.
+- **`SAVE` writes the indent too**, so a saved file reads well on a
+  PC. It never writes colors.
+- **The colors** are a table of a color for each kind of token: line
+  numbers gray, names light blue, numbers light green, strings and
+  `DATA` yellow, `REM` cyan, and the rest the user's color. A color
+  that is the background's is the user's instead.
+
+How it is built, in `basic_prog.nasm`:
+
+- `list_pre` walks the lines before the first one listed and counts
+  their levels, so `LIST 100-200` starts at the right depth, and finds
+  the last line's number for the width. `list_count` counts the levels
+  of a line, with `tok_skip`.
+- `hue_on` keeps the user's color in `V_LCOL`, with bit 0 set, and
+  `hue` sets a color of the table with `scr_color`, only when it
+  changes. `hue_off` sets the user's color again at the end of a
+  listing, and `main`, `err`, and `brk` call it too, so CTRL-C or an
+  error in a listing leaves no color behind. `hue_on` does nothing
+  while `SAVE` writes, as `V_SPOS` is not 0 then.
+- The blanks before a line's number, and all but one after it, do not
+  count toward the 254 characters of a line: the screen editor's
+  RETURN leaves them out (`ed_copy_sq`), and so does its check of a
+  key typed into a full line (`ed_sq`), and `LOAD` drops them from a
+  file's line (`bin_char`). Without that, a line that lists in 254
+  characters would not go back in once indented.
+- `HELP` colors the syntax of each line, up to two blanks, a word at a
+  time: a keyword of the table in the user's color, another name light
+  blue, and a string yellow. Three lines of the help got a second blank
+  for it.
+
 ### Strings
 
 Stage 5 (#116) has strings, as V2 has them, written in
@@ -976,7 +1029,8 @@ as #54 says:
   but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between
   a function or an array and its `(`, so the blanks of a line as typed
   are not kept. A minus is a sign when the token before it ends no
-  operand.
+  operand. `LISTO` adds the indent and the colors
+  ([Listings](#listings)).
 - A stored line is the tokens of stage 2, at most the 160 words of
   `V_TOK`. Since stage 4 the tokenizer checks that, as a line of a
   file may have more, and such a line is `Line too long`. Since stage
@@ -1182,7 +1236,9 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   line from the screen: up to four rows, of which it takes at most
   254 characters, as `LOAD` does. Two rows would not do, as `LIST`
   writes `?` as `PRINT`, so a line typed at 160 characters may list
-  longer, and could not be entered again. A line that lists with more
+  longer, and could not be entered again. The blanks before a line's
+  number, and all but one after it, do not count, as `LIST` indents
+  ([Listings](#listings)). A line that lists with more
   than 254 characters is `Line too long` at RETURN, as it is for
   `LOAD`, and is not entered shortened. The tokenizer may refuse a
   line with fewer, as its tokens must fit the 160 words of `V_TOK`.
@@ -1477,7 +1533,9 @@ Each has an issue, under #54.
     The display offset has no statement.
 11. Later, in no order: statements for the network, after #111,
     the first of which, `HTTP$` and `URL$`, #170, are written in
-    V2.6, as [HTTP](#http) has them;
+    V2.6, as [HTTP](#http) has them; the indent and the colors of
+    `LIST`, with `LISTO`, #174, written in V2.6, as
+    [Listings](#listings) has them;
     virtual screens, #163, `FIND` and `CHANGE`, #162; and graphics,
     sprites, and sound, with their hardware.
 
@@ -1620,6 +1678,9 @@ keywords' and the help's text, and leaves 5469 free (measured
 Stage 9 is 398 words more, to 15409, of which 71 are the keywords',
 the help's, and the message's text, and leaves 5071 free
 (measured 2026-11-21).
+The indent and the colors of `LIST`, with `LISTO` (#174), are 749
+words more, from 16898 to 17647, of which 23 are the keyword's and the
+help's text, and leave 2833 free (measured 2026-11-24).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

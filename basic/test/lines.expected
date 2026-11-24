@@ -56,7 +56,7 @@ Illegal quantity
 READY.
 DELETE
 Syntax error
-DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE "NAME" [, S]  delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 DELETE 50-10
@@ -72,9 +72,9 @@ AUTO 200, 20
 240 
 READY.
 LIST
-10 GOSUB 30: IF 1 THEN 130
-20 END
-30 RETURN
+ 10 GOSUB 30: IF 1 THEN 130
+ 20 END
+ 30 RETURN
 200 PRINT 1
 220 PRINT 2
 READY.
@@ -100,9 +100,9 @@ Screen:
 |240
 |READY.
 |LIST
-|10 GOSUB 30: IF 1 THEN 130
-|20 END
-|30 RETURN
+| 10 GOSUB 30: IF 1 THEN 130
+| 20 END
+| 30 RETURN
 |200 PRINT 1
 |220 PRINT 2
 |READY.

@@ -203,7 +203,10 @@ FUNCS = ? SIN(0), COS(0), TAN(0), ATAN(1) * 4, PI\r? ASIN(1), ACOS(-1), LOG(EXP(
 # LONG.BAS, WIDE.BAS, and HIGH.BAS each end the load at a line, which is
 # shown, with the lines before it kept; NONE.BAS is not there, so LOAD
 # and RUN keep the program. SAVE and LOAD of a name with a dot, T.TXT,
-# and of an empty program, RUN "HELLO.BIN", which calls it at 0x8000,
+# and of an empty program, and of IND.BAS, whose lines LIST indents and
+# right-aligns, one of them to 257 characters, which LOAD takes, as the
+# blanks around a line's number do not count (issue #174), RUN
+# "HELLO.BIN", which calls it at 0x8000,
 # RUN with a number or a word after its name, a program that runs the
 # next, SAVE to TFTP, and a CTRL-C that breaks a SAVE, whose file is
 # closed, and empty, which LOAD then passes over. The failures of
@@ -268,13 +271,14 @@ EDIT = cls\rPOKE 0xFFFF00FA, 88\rPRINT 1\rPOKE 0xFFFF0235, 88: INPUT A: PRINT A\
 LINES = 10 PRINT "A"\r20 GOTO 40\r30 PRINT "C"\r40 GOSUB 60: IF 1 THEN 70\r50 END\r60 RETURN\r70 PRINT "Z": GOTO 50\rRENUMBER 100, 5\rLIST\rRUN\rDELETE 105-110\rLIST\rDELETE 130\rDELETE -100\rLIST\rRENUMBER\rLIST\rRENUMBER 65535\rRENUMBER 1, 0\rDELETE\rDELETE 50-10\rLIST\rAUTO 200, 20\rPRINT 1\rPRINT 2\r\rLIST\rNEW\rAUTO\rREM X\r\003LIST\r5 GOTO 999\rRENUMBER 1000\rLIST\rHALT\r
 # long: the editor's limit of 254 characters. Lines 100 and 1000, each
 # 28 times ?1, which LIST writes as PRINT 1, so that line 100 lists with
-# 254 characters and line 1000 with 255. LIST 100, the cursor up to the
-# end of its text, a DEL, and 2 for the last 1: RETURN stores the line,
-# all 254 characters of it. LIST 1000, the cursor up into it, and RETURN:
+# 254 characters and line 1000 with 255. Line 100 takes 255 columns, as
+# LISTO's bit 0 right-aligns its number, and the blank before it does
+# not count. LIST 100, the cursor up to the end of its text, a DEL, and
+# 2 for the last 1: RETURN stores the line, all 254 characters of it. LIST 1000, the cursor up into it, and RETURN:
 # a Line too long, which stores nothing, as the last LIST shows.
 Q28 = ?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1
-RT14 = $(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)
-LONG = cls\r100 $(Q28)\r1000 $(Q28)\rLIST 100\r$(UP)$(UP)$(RT14)\1772\r$(DN)LIST 1000\r$(UP)$(UP)$(UP)\r$(DN)LIST\rHALT\r
+RT15 = $(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)
+LONG = cls\r100 $(Q28)\r1000 $(Q28)\rLIST 100\r$(UP)$(UP)$(RT15)\1772\r$(DN)LIST 1000\r$(UP)$(UP)$(UP)\r$(DN)LIST\rHALT\r
 # redo: the check at entry (issue #118, step 3). A line of two rows
 # that the tokenizer refuses at its @ is not stored, and after READY. it
 # is shown again with the cursor at the @, as no key waits: the input
@@ -342,6 +346,16 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E3FF, 1\rhalt\
 # LOCAL, with AND, PRINT, and TIME$ among them; a number, a +, and an
 # item of DATA that does not fit, whose Syntax error names none; and
 # one trapped, as error 11, whose line LIST shows as it was typed.
+# listo: LIST's indent and colors (issue #174), test/listo.bas typed line
+# by line. LISTO 1, 2, 0, and 3, and 4, -1, and none, its errors; a
+# program with FOR, NEXT J, I, a block IF with ELSE, DO, LOOP, a FOR
+# with two NEXTs, a PROC, and FNs on one line and over lines, listed
+# whole and from lines in the middle, and run; and a program that reads
+# with PEEK the colors that LIST, DUMP, DIS, and HELP left on the
+# screen: of a line number, REM, a keyword, a name, a number, a string,
+# and the text after it, also with BACKGROUND 14, light blue as the
+# names, which are then in the color of FOREGROUND, and with LISTO 1.
+# INPUT's answer 12   AB keeps its blanks, which BASIC's line drops.
 # str: the strings of stage 5 (issue #116), test/str.bas typed line by
 # line, with --step-time, so that TIME$ is the same in each run. String
 # variables, +, and each function, with the edges of their arguments:
@@ -518,7 +532,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/int.bas test/kw.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/mach.bas test/trap.bas test/int.bas test/kw.bas test/listo.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -546,6 +560,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
 	@tr '\n' '\r' < test/int.bas > $(BUILD)/int.txt
 	@tr '\n' '\r' < test/kw.bas > $(BUILD)/kw.txt
+	@{ tr '\n' '\r' < test/listo.bas; printf 'HALT\r'; } > $(BUILD)/listo.txt
 	@{ tr '\n' '\r' < test/mach.bas; printf '$(MACH_TAIL)'; } > $(BUILD)/mach.txt
 	@{ tr '\n' '\r' < test/trap.bas; printf '$(TRAP_TAIL)'; } > $(BUILD)/trap.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
@@ -557,13 +572,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap int kw load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc mach trap int kw listo load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap|int|kw) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct|proc|trap|int|kw|listo) prog=; dump=;; \
 	    str|mach) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
@@ -593,7 +608,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	        $(PYTHON) $(MON_TEST)/fat_tool.py order --sd0 $$base0; fi; \
 	    if [ $$t = files ]; then \
 	      $(PYTHON) $(MON_TEST)/fat_check.py $(BUILD)/files0.img; \
-	      for f in PROG.BAS T.TXT EMPTY.BAS; do echo "$$f:"; \
+	      for f in PROG.BAS T.TXT EMPTY.BAS IND.BAS; do echo "$$f:"; \
 	        mtype -i $(BUILD)/files0.img ::NICE/$$f | od -An -c; done; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS basic $$t"; \

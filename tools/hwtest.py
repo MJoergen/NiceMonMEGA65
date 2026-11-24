@@ -199,8 +199,9 @@ Checks, in this order:
       instead of failing
     - BASIC's SAVE "HWTEST", "IP:PORT", typed over the UART, writes a
       program of more than 512 bytes to nicemon.py tftpd --write on this
-      computer, whose file must be the program's text, and LOAD reads it
-      back, which LIST must show; BSAVE writes 300 words that a pause
+      computer, whose file must be the program's text, as LIST shows it
+      with the numbers right-aligned, and LOAD reads it back, which LIST
+      must show; BSAVE writes 300 words that a pause
       wrote, whose file must be their lines, and LOAD reads them back
       over the words cleared, which a pause must read (issue #155)
     - the link over TCP to that address pauses the monitor and reads the
@@ -2949,6 +2950,8 @@ def test_eth_tftp(link: Link, ip: str, tmp: str) -> None:
         srv = f'"{mine}:{port}"'
         hint = f"; a firewall of this computer may block UDP from {ip}"
         lines = [f"{10 * (n + 1)} REM {n} NICEMON {'X' * 50}" for n in range(TFTP_LINES)]
+        width = len(str(10 * TFTP_LINES))  # LIST right-aligns the numbers (#174)
+        listed_lines = [line.rjust(len(line) + width - len(line.split()[0])) for line in lines]
         basic_says(link, "NEW", TFTP_TIME)
         for line in lines:
             text = line.encode()
@@ -2957,7 +2960,7 @@ def test_eth_tftp(link: Link, ip: str, tmp: str) -> None:
         said = basic_says(link, f'SAVE "HWTEST", {srv}', TFTP_TIME)
         path = os.path.join(folder, "HWTEST.BAS")
         got = open(path, "rb").read() if os.path.exists(path) else None
-        want = "".join(f"{line}\n" for line in lines).encode()
+        want = "".join(f"{line}\n" for line in listed_lines).encode()
         check(f"eth: BASIC's SAVE writes a program of {len(want)} bytes to "
               f"nicemon.py tftpd --write at {mine}", got == want,
               f"{said!r}{hint}" if got is None else f"{got[:80]!r}")
@@ -2966,7 +2969,7 @@ def test_eth_tftp(link: Link, ip: str, tmp: str) -> None:
         listed = basic_says(link, "LIST", TFTP_TIME)
         rows = [r for r in listed.split("\r\n") if r]
         check("eth: LOAD reads the program back from the server, and LIST "
-              "shows it", rows[:len(lines)] == lines and READY.decode().strip() in rows,
+              "shows it", rows[:len(lines)] == listed_lines and READY.decode().strip() in rows,
               f"{said!r} {listed[-200:]!r}")
         basic_says(link, "NEW", TFTP_TIME)
         words = [(0x9E3779B9 * (i + 1)) & 0xFFFFFFFF for i in range(TFTP_WORDS)]

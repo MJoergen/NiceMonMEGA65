@@ -10,7 +10,7 @@ SAVE "NAME" [, S]   save the program as the text NAME.BAS
 BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
 SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
 BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
-DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE "NAME" [, S]  delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
@@ -35,6 +35,7 @@ RUN [N]             run the program, from line N or its first, after CLR
 RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 0x8000
 RUN "NAME", "IP"    load NAME from the TFTP server at IP and run it
 LIST [N] [- M]      list the lines of the program, those from N to M
+LISTO N             1 indents LIST, 2 colors LIST, DIS, DUMP, and HELP; 3 both
 NEW                 delete the program and its variables
 CLR                 clear the variables
 GOTO N              go on at line N
@@ -47,7 +48,7 @@ END                 end the program
 STOP                stop the program, which CONT goes on with
 CONT                go on after STOP, END, or the break key
 REM TEXT            a remark, the rest of the line
-INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
 GET V               V the code of the next key typed, 0 when none; V$ the key
 DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1
 HIMEM = A           the top of the program, its variables, and arrays; and CLR
@@ -58,7 +59,7 @@ READ V, W$, ...     V and W$ the next items of DATA
 RESTORE [N]         READ from the first DATA again, or from line N
 A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$
 HTTP$(H$, P$)       the body of http://H$P$; URL$(S$) S$ encoded for a path
-ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
+ON X GOTO N, M, ...  go on at the line of the X-th number, or GOSUB it
 DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
 DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X
 LOOP [UNTIL X]      back to DO, until X, or LOOP WHILE X

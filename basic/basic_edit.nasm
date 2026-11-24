@@ -99,7 +99,15 @@ gl_ins
                 CMP     R1, R5          ; the end, or the cursor past it
         ?C      MOVE    R1, R5
                 CMP     R1, EDIT_MAX
+        ?C      JMP     gl_room
+                TST     R10
+        ?!Z     JMP     gl_key          ; INPUT's line is full
+                PUSH    R1
+                CALL    ed_sq           ; less the blanks of LIST's indent
+                CMP     R1, EDIT_MAX
+                POP     R1
         ?!C     JMP     gl_key          ; the line is full
+gl_room
                 CMP     R5, R6
         ?C      ONE     @V_EMOV         ; within the text, not at its end
                 ADD     R1, R1, 1
@@ -220,7 +228,7 @@ gl_tab
 gl_end
                 CALL    ed_ext
                 CALL    ed_floor
-                CALL    ed_copy
+                CALL    gl_copy
                 PUSH    R4
                 TST     @V_EMOV
         ?Z      JMP     :++
@@ -499,27 +507,103 @@ ed_floor
                 ADD     R9, R2, @V_ESC
                 RET
 
+; gl_copy: ed_copy_sq for BASIC's line, and ed_copy for INPUT's, R10
+; not 0, whose blanks are its answer's
+gl_copy
+                TST     R10
+        ?Z      JMP     ed_copy_sq
+                JMP     ed_copy
+
 ; ed_copy: the text of the line from row R3, from position R9 to R6, but
 ; at most EDIT_MAX characters, to V_LINE, with a 0 after it. R1 = the
 ; word of the 0, and R5 = the characters after EDIT_MAX, which it left
-; out, 0 for a line that fits. Uses R1, R2, and R5.
+; out, 0 for a line that fits. ed_copy_sq, for RETURN in BASIC's line,
+; leaves out the blanks before the line's number and all but one after
+; it, which LIST puts there with LISTO's bit 0, so that they do not
+; count toward EDIT_MAX. Uses R1, R2, and R5.
+ed_copy_sq
+                PUSH    R4
+                MOVE    R4, 1           ; before the line's text
+                JMP     ec_go
 ed_copy
+                PUSH    R4
+                CLR     R4
+ec_go
+                PUSH    R3
                 MOVE    R1, R3
                 CALL    ed_row
                 ADD     R2, R1, R9
                 MOVE    R1, V_LINE
                 SUB[M]  R5, R6, R9      ; the characters
         ?C      CLR     R5              ; none
-        ?C      JMP     :++
-        ?Z      JMP     :++
-:
+        ?C      JMP     ec_end
+        ?Z      JMP     ec_end
+ec_char
                 CMP     R1, V_LINE+EDIT_MAX
-        ?Z      JMP     :+
-                AND     @R1++, @R2++, 0xFF
+        ?Z      JMP     ec_end
+                AND     R3, @R2++, 0xFF
+                TST     R4
+        ?Z      JMP     ec_put
+                CMP     R3, 0x20
+        ?!Z     JMP     ec_text
+                CMP     R1, V_LINE
+        ?Z      JMP     ec_next         ; a blank first
+                CMP     @-1[R1], 0x20
+        ?Z      JMP     ec_next         ; a blank after a blank
+                JMP     ec_put
+ec_text
+                CMP     R3, 0x30
+        ?C      CLR     R4              ; no digit: the text
+                CMP     R3, 0x3A
+        ?!C     CLR     R4
+ec_put
+                MOVE    @R1++, R3
+ec_next
                 SUB[M]  R5, R5, 1
-        ?!Z     JMP     :-
-:
+        ?!Z     JMP     ec_char
+ec_end
                 CLR     @R1
+                POP     R3
+                POP     R4
+                RET
+
+; ed_sq: R1 less the blanks that ed_copy_sq leaves out of the line from
+; row R3, which ends at position R6: those before its number and all but
+; one after it. Uses R1 and R2.
+ed_sq
+                PUSH    R3
+                PUSH    R4
+                PUSH    R5
+                PUSH    R1
+                MOVE    R1, R3
+                CALL    ed_row
+                MOVE    R2, R1
+                ADD     R5, R1, R6      ; the word after the text
+                POP     R1
+                CLR     R4              ; 0 before the number, 1 in it, 2 after it
+es_char
+                CMP     R2, R5
+        ?!C     JMP     es_end
+                AND     R3, @R2++, 0xFF
+                CMP     R3, 0x20
+        ?!Z     JMP     es_text
+                CMP     R4, 1
+        ?Z      MOVE    R4, 2           ; the blank after the number, kept
+        ?Z      JMP     es_char
+                SUB     R1, R1, 1
+                JMP     es_char
+es_text
+                CMP     R4, 2
+        ?Z      JMP     es_end
+                SUB     R3, R3, 0x30
+                CMP     R3, 10
+        ?!C     JMP     es_end
+                MOVE    R4, 1
+                JMP     es_char
+es_end
+                POP     R5
+                POP     R4
+                POP     R3
                 RET
 
 ; ed_grow: a row added after the line of the rows R3 to R4, which goes on

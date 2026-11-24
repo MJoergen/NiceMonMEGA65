@@ -55,6 +55,17 @@ V_RTAIL         .EQU    0xFFFFED62      ; and the next to read, the same when it
 V_POLL          .EQU    0xFFFFED63      ; the statements until the next poll
 V_REDO          .EQU    0xFFFFED64      ; the token after INPUT while INPUT reads, else 0
 V_RING          .EQU    0xFFFFED70      ; the ring, RING words
+V_LISTO         .EQU    0xFFFFE890      ; LISTO's bits: 1 indents LIST, 2 colors LIST, DIS, DUMP, and HELP
+V_LCOL          .EQU    0xFFFFE891      ; while they color: the user's color, with bit 0 set, else 0,
+V_LHUE          .EQU    0xFFFFE892      ; and the color set now
+V_LDEP          .EQU    0xFFFFE893      ; for LIST: the depth of the blocks,
+V_LNW           .EQU    0xFFFFE894      ; and the digits of the last line's number
+LIST_INDENT     .EQU    16              ; the blanks of an indent at most
+HUE_LINE        .EQU    0x888           ; LISTO's colors: line numbers and addresses, gray,
+HUE_NUM         .EQU    0x9F9           ; numbers, light green,
+HUE_NAME        .EQU    0x99F           ; names and registers, light blue,
+HUE_STR         .EQU    0xFF0           ; strings and DATA, yellow,
+HUE_REM         .EQU    0x0FF           ; and REM, cyan; 0 is the user's color
 V_AEND          .EQU    0xFFFFED65      ; the end of the arrays' data
 V_RND           .EQU    0xFFFFED66      ; the word of RND's generator, never 0
 V_SBASE         .EQU    0xFFFFED68      ; SP where the statements run, STACK but in a FN over lines,
@@ -614,16 +625,201 @@ st_rem
 ; LIST [N] [- [M]]: the lines from N to M, the keywords in upper case, a
 ; blank between two tokens but before ), a comma, ;, and :, and after (
 ; and a function's name before its (, and after a sign that is no
-; operator on two numbers
+; operator on two numbers. With LISTO's bit 0, the lines in a block are
+; indented a blank for each block, and the numbers are right-aligned,
+; and with its bit 1 the tokens are in their colors on the screen.
 st_list
                 CALL    get_range
                 CALL    stmt_end
 ; list_from: the lines from R10 to R11. Uses R1-R12.
 list_from
+                CALL    hue_on
+                CALL    list_pre
                 MOVE    R3, R10
                 CALL    find_line
                 MOVE    R9, R1
                 JMP     list_line
+
+; LISTO N: how LIST, DIS, DUMP, and HELP look, N 0 to 3: bit 0 indents
+; LIST's lines in blocks and right-aligns their numbers, also in a file
+; of SAVE, and bit 1 colors them on the screen. A cold start sets 3.
+st_listo
+                CALL    eval_word
+                CMP     R1, 4
+        ?!C     JMP     err_quant
+                MOVE    R11, R1
+                CALL    stmt_end
+                MOVE    @V_LISTO, R11
+                RET
+
+; hue_on: LISTO's colors from now on, when its bit 1 is set and the text
+; goes to the screen, not to a file of SAVE: V_LCOL the user's color,
+; with bit 0 set, which hue_off sets again. Uses R1 and R2.
+hue_on
+                AND[M]  R0, @V_LISTO, 2
+        ?Z      RET
+                TST     @V_SPOS
+        ?!Z     RET
+                TST     @V_LCOL
+        ?!Z     RET                     ; on already
+                CLR     R1
+                CALL    SCR_COLOR
+                OR      @V_LCOL, R1, 1
+                MOVE    @V_LHUE, R1
+                JMP     SCR_COLOR       ; which returns to the caller
+
+; hue_off: the user's color again, after hue_on, which main, err, and
+; brk call too, after a break or an error in a listing. Uses R1 and R2.
+hue_off
+                MOVE[M] R1, @V_LCOL
+        ?Z      RET
+                CLR     @V_LCOL
+                JMP     SCR_COLOR       ; which drops bit 0
+
+; hue: the color R1, 12 bits of red, green, and blue, or 0 for the
+; user's, for the characters put next, after hue_on; the user's when R1
+; is the background. Uses R1 and R2.
+hue
+                TST     @V_LCOL
+        ?Z      RET
+                SHR     R2, @V_LCOL, 20
+                CMP     R1, R2
+        ?Z      CLR     R1              ; the background
+                TST     R1
+        ?Z      SHR     R1, @V_LCOL, 8
+                AND     R1, R1, 0xFFF
+                SHL     R1, R1, 8
+                AND     R2, @V_LCOL, 0xFFF00000
+                OR      R1, R1, R2
+                CMP     R1, @V_LHUE
+        ?Z      RET
+                MOVE    @V_LHUE, R1
+                JMP     SCR_COLOR       ; which returns to the caller
+
+; list_pre: for LISTO's bit 0, V_LDEP the depth of the blocks of the
+; lines before line R10, and V_LNW the digits of the last line's number.
+; Uses R1-R9 and R12.
+list_pre
+                CLR     @V_LDEP
+                CLR     @V_LNW
+                AND[M]  R0, @V_LISTO, 1
+        ?Z      RET
+                MOVE    R9, PROGRAM
+                CLR     R12             ; the last line's number
+:
+                CMP     R9, @V_PEND
+        ?!C     JMP     :++
+                MOVE    R12, @1[R9]
+                CMP     R12, R10
+        ?!C     JMP     :+              ; from line R10 on
+                CALL    list_count
+                CALL    list_deep
+:
+                ADD     R9, R9, @R9
+                JMP     :--
+:
+                MOVE    R1, R12
+                CALL    num_width
+                MOVE    @V_LNW, R2
+                RET
+
+; num_width: R2 the digits of R1, 1 to 5, for a line's number
+num_width
+                MOVE    R2, 1
+                CMP     R1, 10
+        ?!C     ADD     R2, R2, 1
+                CMP     R1, 100
+        ?!C     ADD     R2, R2, 1
+                CMP     R1, 1000
+        ?!C     ADD     R2, R2, 1
+                CMP     R1, 10000
+        ?!C     ADD     R2, R2, 1
+                RET
+
+; list_deep: V_LDEP plus R2, and not below 0. Uses R2.
+list_deep
+                ADD[M]  R2, R2, @V_LDEP
+        ?N      CLR     R2
+                MOVE    @V_LDEP, R2
+                RET
+
+; list_count: the blocks of the line at R9, for LISTO's bit 0: R1 those
+; that it closes before it opens one, and R2 those that it opens less
+; those that it closes. FOR, DO, a block's THEN, and the DEF of a FN or a
+; PROC over lines open one; NEXT and each comma after its variable, LOOP,
+; ENDIF, ENDPROC, and an = that starts the line, the end of a FN over
+; lines, close one; and a block's ELSE closes one and opens one. Uses
+; R1-R8.
+list_count
+                CLR     R1              ; closed before one opened
+                CLR     R4              ; opened less closed
+                CLR     R5              ; 1 once one opened
+                CLR     R6              ; 1 in a NEXT
+                ADD     R8, R9, 2
+                CMP     @R8, T_EQ
+        ?Z      CALL    lc_close
+lc_tok
+                MOVE[M] R7, @R8
+        ?Z      JMP     lc_end
+                CMP     R7, T_COLON
+        ?!Z     CMP     R7, T_ELSE
+        ?Z      CLR     R6
+                CMP     R7, T_COMMA
+        ?!Z     JMP     :+
+                TST     R6
+        ?!Z     CALL    lc_close
+:
+                CMP     R7, T_BELSE
+        ?Z      CALL    lc_close
+                AND     R3, R7, 0xFFFFFF00
+                CMP     R3, K_KW*K+I_FOR*0x100
+        ?!Z     CMP     R3, K_KW*K+I_DO*0x100
+        ?!Z     CMP     R7, T_BTHEN
+        ?!Z     CMP     R7, T_BELSE
+        ?Z      CALL    lc_open
+                CMP     R3, K_KW*K+I_LOOP*0x100
+        ?!Z     CMP     R3, K_KW*K+I_ENDIF*0x100
+        ?!Z     CMP     R3, K_KW*K+I_ENDPROC*0x100
+        ?Z      CALL    lc_close
+                CMP     R3, K_KW*K+I_NEXT*0x100
+        ?Z      MOVE    R6, 1
+        ?Z      CALL    lc_close
+                CMP     R3, K_KW*K+I_DEF*0x100
+        ?Z      CALL    lc_def
+                CALL    tok_skip
+                JMP     lc_tok
+lc_end
+                MOVE    R2, R4
+                RET
+lc_open
+                ADD     R4, R4, 1
+                MOVE    R5, 1
+                RET
+lc_close
+                SUB     R4, R4, 1
+                TST     R5
+        ?Z      ADD     R1, R1, 1
+                RET
+; lc_def: a DEF at R8 opens one, unless it is a FN on one line, with =
+; after its name and its parameters. Uses R2 and R3.
+lc_def
+                ADD     R2, R8, 1
+                SHR     R3, @R2, 24
+                CMP     R3, K_UFN
+        ?!Z     CMP     R3, K_SFNU
+        ?!Z     RET
+                MOVE    R2++, R2
+                CMP     @R2, T_LPAR
+        ?!Z     JMP     :++
+:
+                MOVE[M] R3, @R2++
+        ?Z      RET                     ; the line's end
+                CMP     R3, T_RPAR
+        ?!Z     JMP     :-
+:
+                CMP     @R2, T_EQ
+        ?!Z     JMP     lc_open
+                RET
 
 ; get_range: [N] [- [M]] at R8, as LIST and DELETE take it: R10 = N, or
 ; 0, and R11 = M, or N when there is no -, or LINE_LAST, and R8 after it.
@@ -653,14 +849,40 @@ get_range
                 RET
 list_line
                 CMP     R9, @V_PEND
-        ?!C     RET
+        ?!C     JMP     hue_off         ; which returns to the caller
                 CMP     R11, @1[R9]
-        ?C      RET
+        ?C      JMP     hue_off
                 MOVE    R8, @V_TP       ; the break key goes on after LIST
                 CALL    poll
+                CLR     R7              ; the indent
+                AND[M]  R0, @V_LISTO, 1
+        ?Z      JMP     :++
+                CALL    list_count
+                SUB[M]  R7, @V_LDEP, R1
+        ?N      CLR     R7
+                CMP     LIST_INDENT, R7
+        ?C      MOVE    R7, LIST_INDENT
+                CALL    list_deep
+                MOVE    R1, @1[R9]
+                CALL    num_width
+                SUB     R6, @V_LNW, R2  ; the blanks before the number
+:
+                SUB[M]  R6, R6, 1
+        ?N      JMP     :+
+                CALL    put_blank
+                JMP     :-
+:
+                MOVE    R1, HUE_LINE
+                CALL    hue
                 MOVE    R1, @1[R9]
                 CALL    putdec
                 CALL    put_blank
+:
+                SUB[M]  R7, R7, 1
+        ?N      JMP     :+
+                CALL    put_blank
+                JMP     :-
+:
                 ADD     R8, R9, 2
                 CLR     R12             ; no blank before the first token
                 CLR     @V_LPREV
@@ -701,6 +923,11 @@ list_tok
         ?!Z     CMP     R5, K_DATA
         ?!Z     CALL    put_blank
 lt_go
+                MOVE    R1, @LIST_HUES[R5]
+                AND     R2, R6, 0xFFFFFF00
+                CMP     R2, K_KW*K+I_REM*0x100
+        ?Z      MOVE    R1, HUE_REM
+                CALL    hue
                 ONE     R12
                 CMP     R6, T_LPAR
         ?Z      CLR     R12
@@ -740,6 +967,12 @@ LIST_KINDS
                 .DAT    0, lt_dec, lt_dec, lt_hex, lt_num, lt_str, lt_var, lt_kw, lt_punct
                 .DAT    lt_kw, lt_kw, lt_kwi, lt_kw, lt_kw, lt_dec, lt_rem, lt_var
                 .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem, lt_var, lt_var, lt_blk
+
+; The colors of the kinds of the tokens, for hue
+LIST_HUES
+                .DAT    0, HUE_NUM, HUE_NUM, HUE_NUM, HUE_NUM, HUE_STR, HUE_NAME, 0, 0
+                .DAT    0, 0, 0, 0, 0, HUE_LINE, HUE_REM, HUE_NAME
+                .DAT    HUE_NAME, HUE_NAME, 0, HUE_NAME, HUE_STR, HUE_NAME, HUE_NAME, 0
 
 ; A whole number: K_SMALL's and K_LINE's in the token, which K_LINE's
 ; line follows, and K_WORD's in the word after it
@@ -1069,6 +1302,7 @@ brk
                 MOVE[M] R1, @V_CUR
         ?!Z     MOVE    @V_CONT, R8
                 MOVE    @V_CONTL, R1
+                CALL    hue_off         ; the user's color, after a listing's
                 MOVE    R1, S_BREAK
                 CALL    put_msg
                 JMP     main

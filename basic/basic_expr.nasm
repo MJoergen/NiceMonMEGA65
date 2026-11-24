@@ -1361,6 +1361,7 @@ err
         ?Z      TST     @V_EKW          ; nor one that names a keyword
         ?Z      MOVE    R1, S_UNKNOWN   ; not in a statement
                 MOVE    R7, R1
+                CALL    hue_off         ; the user's color, after a listing's
                 CALL    trap            ; ER and EL, and the TRAP's line (basic_trap.nasm)
                 CALL    drop_run        ; no frames, and no CONT
                 MOVE    R1, R7

@@ -42,11 +42,23 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   core file. A new ROM alone, with `make r6 ROMPATCH=`, keeps the old
   font.
 
-- `HTTP$` and `URL$` are keywords of BASIC, and no names of variables
-  any more: `URL$ = "X"` is `Syntax error; URL$ is a keyword`.
+- `HTTP$`, `URL$`, and `LISTO` are keywords of BASIC, and no names of
+  variables any more: `URL$ = "X"` is `Syntax error; URL$ is a keyword`.
+- `LIST` indents and right-aligns its lines, and `SAVE` writes them so
+  ([#174](https://github.com/MJoergen/NiceMonMEGA65/issues/174)). A
+  script that reads `LIST` over the line, or a file of `SAVE`, sees the
+  blanks; `LISTO 0` lists as before. `LOAD` drops the blanks around a
+  line's number, so they do not count toward its 254 characters.
 
 **New.**
 
+- BASIC's `LIST` indents the lines in loops, blocks, and procedures,
+  and shows the parts of a line in colors on the screen: line numbers,
+  names, numbers, strings, and remarks. `DIS`, `DUMP`, and `HELP` have
+  colors too. `LISTO N` turns them on and off: 1 indents, 2 colors,
+  and 3, the default, does both
+  ([#174](https://github.com/MJoergen/NiceMonMEGA65/issues/174),
+  [basic/README.md](../basic/README.md#how-listings-look)).
 - BASIC reads web pages: `HTTP$(H$, P$)` fetches `http://H$P$` and
   gives its text, decoded from UTF-8, and `URL$(A$)` encodes a part of
   a path ([#170](https://github.com/MJoergen/NiceMonMEGA65/issues/170),

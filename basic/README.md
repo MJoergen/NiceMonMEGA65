@@ -3,6 +3,7 @@
 - [The statements](#the-statements)
 - [Numbers](#numbers)
 - [Programs](#programs)
+- [How listings look](#how-listings-look)
 - [Errors in a program](#errors-in-a-program)
 - [Strings](#strings)
 - [The screen and the time](#the-screen-and-the-time)
@@ -89,6 +90,8 @@ showed can be changed and entered again: the cursor up to it, the
 change, and RETURN. A line goes on into the rows below it, up to four,
 and takes up to 254 characters; a line that `PRINT` or `LIST` wraps is
 one line too. A key typed into a line of 254 characters does nothing.
+The blanks before a line's number, and all but one after it, do not
+count, so the indent of `LIST` (How listings look below) takes no room.
 `LIST` may show a line with more, as it writes `?` as `PRINT` and adds
 blanks: RETURN on such a line is `Line too long`, and the line stays
 as it was stored. A shorter line is `Line too long` as well when it
@@ -147,8 +150,8 @@ fails, TAB does nothing.
 | Statement | What it does |
 |---|---|
 | `SYS A` | Calls the program at `A` ([Programs](../monitor/README.md#programs)), and prints its status when it returns: `Returned 0000002A`. The variables stay, so a program that wrote over them leaves them broken. A word of 0 at `A` is no program, and `SYS` says so: `No program at 00008000`. `SYS 0` runs entry 0 of the dispatch table, the cold start, so it restarts BASIC and leaves the RAM from `0x8000` alone. |
-| `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. |
-| `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. |
+| `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. The address and the words have colors of their own (How listings look below). |
+| `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. The address, the numbers, and the registers have colors of their own (How listings look below). |
 | `CLS` | Clears the screen. |
 | `VER` | The versions of the monitor and of BASIC, and of the dispatch table: `NiceMon V2.5.1, BASIC V2.5.1, dispatch table 1.8`. |
 | `IP ["A.B.C.D"]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `IP "192.168.1.65"`. Anything else is no address, and `IP` says so and writes nothing. It sets the address with `net_set`, with no mask, no gateway, and no DNS server, and writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), when the address is another, so a host connected over TCP loses its connection; the same address again changes nothing there. In `niceemu` it is a register that keeps what is written. |
@@ -161,8 +164,8 @@ fails, TAB does nothing.
 | `DIR [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system ([Files](../monitor/README.md#files)): `Directory of NICE in slot 0`, with the slot of the card mounted, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT`, it mounts the card in it first, and a slot that the board does not have is `File error 27`; without, it lists the card mounted, which the first `DIR` or `LOAD` after reset mounts. `LOAD`, `SAVE`, `BSAVE`, `DELETE`, and `RUN` of a file take a `SLOT` too, as their last argument, a number, and mount it the same way. The slot stays mounted for the statements after it, also when its card fails, until another `SLOT` or a reset. It reads the folder through a handle, as a program does, so after a program that left both handles open it is `File error 23`, as `LOAD` and `SAVE` are; `DIR 0` mounts again, which closes them. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `DIR "PATH"` | Lists a folder inside `NICE` by its path, such as `DIR "GAMES"` or `DIR "GAMES/OLD"`, as `DIR` lists `NICE`, with the path in its first row: `Directory of NICE/GAMES in slot 0`. A leading `/` is `NICE` itself, and a `/` at the end is taken, as TAB puts one after a directory. A string that is an IP address, with `:PORT` or not, or that has a pattern after it, is a TFTP server's (`DIR "IP"` below), so a folder whose name is an IP address, such as `10.0.0.1`, cannot be listed. A folder that is not there is `File error 21`, and a file is `File error 22`. |
 | `LOAD "NAME.BIN" [, SLOT]` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. A line with a byte that is not printable ASCII, a control code other than TAB, CR, or LF, DEL, or a byte from `0x80`, is skipped, as `niceemu` rejects it, so that no byte is dropped from the middle of a number. An error in the middle of the file, such as `File error 26, the FAT is damaged`, comes after the summary of the lines before it, whose words are in the RAM. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. Any other name is a BASIC program, `LOAD "NAME"` below. |
-| `LOAD "NAME" [, SLOT]` | Loads the BASIC program `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, such as `LOAD "CHESS"` or `LOAD "game.txt"`. It reads the lines as if they were typed, after a `NEW` at the first, so a program written on a PC loads too: CR LF, LF, and CR end a line, a TAB is a blank, the keywords are in either case, and a line of blanks is passed over. The first line that cannot be stored ends the load, with its error and the line itself, and the lines before it stay: `Line without a number`; `Line too long`, of more than 254 characters, or with more tokens than the 160 words of a line; `A byte that is no character`, a control code or a byte from `0x80`; and the tokenizer's `Syntax error`. A file that is not there, or that has no line, keeps the program, as the `NEW` comes only with the first line stored. It ends at `READY.`, also in a program. |
-| `SAVE "NAME" [, SLOT]` | Writes the program to the file `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, as the text that `LIST` shows, each line ended by LF, so that `LOAD "NAME"` reads it back and an editor on a PC opens it. The text of a line may be longer than the line typed, as `LIST` adds blanks and writes `?` as `PRINT`; `LOAD` takes 254 characters. It makes the file, or truncates it, as `BSAVE` does, and prints nothing. When the card fills up, it prints error 30. CTRL-C stops it, and the file keeps the lines before. `SAVE "NAME", "IP"` writes it to a TFTP server instead, below. |
+| `LOAD "NAME" [, SLOT]` | Loads the BASIC program `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, such as `LOAD "CHESS"` or `LOAD "game.txt"`. It reads the lines as if they were typed, after a `NEW` at the first, so a program written on a PC loads too: CR LF, LF, and CR end a line, a TAB is a blank, the keywords are in either case, and a line of blanks is passed over. The blanks before a line's number, and all but one after it, as `SAVE` writes the indent of `LIST`, do not count toward its 254 characters. The first line that cannot be stored ends the load, with its error and the line itself, and the lines before it stay: `Line without a number`; `Line too long`, of more than 254 characters, or with more tokens than the 160 words of a line; `A byte that is no character`, a control code or a byte from `0x80`; and the tokenizer's `Syntax error`. A file that is not there, or that has no line, keeps the program, as the `NEW` comes only with the first line stored. It ends at `READY.`, also in a program. |
+| `SAVE "NAME" [, SLOT]` | Writes the program to the file `NAME.BAS` of the card's folder `NICE`, or `NAME` when it has a dot, as the text that `LIST` shows, with its indent but no colors, each line ended by LF, so that `LOAD "NAME"` reads it back and an editor on a PC opens it. The text of a line may be longer than the line typed, as `LIST` adds blanks and writes `?` as `PRINT`; `LOAD` takes 254 characters. It makes the file, or truncates it, as `BSAVE` does, and prints nothing. When the card fills up, it prints error 30. CTRL-C stops it, and the file keeps the lines before. `SAVE "NAME", "IP"` writes it to a TFTP server instead, below. |
 | `BSAVE "NAME", A, N [, SLOT]` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `BSAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `BSAVE` prints error 30. It was `SAVE "NAME", A, N` before V2.4, which is now a `Syntax error`. |
 | `DELETE "NAME" [, SLOT]` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `LOAD`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
 | `LOAD "NAME", "IP"` | Loads the `.bin` file `NAME.BIN`, or the BASIC program `NAME.BAS`, from the TFTP server at the IP address `IP`, such as `LOAD "HELLO.BIN", "192.168.1.10"`, as `LOAD` loads one from the card, and prints the same summary for a `.bin` file ([The network](../monitor/README.md#the-network)). `"IP:PORT"` sends the request to `PORT` instead of 69. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. A file that is not there keeps the program, as from the card. |
@@ -304,7 +307,8 @@ program's text into BASIC and runs it, with no card
 |---|---|
 | `RUN [N]` | Runs the program, from line `N` or from its first, after a `CLR`. |
 | `RUN "NAME" [, "IP"]`, `RUN "NAME", SLOT` | Loads `NAME` as `LOAD "NAME"` does, from the card, the one in `SLOT`, or from the TFTP server at `IP`, and runs it: a BASIC program as `RUN` runs it, and a `.bin` file as `SYS 0x8000` calls it, so `RUN "CHESS.BIN"` starts nice_chess. A program may load and run the next this way. A file that is not there, or that has no line, runs nothing and keeps the program. |
-| `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. CTRL-C stops it. |
+| `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. The lines in a loop or a block are indented, and the parts of a line have colors (How listings look below). CTRL-C stops it. |
+| `LISTO N` | Sets how `LIST` shows the lines, `N` 0 to 3: 1 indents them, 2 colors them, and 3, the default, does both. 0 shows them plain. Any other `N` is an `Illegal quantity`. |
 | `NEW` | Deletes the program and its variables and arrays. |
 | `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (Files above). |
 | `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, `ELSE`, `RESTORE`, `TRAP`, and `RESUME`, and those of `ON`'s lists, with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
@@ -399,6 +403,57 @@ loaded until something writes over it, so a program that runs again
 can test for it with `PEEK` before it loads it.
 [examples/README.md](../examples/README.md#basic-with-machine-code)
 has a whole example, `sieve.bas`, which compares the two.
+
+## How listings look
+
+`LIST` indents the lines inside a loop or a block, one blank for each
+level, and right-aligns the line numbers, so that the indents line up:
+
+```
+  5 FOR I = 1 TO 2
+ 10  IF I = 1 THEN
+ 20   PRINT "ONE"
+ 30  ELSE
+ 40   PRINT "TWO"
+ 50  ENDIF
+ 60 NEXT
+100 DEF PROCA(X)
+110  PRINT X
+120 ENDPROC
+```
+
+These open a level: `FOR`, `DO`, an `IF` whose `THEN` ends its line,
+and the `DEF` of a procedure or of a function over lines. These close
+one: `NEXT`, and one more for each name after the first in `NEXT J, I`,
+`LOOP`, `ENDIF`, `ENDPROC`, and an `=` that starts a line, which ends a
+function over lines. An `ELSE` that starts a line is one level out. A
+line that closes a level before it opens one is one level out, so
+`NEXT` lines up with its `FOR`. A loop on one line, such as `FOR I = 1
+TO 3: PRINT I: NEXT`, changes nothing. The indent is at most 16 blanks,
+and a program that jumps out of a loop, with two `NEXT`s for one `FOR`,
+may show some lines a level too far out, but never less than none.
+
+The indent is only for the eye. BASIC drops the blanks before a line's
+number and after it when the line is entered, so a listed line that is
+changed and entered again, or a program that `SAVE` wrote with its
+indent and `LOAD` reads back, is stored as before.
+
+On the screen, `LIST` shows the parts of a line in colors of their own:
+line numbers in gray, names of variables, functions, and procedures in
+light blue, numbers in light green, strings and `DATA` in yellow, and
+`REM` in cyan. The keywords and the rest are in the color of
+`FOREGROUND`. A color that is the background's is shown in the color of
+`FOREGROUND` instead, so that nothing disappears. `DUMP` and `DIS` show
+their addresses in gray and their numbers in light green, and `DIS` its
+registers in light blue; `HELP` shows the names in its statements in
+light blue and the strings in yellow. After a listing, and after
+CTRL-C or an error in one, the colors are those of `FOREGROUND` and
+`BACKGROUND` again. Only the screen has the colors: a host on the line,
+and a file of `SAVE`, get the text alone.
+
+`LISTO N` turns the two off and on: 1 indents, 2 colors, 3, the
+default, does both, and 0 neither. A cold start sets 3, and `NEW` keeps
+it.
 
 ## Errors in a program
 
@@ -936,7 +991,8 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `funcs` | The ROM alone | The functions: their values, in either case, `PI`, the order of `^` and the signs, `RND`'s range and its numbers again after a negative argument, names that start with a function's, `LIST` of each function and of the keywords after them, and the errors of an argument a function does not take, `LOG(0)`, an overflow, and a function without its parentheses. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
 | `edit` | The ROM alone | The screen editor: a character that `POKE` left on the row of the next line, after `READY.`, `INPUT`'s prompt, and `AUTO`'s number, which is no part of the line; `READY.` after a program whose output filled a row, which is a line of its own; a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
-| `long` | The ROM alone | The editor's limit: a listed line of 254 characters, changed at its last character and entered again, and one of 255, which is `Line too long` and stays as it was. |
+| `long` | The ROM alone | The editor's limit: a listed line of 254 characters, right-aligned in 255 columns, changed at its last character and entered again, and one of 255, which is `Line too long` and stays as it was. |
+| `listo` | The ROM alone, with `test/listo.bas` typed | `LISTO` 0 to 3 and its errors; the indent of `FOR`, `NEXT J, I`, `DO`, `LOOP`, block `IF`s with `ELSE`, `DEF PROC`, `ENDPROC`, and a `FN` over lines with its `=`, from the start and from a line in the middle; a `FOR` with two `NEXT`s; and the colors of `LIST`, `DUMP`, `DIS`, and `HELP`, read back from the screen's words, with a background of a syntax color, and with the colors off; and an answer of `INPUT` that keeps the blanks after its number. |
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
@@ -951,7 +1007,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
-| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, a program that runs the next, and the failures of issue #158: `BSAVE` to a slot with no card, and `LOAD` and `DELETE` of a file that is not there, trapped, a failure with no `TRAP`, `LOAD` and `RUN` of a program's text that is not there, trapped, with the program kept, a `LOAD` whose first line that is not blank has no number, trapped too, and a `LOAD` that fails after the file's first line with a number, which a `TRAP` does not take. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
+| `files` | The ROM, with `--step-time` and a copy of the card without partitions, with the files of `test/files_card.py`, and `test/files.in` typed | `SAVE "NAME"` and `LOAD "NAME"` of a program with each kind of token, and `RUN "NAME"`; a file written on a PC, with CR LF, lower case, a TAB, and lines of blanks; the lines that end a load: one without a number, one with too many tokens, one too long, and one with a byte from `0x80`, with the lines before them kept; a file that is not there, to `LOAD` and to `RUN`, which keep the program; a name with a dot, an empty program, `RUN "HELLO.BIN"`, a `SLOT` with no card, one that the board does not have, and slot 0 again for `LOAD`, `SAVE`, `BSAVE`, and `DELETE`, a program that runs the next, and the failures of issue #158: `BSAVE` to a slot with no card, and `LOAD` and `DELETE` of a file that is not there, trapped, a failure with no `TRAP`, `LOAD` and `RUN` of a program's text that is not there, trapped, with the program kept, a `LOAD` whose first line that is not blank has no number, trapped too, and a `LOAD` that fails after the file's first line with a number, which a `TRAP` does not take; and a program with an indent saved and loaded again, with a line of 257 characters in the file. Its output ends with `fsck.fat` on the card, and the files that it wrote, as `od -c` shows them. |
 | `time` | The ROM, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, month 0, day 0, letters, wrong separators, and 2106, and the clock left alone after them; the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, 2105-12-31, the last day of a leap year, and blanks in the quotes; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
 
 `time` runs with `--step-time`, so that the clock starts at 0, not
@@ -984,14 +1040,14 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2362 | 1505 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1910 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2023 | 52 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1803 | 300 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2516 | 1528 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1914 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2382 | 52 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 300 |
 | `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2043 | 222 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
-| `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1178 | 0 |
+| `basic_dis.nasm` | The disassembler of `DIS` | 948 | 79 |
+| `basic_edit.nasm` | The screen editor | 1281 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1609 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1204 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
@@ -1001,5 +1057,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 16898 | 2338 |
+| In all | | 17647 | 2361 |
 <!-- /romsize basic -->

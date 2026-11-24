@@ -226,8 +226,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   stage 6 (#117), `basic_prog.nasm`, the
   programs of stage 3 (#114): the lines from `0x8000`, `LIST`, `RUN`,
   the jumps, the loops, BASIC's line input, the break key, the keys
-  typed ahead, `INPUT`, `GET`, the arrays, and `HIMEM`,
-  `basic_cmd.nasm`, the routines of the statements
+  typed ahead, `INPUT`, `GET`, the arrays, `HIMEM`, and the indent and
+  the colors of `LISTO` (#174), `basic_cmd.nasm`, the routines of the statements
   that were the monitor's commands, and `SAVE` and `LOAD` of a
   program's text (#60), `DHCP`, `NTP`, TFTP, and `HTTP$` and `URL$` (#170) in
   `basic_net.nasm`, `TIME` in `basic_time.nasm`, `DIS` in

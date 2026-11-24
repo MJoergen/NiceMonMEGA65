@@ -64,12 +64,12 @@ READY.
 10 INPUT DS
 RUN
 Syntax error; DS is a keyword in 10
-INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
 READY.
 10 INPUT TIME$
 RUN
 Syntax error; TIME$ is a keyword in 10
-INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
 READY.
 10 DIM ER(3)
 RUN
@@ -127,7 +127,7 @@ NOT HERE
 END
 READY.
 LIST 20
-20 TI = 5: PRINT "NOT HERE"
+ 20 TI = 5: PRINT "NOT HERE"
 READY.
 HALT
 Halted
@@ -155,7 +155,7 @@ Screen:
 |END
 |READY.
 |LIST 20
-|20 TI = 5: PRINT "NOT HERE"
+| 20 TI = 5: PRINT "NOT HERE"
 |READY.
 |HALT
 |Halted

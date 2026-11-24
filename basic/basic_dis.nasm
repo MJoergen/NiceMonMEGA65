@@ -29,6 +29,7 @@ st_dis
                 MOVE[M] R8, R2
         ?Z      RET
                 MOVE    R7, @V_UNEXT
+                CALL    hue_on
 dis_row
                 MOVE    R9, @R7
                 ADD     R12, R7, 1
@@ -107,9 +108,13 @@ dis_ctrl
 ; The address, the words, blanks for the words that the instruction does
 ; not have, and the text of its kind
 dis_print
+                MOVE    R1, HUE_LINE
+                CALL    hue
                 MOVE    R1, R7
                 MOVE    R2, 8
                 CALL    u_hex
+                MOVE    R1, HUE_NUM
+                CALL    hue
                 MOVE    R11, R7
 :
                 CMP     R11, R12
@@ -128,6 +133,8 @@ dis_print
                 ADD     R11, R11, 1
                 JMP     :-
 :
+                CLR     R1
+                CALL    hue
                 MOVE    R1, S_UGAP
                 CALL    puts_b
                 JMP     @DIS_KINDS[R10]
@@ -168,6 +175,8 @@ dis_cmd         MOVE    R1, R9
         ?!Z     JMP     dis_end
                 MOVE    R1, 0x20
                 CALL    MON_PUTC
+                MOVE    R1, HUE_NUM
+                CALL    hue
                 AND     R1, R9, 0xFF
                 CALL    _io_putdec
                 JMP     dis_end
@@ -221,7 +230,7 @@ dis_end         CALL    _io_crlf
                 SUB[M]  R8, R8, 1
         ?!Z     JMP     dis_row
                 MOVE    @V_UNEXT, R7
-                RET
+                JMP     hue_off         ; which returns to the caller
 
 ; u_stmt: the condition, the mnemonic with its modifiers, and the operands
 ; of the ALU or SHIFT instruction R9. Uses R1-R6 and R10.
@@ -260,6 +269,8 @@ u_stmt_op
                 ADD     R10, R10, 1
                 CMP     R10, @V_UNOPS
         ?Z      RET
+                CLR     R1
+                CALL    hue
                 MOVE    R1, S_UCOMMA
                 CALL    puts_b
                 JMP     u_stmt_op
@@ -268,11 +279,15 @@ u_stmt_op
 ; R0, by name, in brackets, as nicedis.py writes them after the .DAT.
 ; Uses R1-R6, R10, and R11.
 u_unused
+                CLR     R1
+                CALL    hue
                 MOVE    R1, S_UOPEN
                 CALL    puts_b
                 MOVE    R10, @V_UNOPS
                 CLR     R11             ; not 0 after the first
 u_unused_f
+                CLR     R1
+                CALL    hue
                 CMP     R10, 3
         ?Z      MOVE    R1, 0x29        ; )
         ?Z      JMP     MON_PUTC        ; which returns to the caller
@@ -295,15 +310,21 @@ u_unused_f
 ; u_dat: .DAT, the words from R7 up to R12 in hex, and the ; of the
 ; comment that says what they would do. Uses R1-R6 and R11.
 u_dat
+                CLR     R1
+                CALL    hue
                 MOVE    R1, S_UDAT
                 CALL    puts_b
                 MOVE    R11, R7
 :
+                MOVE    R1, HUE_NUM
+                CALL    hue
                 MOVE    R1, S_U0X
                 CALL    puts_b
                 MOVE    R1, @R11++
                 MOVE    R2, 8
                 CALL    u_hex
+                CLR     R1
+                CALL    hue
                 CMP     R11, R12
         ?Z      MOVE    R1, S_USEMI
         ?Z      JMP     puts_b          ; which returns to the caller
@@ -342,6 +363,8 @@ u_op
                 CMP     R4, 0x10
         ?Z      OR      R5, R5, 0x80    ; Rx--
 :
+                MOVE    R1, HUE_NAME
+                CALL    hue
                 AND[M]  R0, R5, 0x40
         ?Z      JMP     :+
                 MOVE    R1, 0x40        ; @
@@ -368,6 +391,8 @@ u_op
                 MOVE    R1, S_UDEC      ; Rx--
                 JMP     puts_b
 u_op_const
+                MOVE    R1, HUE_NUM
+                CALL    hue
                 MOVE    R1, S_U0X
                 CALL    puts_b
                 PUSH    R5
@@ -377,6 +402,8 @@ u_op_const
                 AND[M]  R1, @SP++, 0xF  ; the register
         ?Z      RET                     ; R0: the constant alone
                 PUSH    R1
+                MOVE    R1, HUE_NAME
+                CALL    hue
                 MOVE    R1, 0x5B        ; [
                 CALL    MON_PUTC
                 POP     R1

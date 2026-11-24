@@ -103,6 +103,26 @@ LOAD "EMPTY"
 READY.
 LIST
 READY.
+5 FOR I = 1 TO 2
+10 DO
+200 ?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1
+300 LOOP UNTIL 1
+1000 NEXT
+SAVE "IND"
+READY.
+NEW
+READY.
+LOAD "IND"
+READY.
+LIST
+   5 FOR I = 1 TO 2
+  10  DO
+ 200   PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1: PRINT 1
+ 300  LOOP UNTIL 1
+1000 NEXT
+READY.
+NEW
+READY.
 RUN "HELLO.BIN"
 Words loaded: 802, 00008000 to 00008321
 Hello from 00008000, table 00010008
@@ -128,7 +148,7 @@ File error 27, no such slot
 READY.
 DELETE "W.BIN", "1.2.3.4"
 Syntax error
-DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE "NAME" [, S]  delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 DELETE "W.BIN", 0
@@ -196,9 +216,9 @@ File error 21, no such file
 NEXT
 READY.
 LIST
-10 TRAP 100: LOAD "NOPE": PRINT "NEXT"
-20 RUN "NOPE": PRINT "NEXT"
-30 END
+ 10 TRAP 100: LOAD "NOPE": PRINT "NEXT"
+ 20 RUN "NOPE": PRINT "NEXT"
+ 30 END
 100 PRINT ER, EL, DS, ERR$(ER): PRINT DS$: RESUME NEXT
 READY.
 10 TRAP 100: LOAD "NONUM": PRINT "NEXT"
@@ -209,9 +229,9 @@ File error 21, no such file
 NEXT
 READY.
 LIST
-10 TRAP 100: LOAD "NONUM": PRINT "NEXT"
-20 END
-30 END
+ 10 TRAP 100: LOAD "NONUM": PRINT "NEXT"
+ 20 END
+ 30 END
 100 PRINT ER, EL, DS, ERR$(ER): PRINT DS$: RESUME NEXT
 READY.
 10 TRAP 100: LOAD "BAD": PRINT "NOT HERE"
@@ -236,13 +256,13 @@ HIGH.BAS                          13
 PROG.BAS                         225
 T.TXT                             16
 EMPTY.BAS                          0
+IND.BAS                          316
 BRK.BAS                            0
-Files: 11, directories: 0
+Files: 12, directories: 0
 READY.
 HALT
 Halted
 Screen:
-|10 TRAP 100: LOAD "BAD": PRINT "NOT HERE"
 |RUN
 |Line without a number
 |PRINT "NO NUMBER"
@@ -264,17 +284,18 @@ Screen:
 |PROG.BAS                         225
 |T.TXT                             16
 |EMPTY.BAS                          0
+|IND.BAS                          316
 |BRK.BAS                            0
-|Files: 11, directories: 0
+|Files: 12, directories: 0
 |READY.
 |HALT
 |Halted
 VBASE at the halt 000000
 exit 0
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128983)
-IMAGE: 12 files, 39/129022 clusters
-Files in NICE: HELLO.BIN PC.BAS BAD.BAS NONUM.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS BRK.BAS
+Free cluster summary uninitialized (should be 128982)
+IMAGE: 13 files, 40/129022 clusters
+Files in NICE: HELLO.BIN PC.BAS BAD.BAS NONUM.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS IND.BAS BRK.BAS
 PROG.BAS:
    1   0       R   E   M       S   T   A   G   E       4   :    
    "   Q   U   O   T   E   S   "       A   N   D       ?       S
@@ -294,3 +315,24 @@ PROG.BAS:
 T.TXT:
    5       P   R   I   N   T       "   F   I   R   S   T   "  \n
 EMPTY.BAS:
+IND.BAS:
+               5       F   O   R       I       =       1       T
+   O       2  \n           1   0           D   O  \n       2   0
+   0               P   R   I   N   T       1   :       P   R   I
+   N   T       1   :       P   R   I   N   T       1   :       P
+   R   I   N   T       1   :       P   R   I   N   T       1   :
+       P   R   I   N   T       1   :       P   R   I   N   T    
+   1   :       P   R   I   N   T       1   :       P   R   I   N
+   T       1   :       P   R   I   N   T       1   :       P   R
+   I   N   T       1   :       P   R   I   N   T       1   :    
+   P   R   I   N   T       1   :       P   R   I   N   T       1
+   :       P   R   I   N   T       1   :       P   R   I   N   T
+       1   :       P   R   I   N   T       1   :       P   R   I
+   N   T       1   :       P   R   I   N   T       1   :       P
+   R   I   N   T       1   :       P   R   I   N   T       1   :
+       P   R   I   N   T       1   :       P   R   I   N   T    
+   1   :       P   R   I   N   T       1   :       P   R   I   N
+   T       1   :       P   R   I   N   T       1   :       P   R
+   I   N   T       1   :       P   R   I   N   T       1  \n    
+   3   0   0           L   O   O   P       U   N   T   I   L    
+   1  \n   1   0   0   0       N   E   X   T  \n

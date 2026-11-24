@@ -14,11 +14,11 @@ Syntax error
 REM TEXT            a remark, the rest of the line
 READY.
 LIST
-0 REM the first
-10 PRINT "A"
-15 PRINT "glued"
-20 PRINT "BB"
-30 PRINT "C"
+    0 REM the first
+   10 PRINT "A"
+   15 PRINT "glued"
+   20 PRINT "BB"
+   30 PRINT "C"
 65535 REM the last
 READY.
 RUN
@@ -29,10 +29,10 @@ C
 READY.
 30
 LIST
-0 REM the first
-10 PRINT "A"
-15 PRINT "glued"
-20 PRINT "BB"
+    0 REM the first
+   10 PRINT "A"
+   15 PRINT "glued"
+   20 PRINT "BB"
 65535 REM the last
 READY.
 NEW

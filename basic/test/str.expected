@@ -132,16 +132,16 @@ READY.
 100 A$ = TIME$ + CHR$(65) + MID$("XYZ", 2) + STR$(-1): IF A$ <> "" THEN PRINT LEN(A$); INSTR(A$, "A") > 0; VAL("1")
 110 READ Z$, Z, Z$, Z$, Z$
 LIST
-5 DIM C(2)
-10 READ A, B$, C(1)
-20 PRINT A; B$; C(1)
-30 READ D$, E: PRINT D$; E
-40 RESTORE 60: READ F$: PRINT F$
-50 RESTORE: READ G: PRINT G
-60 DATA 1, "A,B" , 3.5 : DATA HELLO WORLD , -4
-70 READ X$, Y$: PRINT "["; X$; "]["; Y$; "]"
-80 DATA ,
-90 READ Z
+  5 DIM C(2)
+ 10 READ A, B$, C(1)
+ 20 PRINT A; B$; C(1)
+ 30 READ D$, E: PRINT D$; E
+ 40 RESTORE 60: READ F$: PRINT F$
+ 50 RESTORE: READ G: PRINT G
+ 60 DATA 1, "A,B" , 3.5 : DATA HELLO WORLD , -4
+ 70 READ X$, Y$: PRINT "["; X$; "]["; Y$; "]"
+ 80 DATA ,
+ 90 READ Z
 100 A$ = TIME$ + CHR$(65) + MID$("XYZ", 2) + STR$(-1): IF A$ <> "" THEN PRINT LEN(A$); INSTR(A$, "A") > 0; VAL("1")
 110 READ Z$, Z, Z$, Z$, Z$
 READY.

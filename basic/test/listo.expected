@@ -1,0 +1,283 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30 B = 0x1F + I
+40 NEXT
+LIST
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30  B = 0x1F + I
+40 NEXT
+READY.
+LIST 30
+30  B = 0x1F + I
+READY.
+LISTO 1
+READY.
+LIST
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30  B = 0x1F + I
+40 NEXT
+READY.
+LISTO 2
+READY.
+LIST
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30 B = 0x1F + I
+40 NEXT
+READY.
+LISTO 0
+READY.
+LIST
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30 B = 0x1F + I
+40 NEXT
+READY.
+LISTO 4
+Illegal quantity
+READY.
+LISTO -1
+Illegal quantity
+READY.
+LISTO
+Syntax error
+LISTO N             1 indents LIST, 2 colors LIST, DIS, DUMP, and HELP; 3 both
+READY.
+LISTO 3
+READY.
+NEW
+READY.
+5 FOR I = 1 TO 2: FOR J = 1 TO 2
+10 IF I = J THEN
+20 PRINT I;
+30 ELSE
+40 DO WHILE 0
+50 LOOP
+60 ENDIF
+70 NEXT J, I
+80 FOR K = 1 TO 2
+90 IF K = 1 THEN 110
+100 NEXT: GOTO 120
+110 NEXT
+120 PROCA(1): PRINT FNB(2); FNC(3)
+130 END
+200 DEF PROCA(X)
+210 PRINT X: ENDPROC
+220 PRINT "NOT HERE"
+300 DEF FNB(X)
+310 IF X < 2 THEN = 1
+320 = X * 3
+400 DEF FNC(X) = X + 1
+500 DATA 1, "A"
+LIST
+  5 FOR I = 1 TO 2: FOR J = 1 TO 2
+ 10   IF I = J THEN
+ 20    PRINT I;
+ 30   ELSE
+ 40    DO WHILE 0
+ 50    LOOP
+ 60   ENDIF
+ 70 NEXT J, I
+ 80 FOR K = 1 TO 2
+ 90  IF K = 1 THEN 110
+100 NEXT: GOTO 120
+110 NEXT
+120 PROCA(1): PRINT FNB(2); FNC(3)
+130 END
+200 DEF PROCA(X)
+210 PRINT X: ENDPROC
+220 PRINT "NOT HERE"
+300 DEF FNB(X)
+310  IF X < 2 THEN = 1
+320 = X * 3
+400 DEF FNC(X) = X + 1
+500 DATA 1, "A"
+READY.
+LIST 20-60
+ 20    PRINT I;
+ 30   ELSE
+ 40    DO WHILE 0
+ 50    LOOP
+ 60   ENDIF
+READY.
+LIST 210-
+210 PRINT X: ENDPROC
+220 PRINT "NOT HERE"
+300 DEF FNB(X)
+310  IF X < 2 THEN = 1
+320 = X * 3
+400 DEF FNC(X) = X + 1
+500 DATA 1, "A"
+READY.
+RUN
+121
+64
+READY.
+NEW
+READY.
+10 REM X
+20 FOR I = 1 TO 2: A$ = "S"
+30 B = 0x1F + I
+40 NEXT
+900 CLS: LIST 10-40: PRINT "Q"
+910 S = 0xFFFF0000: PRINT HEX$(PEEK(S + 1)); " "; HEX$(PEEK(S + 4)); " "; HEX$(PEEK(S + 84)); " "; HEX$(PEEK(S + 88))
+920 PRINT HEX$(PEEK(S + 92)); " "; HEX$(PEEK(S + 105)); " "; HEX$(PEEK(S + 165)); " "; HEX$(PEEK(S + 169)); " "; HEX$(PEEK(S + 320))
+930 END
+940 CLS: DUMP 0x3000, 1: DIS 0x3000, 1: S = 0xFFFF0000
+950 PRINT HEX$(PEEK(S)); " "; HEX$(PEEK(S + 9)); " "; HEX$(PEEK(S + 80)); " "; HEX$(PEEK(S + 89)); " "; HEX$(PEEK(S + 126)): END
+960 HELP: RCURSOR C, R: S = 0xFFFF0000 + 80 * R
+970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 240)); " "; HEX$(PEEK(S - 307))
+980 END
+RUN 900
+ 10 REM X
+ 20 FOR I = 1 TO 2: A$ = "S"
+ 30  B = 0x1F + I
+ 40 NEXT
+Q
+00088831 0000FF52 000FFF46 00099F49
+0009F931 000FF022 00099F42 0009F930 000FFF51
+READY.
+BACKGROUND 14: FOREGROUND 7
+READY.
+RUN 900
+ 10 REM X
+ 20 FOR I = 1 TO 2: A$ = "S"
+ 30  B = 0x1F + I
+ 40 NEXT
+Q
+99F88831 99F0FF52 99FFF046 99FFF049
+99F9F931 99FFF022 99FFF042 99F9F930 99FFF051
+READY.
+FOREGROUND 1: BACKGROUND 0
+READY.
+RUN 940
+00003000 0003D800
+00003000 0003d800 00003014                    JMP 0x3014
+00088830 0009F930 00088830 0009F930 000FFF4A
+READY.
+RUN 960
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME", "IP"   load it from the TFTP server at IP
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
+BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
+SAVE "NAME", "IP"   save it to the TFTP server at IP (nicemon.py tftpd --write)
+BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
+DELETE "NAME" [, S]  delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
+DIR [S]             list the files of the card in slot S, or of the one mounted
+DIR "PATH"          list the files of the folder PATH, such as "GAMES/OLD"
+DIR "IP" [, "PAT"]  list the files of nicemon.py tftpd at IP, or those of PAT
+  S, a slot, mounts its card first, for the statements after it too
+DUMP [A] [, N]      show N words from A, in hex, or the next ones
+DIS [A] [, N]       disassemble N instructions from A, or the next ones
+IP ["A.B.C.D"]      show the IP address, or set it, such as "192.168.1.65"
+DHCP                get the IP address from a DHCP server
+MAC ["MAC"]         show the MAC address, or set it, "02:4E:49:43:45:01"
+BAUD [RATE]         show the UART baud rate, or set it, such as 921600
+TIME ["D T"]        show the local time, or set it, "2026-11-11 14:30:00"
+NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
+CLS                 clear the screen
+VER                 the version
+HALT                halt the core
+HELP                the statements
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+LET V = X           set the variable V, or V$ to a string; LET may be left out
+POKE A, X           write X to the word at A, which PEEK(A) reads
+RUN [N]             run the program, from line N or its first, after CLR
+RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 0x8000
+RUN "NAME", "IP"    load NAME from the TFTP server at IP and run it
+LIST [N] [- M]      list the lines of the program, those from N to M
+LISTO N             1 indents LIST, 2 colors LIST, DIS, DUMP, and HELP; 3 both
+NEW                 delete the program and its variables
+CLR                 clear the variables
+GOTO N              go on at line N
+GOSUB N             go on at line N, and back after it at RETURN
+RETURN              go back after the last GOSUB
+IF X THEN S ELSE T  S when X is not 0, else T; each statements or a line N
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+NEXT [V]            the loop of FOR again, or its end
+END                 end the program
+STOP                stop the program, which CONT goes on with
+CONT                go on after STOP, END, or the break key
+REM TEXT            a remark, the rest of the line
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
+GET V               V the code of the next key typed, 0 when none; V$ the key
+DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1
+HIMEM = A           the top of the program, its variables, and arrays; and CLR
+AUTO [N] [, S]      number the lines typed from N, by S; a number alone ends it
+RENUMBER [N] [, S]  number the lines from N, by S, and the jumps with them
+DATA 1, "A,B", C    the items that READ reads, numbers and strings
+READ V, W$, ...     V and W$ the next items of DATA
+RESTORE [N]         READ from the first DATA again, or from line N
+A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$
+HTTP$(H$, P$)       the body of http://H$P$; URL$(S$) S$ encoded for a path
+ON X GOTO N, M, ...  go on at the line of the X-th number, or GOSUB it
+DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
+DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X
+LOOP [UNTIL X]      back to DO, until X, or LOOP WHILE X
+EXIT                on after the LOOP of the latest DO
+IF X THEN           the lines up to ELSE or ENDIF when X, with THEN last
+ELSE ... ENDIF      the lines up to ENDIF when not, each first in its line
+DEF PROCA(X)        the lines up to ENDPROC, run by PROCA(2)
+DEF FNA(X)          the lines up to = E, whose E is the value of FNA(2)
+LOCAL X, Y$         X 0 and Y$ empty in a PROC or FN, until it ends
+SLEEP S             wait S seconds, such as 0.5; TI is the microseconds counted
+FOREGROUND N        the color of the characters, 0 to 15, or of R, G, B 0 to 15
+BACKGROUND N        their background, likewise; 0 black, 1 white, 6 blue
+CURSOR ON | OFF     show the cursor, or hide it
+CURSOR C, R [, S]   the cursor to column C, row R; S 0 solid, 1 blinking
+RCURSOR C, R        C and R the column and the row of the cursor
+TRAP N              on an error, go on at line N; TRAP alone, stop at errors
+RESUME [NEXT | N]   after TRAP: the statement again, the one after it, or line N
+ER, EL, ERR$(N)     the last error's number and line, and the text of error N
+DS, DS$             the last file or network failure: its number and text
+CRSR keys, HOME     move the cursor; RETURN takes the line it is in
+PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
+00099F50 000FFF73 000FFF44 00099F4E
+READY.
+LISTO 1
+READY.
+RUN 900
+ 10 REM X
+ 20 FOR I = 1 TO 2: A$ = "S"
+ 30  B = 0x1F + I
+ 40 NEXT
+Q
+000FFF31 000FFF52 000FFF46 000FFF49
+000FFF31 000FFF22 000FFF42 000FFF30 000FFF51
+READY.
+RUN 940
+00003000 0003D800
+00003000 0003d800 00003014                    JMP 0x3014
+000FFF30 000FFF30 000FFF30 000FFF30 000FFF4A
+READY.
+LISTO 3
+READY.
+INPUT A$: PRINT "["; A$; "]"
+? 12   AB
+[12   AB]
+READY.
+HALT
+Halted
+Screen:
+|00003000 0003D800
+|00003000 0003d800 00003014                    JMP 0x3014
+|000FFF30 000FFF30 000FFF30 000FFF30 000FFF4A
+|READY.
+|LISTO 3
+|READY.
+|INPUT A$: PRINT "["; A$; "]"
+|? 12   AB
+|[12   AB]
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0

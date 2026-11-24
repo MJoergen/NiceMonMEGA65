@@ -42,12 +42,12 @@ READY.
 10 INPUT "A" A
 RUN
 Syntax error in 10
-INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
 READY.
 10 INPUT A,
 RUN
 Syntax error in 10
-INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+INPUT ["P";] V, ...  the items of a line typed into V, ..., after the prompt P
 READY.
 10 INPUT A: ? A
 RUN
