@@ -22,7 +22,9 @@ SCR_LAST        .EQU    SCREEN+SCR_WORDS-80  ; the screen's last row
 ; line; TAB completes the name of a file of the card (fs_complete) at
 ; the end of the line's text or after it; and CTRL-C empties the line, or is a break
 ; at INPUT when R1 is not 0. Page Up and Page Down show the scrollback a
-; page back or forward (scr_back), until another key; an ESC with
+; page back or forward (scr_back), and the cursor key up at the top row
+; and the cursor keys up and down while it is shown a row (issue #173),
+; until another key; an ESC with
 ; another sequence, or alone, is dropped. A key typed at the end of the
 ; line's text goes to the line as well, as before; after any other key,
 ; or when the line had text after the cursor at the first key, the line
@@ -293,15 +295,25 @@ gl_back
                 MOVE    R7, R1
                 JMP     gl_key
 ; The cursor keys: up and down a row, the last row scrolled for down,
-; left and right a column, to the row before or after at the ends
+; left and right a column, to the row before or after at the ends. Up at
+; the top row shows the scrollback a row back (issue #173), and while it
+; is shown, up and down move it a row back or forward, down to the screen
+; again, with the cursor where it was.
 gl_up
-                CALL    gl_leave
+                TST     R7
+        ?!Z     JMP     :+              ; shown back: a row further
                 CALL    SCR_GETXY
                 SUB[M]  R2, R2, 1
-        ?C      JMP     gl_key          ; at the top
-                JMP     gl_at
+        ?!C     JMP     gl_at
+:
+                MOVE    R1, 1           ; at the top: a row back
+                JMP     gl_back
 gl_down
-                CALL    gl_leave
+                TST     R7
+        ?Z      JMP     :+
+                MOVE    R1, -1          ; shown back: a row forward
+                JMP     gl_back
+:
                 CALL    SCR_GETXY
                 ADD     R2, R2, 1
                 CMP     R2, ROWS

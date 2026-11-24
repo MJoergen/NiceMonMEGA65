@@ -187,8 +187,9 @@ up, it copies row 0 into the ring. The cold start finds the size of the
 memory from the display offset, which a board keeps only in the bits
 that address the memory: 32768 words on the MEGA65 and 8192 on the
 Nexys4DDR, so one ROM serves every board. `k` rows back is the
-display offset `size - 80k`, which wraps to row 0 of the screen, with
-the cursor off. The first key that scrolls back turns the ring so that
+display offset `size - 80k`, which wraps to row 0 of the screen. The
+cursor moves `k` rows down the display with its row, and is off when
+that row is below the screen (issue #173). The first key that scrolls back turns the ring so that
 its newest row is the last of the memory. In `niceemu` the display
 offset is plain memory, so all its bits are kept: the history has 381
 rows there, which `DUMP` and `--dump` read.
@@ -263,10 +264,10 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2A5E` | 10847 |
-| Free | `0x2A5F`–`0x2FFF` | 1441 |
-| BASIC | `0x3000`–`0x71FD` | 16894 |
-| Free | `0x71FE`–`0x7FFF` | 3586 |
+| The monitor | `0x0000`–`0x2A6C` | 10861 |
+| Free | `0x2A6D`–`0x2FFF` | 1427 |
+| BASIC | `0x3000`–`0x7201` | 16898 |
+| Free | `0x7202`–`0x7FFF` | 3582 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -279,7 +280,7 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1111 | 0 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1125 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 3058 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
@@ -291,7 +292,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10847 | 71 |
+| In all | | 10861 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -393,7 +394,9 @@ steps in order:
    a board can have, with room for 23 rows. For each, it reads the rows a board would show from a dump of
    the memory, and compares them with the console output. It does this
    with the history partly filled and gone round, and after Page Up, Page
-   Down, and a key that shows the screen again.
+   Down, and a key that shows the screen again. It does it too with the
+   cursor keys of BASIC's editor, which move the history a row at a
+   time from the top row (issue #173).
 3. **DHCP.** `test/dhcp.py` runs `DHCP` with `--step-time`, so that
    each run takes the same steps. A first run with no server gives the
    transaction's number. Then it builds the OFFER and the ACK, among

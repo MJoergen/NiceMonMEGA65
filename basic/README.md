@@ -124,8 +124,11 @@ takes it.
 
 Page Up and Page Down scroll back through the rows that left the top
 of the screen, 27 rows at a time. On the MEGA65 Page Up and Page Down
-are CTRL and MEGA with CRSR↑ and CRSR↓. Any other key shows the
-screen again, and goes on to the line. The history has 381 rows on
+are CTRL and MEGA with CRSR↑ and CRSR↓. CRSR↑ at the top row scrolls
+back one row (issue #173). While the rows are shown, CRSR↑ goes one row
+further back, and CRSR↓ one row forward, up to the screen again, with
+the cursor where it was. Any other key shows the screen again, and goes
+on to the line. The history has 381 rows on
 the MEGA65 and 74 on the Nexys4DDR. `CLS` leaves it, as `clear` in a
 terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
@@ -988,7 +991,7 @@ table, and `make romsize` writes it again.
 | `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2043 | 222 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1174 | 0 |
+| `basic_edit.nasm` | The screen editor | 1178 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1609 | 11 |
 | `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1204 | 45 |
 | `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
@@ -998,5 +1001,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 16894 | 2338 |
+| In all | | 16898 | 2338 |
 <!-- /romsize basic -->

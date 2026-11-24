@@ -12,7 +12,13 @@ rows fill part of the history and one whose rows go round its ring, and
 with Page Up more times than there are rows back, then the same and
 three Page Downs, then the same and one Page Up more, then the same and
 VER, which shows the screen again. The cursor keys up and down are
-BASIC's screen editor's, and move no row of the history (issue #118).
+BASIC's screen editor's (issue #118), and move a row of the history only
+when up is at the top row, or while the history is shown (issue #173):
+the monitor runs with DUMP 0x8000, N, HOME, and five ups, which keep the
+cursor shown five rows down the display, then more ups than there are
+rows back, which turn it off, then the same and three downs, then the same and a Page Up,
+then the same and as many downs as rows back, which show the screen
+again, and then the same and a down more, which moves the cursor.
 niceemu has no display offset, so the rows that a board would show are
 read from the dump of the screen's memory, at the offset the monitor
 set, modulo WORDS. They must be the rows of the console output, which
@@ -31,11 +37,14 @@ import tempfile
 SCREEN = 0xFFFF0000
 VARS = 0xFFFFF000
 SCR_CTL = 0xFFFFFF80
+SCR_Y = 0xFFFFFF82
 SCR_OFFS = 0xFFFFFF85
+CURSOR_ON = 0x40            # SCR_CTL's bit that shows the cursor
 ROWS, COLS = 28, 80
 PAGE = ROWS - 1             # the rows of a Page Up (monitor.nasm, PAGE)
 HIST_SHOWN = 0x400          # SCR_CTL while the history is shown
 PAGE_UP, PAGE_DOWN = b"\x1b[5~", b"\x1b[6~"
+UP, DOWN, HOME = b"\x1b[A", b"\x1b[B", b"\x1b[H"
 STEPS = 20_000_000
 # The d counts for each size: one whose rows leave part of the history
 # empty, and one whose rows go round the ring
@@ -146,6 +155,46 @@ def test(emu: str, monitor: str, words: int, tmp: str) -> None:
             check(f"{what}: the rows shown", not diff, "; ".join(diff[:3]))
 
 
+def test_rows(emu: str, monitor: str, words: int, tmp: str) -> None:
+    """The cursor keys up and down, a row of the history at a time."""
+    hcap = max(0, (words - ROWS * COLS) // COLS)
+    count = COUNTS[words][0]
+    base = f"dump 0x8000, 0x{count:X}\r".encode() + HOME
+    text, _ = run(emu, monitor, words, base, tmp)
+    most = min(max(0, len(text) - ROWS), hcap)
+    ups = base + UP * (most + 5)
+    downs = ups + DOWN * 3
+    page = downs + PAGE_UP
+    back = min(most - 3 + PAGE, most)
+    # The keys, the rows back, and the cursor's row on the screen
+    stages = [("HOME and 5 ups", base + UP * 5, min(5, most), 0),
+              (f"HOME and {most + 5} ups", ups, most, 0),
+              ("then 3 downs", downs, most - 3, 0),
+              ("then a Page Up", page, back, 0),
+              (f"then {back} downs", page + DOWN * back, 0, 0),
+              ("then a down more", page + DOWN * (back + 1), 0, 1)]
+    for name, keys, want_back, row in stages:
+        text, mem = run(emu, monitor, words, keys, tmp)
+        got_back = mem.get(VARS + 9, -1)
+        what = f"{words} words, DUMP 0x8000, 0x{count:X}, {name}"
+        check(f"{what}: V_BACK {want_back}", got_back == want_back,
+              f"got {got_back}")
+        on = bool(mem[SCR_CTL] & HIST_SHOWN)
+        check(f"{what}: the history {'shown' if want_back else 'left'}",
+              on == (want_back > 0),
+              f"SCR_CTL {mem[SCR_CTL]:08X}, SCR_OFFS {mem[SCR_OFFS]}")
+        got, want = shown(mem, words), expected(text, got_back)
+        diff = [f"row {r}: {g!r}, not {w!r}"
+                for r, (g, w) in enumerate(zip(got, want)) if g != w]
+        check(f"{what}: the rows shown", not diff, "; ".join(diff[:3]))
+        # The cursor's row is got_back rows down the display
+        y = row + got_back
+        cursor = bool(mem[SCR_CTL] & CURSOR_ON)
+        check(f"{what}: the cursor {f'at row {y}' if y < ROWS else 'off'}",
+              cursor == (y < ROWS) and (not cursor or mem[SCR_Y] == y),
+              f"SCR_CTL {mem[SCR_CTL]:08X}, SCR_Y {mem[SCR_Y]}")
+
+
 def main() -> None:
     if len(sys.argv) < 3:
         sys.exit(__doc__.split("\n\n")[1])
@@ -154,6 +203,7 @@ def main() -> None:
         for arg in sys.argv[2:]:
             monitor, words = arg.rsplit(":", 1)
             test(emu, monitor, int(words), tmp)
+            test_rows(emu, monitor, int(words), tmp)
     sys.exit(1 if failed else 0)
 
 

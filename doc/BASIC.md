@@ -1229,7 +1229,9 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   with their bits, as the C64 does.
 - The cursor keys up and down scroll the history today, before the
   first key of a line. The editor takes them, and the history keeps
-  Page Up and Page Down.
+  Page Up and Page Down. The cursor key up at the top row scrolls the
+  history back a row, and while it is shown, the cursor keys up and
+  down move it a row (issue #173).
 - A line is checked when it is entered, as far as the tokenizer
   checks it. On an error the line is not stored, and after `READY.`
   it is shown again, with the cursor at the column where the tokenizer

@@ -900,14 +900,21 @@ hist_up
                 ADD     R1, @V_BACK, R3
                 CMP     @V_HCOUNT, R1
         ?C      MOVE    R1, @V_HCOUNT
-; R1 rows back: the offset V_HSIZE - 80 R1 on, and the cursor off
+; R1 rows back: the offset V_HSIZE - 80 R1 on, and the cursor R1 rows
+; lower on the display, where it is in the screen's rows, with V_CTL's
+; bits, or off below them (issue #173)
 hist_show
                 MOVE    @V_BACK, R1
                 SHL     R2, R1, 6
                 SHL     R1, R1, 4
                 ADD     R1, R1, R2
                 SUB     @SCR_OFFS, @V_HSIZE, R1
-                MOVE    @SCR_CTL, 0x400
+                ADD     R1, @V_ROW, @V_BACK
+                MOVE    @SCR_Y, R1
+                OR      R2, @V_CTL, 0x400
+                CMP     R1, ROWS
+        ?!C     AND     R2, R2, 0xFFFFFFBF  ; below the rows shown: off
+                MOVE    @SCR_CTL, R2
                 RET
 
 ; hist_down: R3 rows forward, and the screen again at the end. Uses R1
@@ -920,12 +927,13 @@ hist_down
         ?Z      JMP     hist_leave
                 JMP     hist_show
 
-; hist_leave: the screen again, if the history is shown, with its SCR_CTL.
-; Uses no register.
+; hist_leave: the screen again, if the history is shown, with its SCR_CTL
+; and the cursor's row. Uses no register.
 hist_leave
                 TST     @V_BACK
         ?Z      RET
                 CLR     @V_BACK
+                MOVE    @SCR_Y, @V_ROW
                 MOVE    @SCR_CTL, @V_CTL
                 CLR     @SCR_OFFS
                 RET
