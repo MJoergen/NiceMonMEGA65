@@ -202,8 +202,6 @@ keeps the changes on the card.
 The screen is that of `weather.bin`, but for the texts of the errors,
 which are BASIC's `DS$`, such as `The server refused the connection`.
 R fetches now, and Q goes back to BASIC. CTRL-C stops the program too.
-On a core before V2.6, the font then stays the program's, until
-`POKE 0xFFFFFF86, 0`.
 
 ### How it works
 
@@ -226,9 +224,7 @@ codes of their glyphs, so `FNPARSE` only splits the first line at its
 
 The program writes the screen with `POKE`, a word for each character
 with its color. The clock's blocks and the wind's arrows are the
-character ROM's, at `0x80`–`0x99`. On a core before V2.6, whose ROM
-has them blank, `PEEK(0xFFFE3000)` reads 0, and the program draws them
-into the font RAM, as `weather.c` does.
+character ROM's, at `0x80`–`0x99`.
 
 The clock stops while a fetch waits, for a second or so, where
 `weather.bin` fetches while it runs.

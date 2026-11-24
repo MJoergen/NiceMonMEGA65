@@ -1321,7 +1321,7 @@ network's entries from C. `make weathertest` checks it in two parts:
   same screens as for `weather.bin`, with `DS$` as the error's text,
   and `HTTP$`'s request, the answers cut short and not HTTP too, a body
   too long for a string, a place in UTF-8 with the units `u`, another
-  port, and Q back to BASIC with Spleen's font. It takes
+  port, and Q back to BASIC. It takes
   about 100 seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's

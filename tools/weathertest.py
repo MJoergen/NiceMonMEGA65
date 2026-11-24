@@ -372,10 +372,9 @@ def basic_cases(tmp: str) -> None:
     check("weather.bas: the port 8080, where the peer, on 80, refuses",
           again(r, "The server refused the connection"), r.row(ROW_ERROR))
 
-    r = Run(tmp, BAS_RUN + "qPRINT PEEK(0xFFFFFF86)\rHALT\r", None, answer("ok.http"),
-            basic=True)
-    check("weather.bas: Q ends it, with Spleen's font again", re.search(
-        r"PRINT PEEK\(0xFFFFFF86\)\n0\nREADY\.", r.out) is not None, r.out[-400:])
+    r = Run(tmp, BAS_RUN + "qPRINT 42\rHALT\r", None, answer("ok.http"), basic=True)
+    check("weather.bas: Q ends it, back to BASIC", re.search(
+        r"PRINT 42\n42\nREADY\.", r.out) is not None, r.out[-400:])
 
 
 def main() -> None:
