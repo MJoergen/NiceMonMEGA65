@@ -337,6 +337,14 @@ def basic_cases(tmp: str) -> None:
     check("weather.bas, a body of 300 characters: String too long",
           again(r, "String too long"), r.row(ROW_ERROR))
 
+    # A name with an IP address but no DNS server, as after IP: the
+    # program types DHCP, which the peer, with no DHCP server, leaves
+    # unanswered
+    r = Run(tmp, BAS_KEYS + '100 SERVER$ = "wttr.in": PORT = 80\rRUN\r', None, None,
+            steps=400_000_000, basic=True)
+    check("weather.bas, no DNS server: DHCP, for one",
+          again(r, "No answer from a DHCP server"), r.row(ROW_ERROR))
+
     r = Run(tmp, BAS_RUN, None, None, basic=True)
     want = "The server refused the connection"
     check("weather.bas, no server on port 80: the refusal", again(r, want), r.row(ROW_ERROR))

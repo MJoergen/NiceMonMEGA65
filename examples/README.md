@@ -216,7 +216,10 @@ On a core before V2.6, the font then stays the program's, until
 Before it, `TRAP` points to a handler, which sets `FAILED`, keeps
 `DS$` as the text of the error, or `ERR$(ER)` for an error of BASIC,
 such as `String too long`, and goes on with `RESUME NEXT`. When the
-board has no IP address, the program types `DHCP` first. `HTTP$` has
+board has no IP address, the program types `DHCP` first, and so it
+does when `HTTP$` finds no DNS server, `DS` 46, and then fetches
+again. `DHCP` prints its lines from row 20, which the program then
+clears. `HTTP$` has
 decoded the text from UTF-8 already, with the wind's arrows as the
 codes of their glyphs, so `FNPARSE` only splits the first line at its
 `|`s with `INSTR`, into the five fields.

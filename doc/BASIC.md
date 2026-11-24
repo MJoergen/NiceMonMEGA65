@@ -755,7 +755,7 @@ B$ = HTTP$(SERVER$, "/" + URL$(PLACE$) + "?format=%l|%C|%t|%w|%h&m&M")
 
 and `INSTR` on its `|`s, with `DS$` in the handler at line 900.
 `wfetch.nasm`, the request, the parse, and the table of the errors
-went, and the program dropped to 248 lines, with its screen by `POKE`
+went, and the program dropped to 255 lines, with its screen by `POKE`
 and its font code for an older core kept, behind the probe of
 `0xFFFE3000` (measured 2026-11-23). For a core that has the glyphs
 alone, without the font code, and with `CURSOR` and `PRINT` in place
