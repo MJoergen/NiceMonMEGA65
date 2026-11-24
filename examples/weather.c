@@ -3,7 +3,9 @@
 // large, from the clock of the time of day. It runs under the monitor,
 // at 0x8000, and uses the network of the ROM from C: DNS, a TCP
 // connection, and the poll (monitor/README.md, "TCP and DNS"). R fetches
-// at once, and Q returns to the monitor.
+// at once, and Q returns to the monitor. The blocks of the clock and the
+// arrows of the wind are the character ROM's, so it needs the core of
+// V2.6 or later.
 //
 // The settings are in WEATHER.CFG of the card's folder NICE, lines such as
 // "place Copenhagen" (weather_parse.h, cfg_parse). With no file, the
@@ -44,7 +46,6 @@
 #define ROW_CFG 21
 #define ROW_KEYS (NICE_SCREEN_ROWS - 1)
 
-#define FONT_RAM 0xFFFE0000u
 #define FONT_ROM 0xFFFE2000u
 #define FONT_BASE 0xFFFFFF86u
 #define SCR_STATE 0xFFFFFF80u
@@ -141,65 +142,6 @@ static void center(int row, unsigned color, const char *s)
 {
     clear_row(row, C_TEXT);
     text((COLS - (int)strlen(s)) / 2, row, color, s);
-}
-
-// ---- The font
-
-static unsigned glyph[32];
-
-static void dot(int x, int y)
-{
-    for (int dy = 0; dy < 2; dy++)
-        for (int dx = 0; dx < 2; dx++)
-            if (x + dx >= 0 && x + dx < 16 && y + dy >= 0 && y + dy < 32)
-                glyph[y + dy] |= 0x8000u >> (x + dx);
-}
-
-static void line(int x, int y, int dx, int dy, int n)
-{
-    for (int i = 0; i <= n; i++)
-        dot(x + i * dx, y + i * dy);
-}
-
-static int sgn(int v)
-{
-    return (v > 0) - (v < 0);
-}
-
-// The arrow to (dx, dy), y down, as the glyph of code c.
-static void arrow(int c, int dx, int dy)
-{
-    int n = dx && dy ? 5 : 6;           // a diagonal is longer per step
-    int tx = 7 + n * dx, ty = 15 + n * dy;
-    memset(glyph, 0, sizeof glyph);
-    line(7 - n * dx, 15 - n * dy, dx, dy, 2 * n);
-    int a = -dx, b = -dy;               // the head: back, turned by 45 degrees
-    line(tx, ty, sgn(a - b), sgn(a + b), 4);
-    line(tx, ty, sgn(a + b), sgn(b - a), 4);
-    for (int r = 0; r < 32; r++)
-        nice_poke(FONT_RAM + 32 * (unsigned)c + (unsigned)r, glyph[r]);
-}
-
-// The glyphs of weather_parse.h: the character ROM's, or, on a core
-// before V2.6, whose ROM has them blank (0 at row 0 of 0x80), the ROM
-// copied to the font RAM with the glyphs drawn there.
-static void font_init(void)
-{
-    if (nice_peek(FONT_ROM + 32 * G_UPPER) == 0xFFFF)
-        return;
-    for (unsigned i = 0; i < 8192; i++)
-        nice_poke(FONT_RAM + i, nice_peek(FONT_ROM + i));
-    for (unsigned r = 0; r < 32; r++) {
-        nice_poke(FONT_RAM + 32 * G_UPPER + r, r < 16 ? 0xFFFF : 0);
-        nice_poke(FONT_RAM + 32 * G_LOWER + r, r < 16 ? 0 : 0xFFFF);
-        nice_poke(FONT_RAM + 32 * G_FULL + r, 0xFFFF);
-    }
-    static const signed char dir[8][2] = {
-        {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, -1}, {1, -1}, {1, 1}, {-1, 1},
-    };
-    for (int k = 0; k < 8; k++)
-        arrow(G_ARROW + k + (k < 4 ? 0 : 2), dir[k][0], dir[k][1]);
-    nice_poke(FONT_BASE, FONT_RAM);
 }
 
 // ---- The large clock: digits of 5 by 7 dots, two dots to a cell
@@ -563,9 +505,16 @@ int main(void)
         nice_print("The weather needs the monitor's dispatch table 1.5 or later\n");
         return 1;
     }
+    // The glyphs of weather_parse.h are the character ROM's, which has
+    // them from V2.6 on: row 0 of the upper half is 0xFFFF there, and 0
+    // in the ROM of an older core (doc/SYSTEM.md, "The font").
+    if (nice_peek(FONT_ROM + 32 * G_UPPER) != 0xFFFF) {
+        nice_print("The weather needs the core of V2.6 or later\n");
+        return 1;
+    }
     mon_scr_cls();
     nice_poke(SCR_STATE, nice_peek(SCR_STATE) & ~0x40u);    // no cursor
-    font_init();
+    nice_poke(FONT_BASE, 0);    // the character ROM, whatever was shown before
     cfg_parse(&cfg, "", 0);
     draw_bar();
     int quit = settings();

@@ -41,6 +41,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The font is in the FPGA, so it needs this release's bitstream or
   core file. A new ROM alone, with `make r6 ROMPATCH=`, keeps the old
   font.
+- The weather display, `weather.bin`, shows the ROM's blocks and
+  arrows, and no longer draws its own in the font RAM. So it needs
+  this release's core, and says so on an older one.
 
 - `HTTP$`, `URL$`, and `LISTO` are keywords of BASIC, and no names of
   variables any more: `URL$ = "X"` is `Syntax error; URL$ is a keyword`.
@@ -72,8 +75,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   (`examples/README.md`, "The weather display in BASIC").
 - BASIC's `CHR$(0x80)` to `CHR$(0x99)` print the blocks and the
   arrows ([basic/README.md](../basic/README.md)).
-- The weather display, `weather.bin`, shows the ROM's blocks and
-  arrows, and draws them in the font RAM only on an older core.
 - `make -C sim check-font`, part of `make test`, checks that the
   board's font is niceemu's, word for word. `font/gen_font_pkg.py`
   makes it from niceemu's font, not from Spleen's file.

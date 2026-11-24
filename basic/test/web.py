@@ -9,15 +9,16 @@ frames go to tcppeer's peer, the host 10.0.0.2, which listens on port 80
 and answers each request by its path, from ANSWERS, and refuses port 81.
 BASIC's IP "10.0.0.9" gives the address, and PROGRAM, typed before its
 RUN, fetches the paths: a body in UTF-8 with the arrows and the blocks,
-Content-Length shorter than what the server sends, line ends inside the
-body and at its end, the longest body and two too long, the statuses
-404, 301 with a Location, and 500 with a line of text, answers that are
-not HTTP or are cut short, bytes that are no UTF-8, an empty body, a
-refused port, a name with no DNS server, URL$, and a path and a port
-that are an Illegal quantity. Its TRAP prints each error's ER, DS, and
-DS$, and goes on after it. Its 19 fetches, more than the 4 handles of
-TCP, show that each frees its handle. The checks read what RUN prints,
-a line each, and the requests that the peer got.
+Content-Length shorter than what the server sends, and one with no
+digits, which counts as none, line ends inside the body and at its end,
+the longest body and two too long, the statuses 404, 301 with a
+Location, and 500 with a line of text, answers that are not HTTP or are
+cut short, bytes that are no UTF-8, an empty body, a refused port, a
+name with no DNS server, URL$, and a path and a port that are an Illegal
+quantity. Its TRAP prints each error's ER, DS, and DS$, and goes on
+after it. Its 18 connections, more than the 4 handles of TCP, show that
+each frees its handle. The checks read what RUN prints, a line each, and
+the requests that the peer got.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. Only the Python standard library is used.
@@ -40,6 +41,7 @@ ANSWERS: Dict[str, bytes] = {
     "/ok": OK + "Copenhagen: +8°C\n".encode(),
     "/glyphs": OK + "→↗█▀ ü".encode(),
     "/len": b"HTTP/1.1 200 OK\r\ncontent-LENGTH:  5\r\n\r\nHelloEXTRA",
+    "/nolen": b"HTTP/1.0 200 OK\r\nContent-Length: abc\r\n\r\nWhole",
     "/crlf": OK + b"a\r\nb\r\n",
     "/255": OK + b"x" * 255 + b"\r\n",
     "/256": OK + b"x" * 256,
@@ -61,6 +63,7 @@ PROGRAM = [
     '20 PRINT "["; HTTP$("10.0.0.2", "/ok"); "]"',
     '30 A$ = HTTP$("10.0.0.2:80", "/glyphs"): GOSUB 800',
     '40 PRINT "["; HTTP$("10.0.0.2", "/len"); "]"',
+    '45 PRINT "["; HTTP$("10.0.0.2", "/nolen"); "]"',
     '50 A$ = HTTP$("10.0.0.2", "/crlf"): GOSUB 800',
     '60 PRINT LEN(HTTP$("10.0.0.2", "/255"))',
     '70 PRINT HTTP$("10.0.0.2", "/256")',
@@ -89,6 +92,7 @@ WANT = [
     "[Copenhagen: +8\xb0C]",
     "146 151 136 128 32 252 ",
     "[Hello]",
+    "[Whole]",
     "97 13 10 98 ",
     "255",
     "E 23 0 ",

@@ -1,6 +1,7 @@
 # The examples
 
-Programs in C for the NICE CPU, and two in BASIC with machine code. `make examples` at the top builds them to
+Programs in C for the NICE CPU, and two in BASIC, one of them with
+machine code. `make examples` at the top builds them to
 `examples/build/`. It needs clang with the wasm32 target, `wasm-ld`, and
 `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and `llvm`
 packages). [doc/PROGRAMMING.md](../doc/PROGRAMMING.md) says how C
@@ -42,6 +43,10 @@ The board needs a network with a DHCP server, the service that hands out
 IP addresses, as most home routers have. When the board has no IP
 address yet, the program asks for one by itself, as BASIC's `DHCP`
 does.
+
+The program needs the core of V2.6 or later, whose font has the blocks
+of the clock and the arrows of the wind. On an older core it says so,
+and returns.
 
 | Key | What it does |
 |---|---|

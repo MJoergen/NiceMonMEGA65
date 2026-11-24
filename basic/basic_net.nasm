@@ -946,7 +946,8 @@ h_byte
                 SUB     @V_HDS, R4, V_HDST
                 RET
 h_clen
-                CLR     R4              ; Content-Length: its digits
+                CLR     R4              ; Content-Length: its digits, from
+                MOVE    R6, R3          ; the first
 :
                 CMP     R3, R2
         ?Z      JMP     :+
@@ -962,7 +963,8 @@ h_clen
                 ADD     R3, R3, 1
                 JMP     :-
 :
-                MOVE    @V_HCL, R4
+                CMP     R3, R6
+        ?!Z     MOVE    @V_HCL, R4      ; with no digit, as with no header
                 RET
 ; The status line, HTTP/ and the version, a blank, and the 3 digits
 h_first

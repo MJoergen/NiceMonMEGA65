@@ -354,7 +354,8 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E3FF, 1\rhalt\
 # with PEEK the colors that LIST, DUMP, DIS, and HELP left on the
 # screen: of a line number, REM, a keyword, a name, a number, a string,
 # and the text after it, also with BACKGROUND 14, light blue as the
-# names, which are then in the color of FOREGROUND, and with LISTO 1.
+# names, which are then in the color of FOREGROUND, and with LISTO 1,
+# and of LEN, HEX$, and SIN, which are keywords, not names.
 # INPUT's answer 12   AB keeps its blanks, which BASIC's line drops.
 # str: the strings of stage 5 (issue #116), test/str.bas typed line by
 # line, with --step-time, so that TIME$ is the same in each run. String

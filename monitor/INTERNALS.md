@@ -189,10 +189,10 @@ that address the memory: 32768 words on the MEGA65 and 8192 on the
 Nexys4DDR, so one ROM serves every board. `k` rows back is the
 display offset `size - 80k`, which wraps to row 0 of the screen. The
 cursor moves `k` rows down the display with its row, and is off when
-that row is below the screen (issue #173). The first key that scrolls back turns the ring so that
-its newest row is the last of the memory. In `niceemu` the display
-offset is plain memory, so all its bits are kept: the history has 381
-rows there, which `DUMP` and `--dump` read.
+that row is below the screen (issue #173). The first key that scrolls
+back turns the ring so that its newest row is the last of the memory.
+In `niceemu` the display offset is plain memory, so all its bits are
+kept: the history has 381 rows there, which `DUMP` and `--dump` read.
 
 ## The loader of BASIC
 
@@ -266,8 +266,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2A6C` | 10861 |
 | Free | `0x2A6D`–`0x2FFF` | 1427 |
-| BASIC | `0x3000`–`0x74EE` | 17647 |
-| Free | `0x74EF`–`0x7FFF` | 2833 |
+| BASIC | `0x3000`–`0x74F0` | 17649 |
+| Free | `0x74F1`–`0x7FFF` | 2831 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order

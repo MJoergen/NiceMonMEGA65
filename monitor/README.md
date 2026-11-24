@@ -544,10 +544,10 @@ buffer of bytes is packed, 4 to a word, as a C program has it:
   `tcp_recv`, is one of the byte window, `0x20000000 + 4*W + b` for
   byte b of word W, bits 8b+7 to 8b, so a buffer may start at any byte.
   An assembly program passes `0x20000000 + 4*W` for a buffer at word W.
-  A plain address, below `0x10000000`, is a buffer of a byte a word,
-  in bits 7..0 of each, as BASIC's strings are: `dns_lookup`,
+  A plain address, one outside the byte windows, is a buffer of a byte
+  a word, in bits 7..0 of each, as BASIC's strings are: `dns_lookup`,
   `tcp_send`, and `tcp_recv` take one, and BASIC's `NTP` and `HTTP$`
-  use them so.
+  use them so, with their buffers in the top words of the RAM.
 - An IP address is a word, its first byte in bits 31..24, as `NET_IP`
   has it.
 

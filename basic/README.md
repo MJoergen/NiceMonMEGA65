@@ -951,14 +951,14 @@ the default. It runs these steps in order:
    answer of its own, in real time, not with `--step-time`. A program
    typed before its `RUN` fetches them, as keys typed while `HTTP$`
    waits would go to the keys typed ahead. It covers a body with
-   UTF-8, the arrows, and the blocks, `Content-Length`, line ends
-   inside the body and at its end, a body of 255 characters and two
+   UTF-8, the arrows, and the blocks, `Content-Length`, also one with
+   no digits, line ends inside the body and at its end, a body of 255 characters and two
    longer, the statuses 404, 301 with a `Location`, and 500, answers
    that are not HTTP or are cut short, bytes that are no UTF-8, an
    empty body, a refused port, a name with no DNS server, and a path
    and a port that are an `Illegal quantity`, each through a `TRAP`,
-   and the request that the server got. Its 19 fetches, more than the
-   4 handles of TCP, show that each frees its handle.
+   and the request that the server got. Its 18 connections, more than
+   the 4 handles of TCP, show that each frees its handle.
 8. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
    benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
    with strings until it is swept, in `bench/`, and checks their
@@ -992,7 +992,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
 | `edit` | The ROM alone | The screen editor: a character that `POKE` left on the row of the next line, after `READY.`, `INPUT`'s prompt, and `AUTO`'s number, which is no part of the line; `READY.` after a program whose output filled a row, which is a line of its own; a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
 | `long` | The ROM alone | The editor's limit: a listed line of 254 characters, right-aligned in 255 columns, changed at its last character and entered again, and one of 255, which is `Line too long` and stays as it was. |
-| `listo` | The ROM alone, with `test/listo.bas` typed | `LISTO` 0 to 3 and its errors; the indent of `FOR`, `NEXT J, I`, `DO`, `LOOP`, block `IF`s with `ELSE`, `DEF PROC`, `ENDPROC`, and a `FN` over lines with its `=`, from the start and from a line in the middle; a `FOR` with two `NEXT`s; and the colors of `LIST`, `DUMP`, `DIS`, and `HELP`, read back from the screen's words, with a background of a syntax color, and with the colors off; and an answer of `INPUT` that keeps the blanks after its number. |
+| `listo` | The ROM alone, with `test/listo.bas` typed | `LISTO` 0 to 3 and its errors; the indent of `FOR`, `NEXT J, I`, `DO`, `LOOP`, block `IF`s with `ELSE`, `DEF PROC`, `ENDPROC`, and a `FN` over lines with its `=`, from the start and from a line in the middle; a `FOR` with two `NEXT`s; and the colors of `LIST`, `DUMP`, `DIS`, and `HELP`, read back from the screen's words, with `LEN`, `HEX$`, and `SIN` as keywords, not names, with a background of a syntax color, and with the colors off; and an answer of `INPUT` that keeps the blanks after its number. |
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
@@ -1044,7 +1044,7 @@ table, and `make romsize` writes it again.
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1914 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2382 | 52 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 300 |
-| `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2043 | 222 |
+| `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2045 | 222 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 948 | 79 |
 | `basic_edit.nasm` | The screen editor | 1281 | 0 |
@@ -1057,5 +1057,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 17647 | 2361 |
+| In all | | 17649 | 2361 |
 <!-- /romsize basic -->

@@ -972,7 +972,7 @@ LIST_KINDS
 LIST_HUES
                 .DAT    0, HUE_NUM, HUE_NUM, HUE_NUM, HUE_NUM, HUE_STR, HUE_NAME, 0, 0
                 .DAT    0, 0, 0, 0, 0, HUE_LINE, HUE_REM, HUE_NAME
-                .DAT    HUE_NAME, HUE_NAME, 0, HUE_NAME, HUE_STR, HUE_NAME, HUE_NAME, 0
+                .DAT    HUE_NAME, HUE_NAME, 0, 0, HUE_STR, HUE_NAME, HUE_NAME, 0
 
 ; A whole number: K_SMALL's and K_LINE's in the token, which K_LINE's
 ; line follows, and K_WORD's in the word after it

@@ -708,9 +708,11 @@ program that reads a web service would have had them again.
   and its port are a parse of `HTTP$`'s own, and `dns_lookup` takes
   the name, or four numbers with dots as they are. `PATH$` goes as it
   is, so that its `?`, `&`, and `%` stay; it must start with `/`, or
-  it is an `Illegal quantity`. The request has `Host`, with the port
-  when it is not 80, `User-Agent`, and `Connection: close`, and the
-  body ends where the server closes, or at `Content-Length`.
+  it is an `Illegal quantity`. The request has `Host`, which is
+  `HOST$` as it is, with its port when it has one, `User-Agent`, and
+  `Connection: close`, and the body ends where the server closes, or
+  at `Content-Length`. A `Content-Length` with no digits counts as
+  none.
 - **Plain HTTP alone.** There is no HTTPS. Many services answer plain
   HTTP with a 301 to `https://`, which `DS$` then shows. So `HTTP$`
   reaches wttr.in, the devices of the local network, and one's own
@@ -739,9 +741,11 @@ program that reads a web service would have had them again.
   and no tag of nice_cpu has them yet, so a BASIC that ships before
   that tag relies on the decision.
 - **At most 255 characters**, a string's limit. A longer body is an
-  error, `String too long`, as `+` past 255 is, and `HTTP$` drops the
-  connection at the 256th character (question 2). A web service for a
-  small board answers in a line, as wttr.in's `?format=` does.
+  error, `String too long`, as `+` past 255 is. `HTTP$` keeps 257
+  characters, as a body of 255 may end with a CR LF, which is dropped,
+  and drops the connection at the 258th (question 2). A body of 256 or
+  257 is the error when it ends. A web service for a small board
+  answers in a line, as wttr.in's `?format=` does.
 - **A line end at the body's end is dropped**, LF or CR LF, and not
   counted. wttr.in's `?format=3` ends with one (measured 2026-11-23),
   and a program would find the code 10 in its last field. Those inside

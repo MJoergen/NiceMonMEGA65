@@ -124,6 +124,7 @@ READY.
 20 FOR I = 1 TO 2: A$ = "S"
 30 B = 0x1F + I
 40 NEXT
+50 PRINT LEN(A$); HEX$(I); SIN(I); B
 900 CLS: LIST 10-40: PRINT "Q"
 910 S = 0xFFFF0000: PRINT HEX$(PEEK(S + 1)); " "; HEX$(PEEK(S + 4)); " "; HEX$(PEEK(S + 84)); " "; HEX$(PEEK(S + 88))
 920 PRINT HEX$(PEEK(S + 92)); " "; HEX$(PEEK(S + 105)); " "; HEX$(PEEK(S + 165)); " "; HEX$(PEEK(S + 169)); " "; HEX$(PEEK(S + 320))
@@ -133,6 +134,8 @@ READY.
 960 HELP: RCURSOR C, R: S = 0xFFFF0000 + 80 * R
 970 PRINT HEX$(PEEK(S - 80)); " "; HEX$(PEEK(S - 60)); " "; HEX$(PEEK(S - 240)); " "; HEX$(PEEK(S - 307))
 980 END
+985 CLS: LIST 50: S = 0xFFFF0000
+990 PRINT HEX$(PEEK(S + 10)); " "; HEX$(PEEK(S + 14)); " "; HEX$(PEEK(S + 19)); " "; HEX$(PEEK(S + 28)); " "; HEX$(PEEK(S + 36))
 RUN 900
  10 REM X
  20 FOR I = 1 TO 2: A$ = "S"
@@ -241,6 +244,10 @@ DS, DS$             the last file or network failure: its number and text
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 00099F50 000FFF73 000FFF44 00099F4E
+READY.
+RUN 985
+ 50 PRINT LEN(A$); HEX$(I); SIN(I); B
+000FFF4C 00099F41 000FFF48 000FFF53 00099F42
 READY.
 LISTO 1
 READY.

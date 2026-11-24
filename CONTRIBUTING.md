@@ -1310,11 +1310,14 @@ network's entries from C. `make weathertest` checks it in two parts:
   tests in `niceemu`, with a card that holds `NICE/WEATHER.CFG` and
   `tools/lib/tcppeer.py` as the HTTP server at 10.0.0.2. Each case runs
   to a step limit, and the script reads the screen's words, so that the
-  glyphs of the font RAM are checked too: the weather, a redirect, a
-  status of 500, an answer of another format, a refused connection, a
-  line of the settings not understood, a settings file of more than
-  1024 bytes, and one of 1024, the place typed when there is
-  no file, and ESC and Q back to the monitor. Then it runs
+  codes of the blocks and the arrows are checked too: the weather, with
+  the font RAM shown before the start, which the program changes to the
+  character ROM, a redirect, a status of 500, an answer of another
+  format, a refused connection, a line of the settings not understood,
+  a settings file of more than 1024 bytes, and one of 1024, the place
+  typed when there is no file, ESC and Q back to the monitor, and a
+  character ROM with no blocks, `niceemu --no-font`, where the program
+  asks for the core of V2.6. Then it runs
   `examples/weather.bas` the same way, with `WEATHER.BAS` on the
   card, under the monitor of the tests alone: the keys load the
   program, type its line of the server, and `RUN` it. It checks the

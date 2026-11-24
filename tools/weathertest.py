@@ -48,6 +48,8 @@ BASIC = os.path.join(REPO, "examples", "weather.bas")
 ANSWERS = os.path.join(REPO, "examples", "test")
 SCREEN = 0xFFFF0000
 ROWS = 28  # the screen's, as nice.h's NICE_SCREEN_ROWS
+FONT_RAM = 0xFFFE0000
+FONT_BASE = 0xFFFFFF86  # 0 shows the character ROM
 # The steps of a case: about 3 seconds of the host, far more than a fetch
 # from the peer takes, and less than the 60 s before a fetch again.
 STEPS = 100_000_000
@@ -115,7 +117,8 @@ class Run:
     runs alone, with weather.bas on the card."""
 
     def __init__(self, tmp: str, keys: str, cfg: Optional[str], answer: Optional[bytes],
-                 steps: int = STEPS, basic: bool = False) -> None:
+                 steps: int = STEPS, basic: bool = False,
+                 opts: Optional[List[str]] = None) -> None:
         self.peer = Peer()
         self.script: Optional[Http] = None
         if answer is not None:
@@ -132,8 +135,9 @@ class Run:
         with open(inp, "w") as f:
             f.write(keys)
         cmd = [NICEEMU, "-i", inp, "-n", str(steps), "-d", f"{SCREEN:#x}:{80 * ROWS}",
+               "-d", f"{FONT_BASE:#x}:1",
                "--sd0", card(tmp, cfg, basic), "--eth-udp", f"127.0.0.1:{self.peer.emu_port}",
-               "--eth-peer", f"127.0.0.1:{self.peer.port}", image]
+               "--eth-peer", f"127.0.0.1:{self.peer.port}"] + (opts or []) + [image]
         try:
             res = subprocess.run(cmd, capture_output=True, timeout=120)
             self.out = res.stdout.decode("latin-1").replace("\r", "")
@@ -147,6 +151,7 @@ class Run:
             for k, w in enumerate(m[2].split()):
                 words[a + k] = int(w, 16)
         self.words = [words.get(SCREEN + i, 0) for i in range(80 * ROWS)]
+        self.font_base = words.get(FONT_BASE, -1)
         self.rows = ["".join(char(w) for w in self.words[80 * r:80 * r + 80]).rstrip()
                      for r in range(ROWS)]
 
@@ -207,11 +212,14 @@ def size() -> None:
 
 
 def cases(tmp: str) -> None:
-    r = Run(tmp, KEYS, CFG, answer("ok.http"))
+    # The font RAM is shown at the start, as a POKE of the font base leaves it
+    r = Run(tmp, f'POKE {FONT_BASE:#x}, {FONT_RAM:#x}\r' + KEYS, CFG, answer("ok.http"))
     script = r.script
     assert script is not None
     check("ok.http: the request, with the place, the units, and the server as Host",
           script.request == REQUEST, repr(script.request))
+    check("ok.http: the font base is 0, the character ROM, though the font RAM was shown",
+          r.font_base == 0, f"{r.font_base:#x}")
     check("ok.http: the bar shows the IP address", r.rows[0].endswith("IP 10.0.0.9"), r.rows[0])
     check("ok.http: the place", r.row(ROW_PLACE) == "Copenhagen", r.row(ROW_PLACE))
     check("ok.http: the condition", r.row(ROW_COND) == "Patchy rain nearby", r.row(ROW_COND))
@@ -281,6 +289,13 @@ def cases(tmp: str) -> None:
           r.out[-400:])
     r = Run(tmp, KEYS + "qHALT\r", CFG, answer("ok.http"))
     check("Q returns to the monitor", "Returned 00000000" in r.out, r.out[-400:])
+
+    # niceemu --no-font has plain memory for the character ROM, so no
+    # blocks and arrows, as the core before V2.6
+    r = Run(tmp, "SYS 0x8000\rHALT\r", None, None, opts=["--no-font"])
+    check("no blocks in the character ROM: the core of V2.6 is asked for",
+          "The weather needs the core of V2.6 or later\nReturned 00000001" in r.out,
+          r.out[-400:])
 
 
 # The keys that load weather.bas and point it to the peer, with its line

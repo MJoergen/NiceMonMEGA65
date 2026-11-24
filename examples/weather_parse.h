@@ -7,8 +7,7 @@
 
 // The codes of the glyphs of the large clock, the halves of a block and
 // the whole block, and of the arrows of the wind, those of the character
-// ROM (nice_cpu's DEVICES.md 1.8): the low byte of the code point. On a
-// core whose ROM has them blank, weather.c draws them in the font RAM.
+// ROM (nice_cpu's DEVICES.md 1.8): the low byte of the code point.
 enum {
     G_UPPER = 0x80, // U+2580, the upper half of a cell
     G_LOWER = 0x84, // U+2584, the lower half
