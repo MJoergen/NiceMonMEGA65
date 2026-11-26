@@ -169,6 +169,21 @@ Screen:
 |halt
 |Halted
 exit 0
+== a BASIC of the cores before V3.0, with jumps of two words, layout 2
+BASIC-11.ROM on card 0: for another monitor
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-11.ROM on card 0: for another monitor
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
 == too much RAM
 BASIC-6.ROM on card 0: bad header
 NiceMon V9.9, BASIC V9.9

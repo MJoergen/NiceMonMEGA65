@@ -499,7 +499,7 @@ DUMP_load_64k = -d 0xFFFFE816:1
 MAX_STEPS = 10000000
 # The header of the tests' image, as basic_rom.py check shows it, but for
 # its length, which changes with the code
-HEADER_TEST = version 9.9.0+0, layout 2, 42 entries, [0-9]* words, RAM 2048 words, flags 1
+HEADER_TEST = version 9.9.0+0, layout 3, 42 entries, [0-9]* words, RAM 2048 words, flags 1
 
 # The benchmarks (doc/BASIC.md, "Tests"): Rugg/Feldman 1 to 7 and the
 # sieve, as they are written, and since stage 6 Rugg/Feldman 8. make bench prints their steps in niceemu

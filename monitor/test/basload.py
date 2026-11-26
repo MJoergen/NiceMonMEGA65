@@ -286,6 +286,8 @@ def main() -> None:
             [File("BASIC-4.ROM", v(10, 0, "A", entries=0xFFFF))]),
         Run("another layout of the monitor's RAM, the 25 rows of layout 1",
             [File("BASIC-5.ROM", v(10, 0, "A", layout=1))]),
+        Run("a BASIC of the cores before V3.0, with jumps of two words, layout 2",
+            [File("BASIC-11.ROM", v(10, 0, "A", layout=2))]),
         Run("too much RAM", [File("BASIC-6.ROM", v(10, 0, "A", ram=0x4000))]),
         Run("an address past BASIC's part", [File("BASIC-7.ROM", v(10, 0, "A"), outside)]),
         Run("addresses that fall", [File("BASIC-8.ROM", v(10, 0, "A"), falling)]),

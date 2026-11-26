@@ -227,7 +227,8 @@ the monitor's write of a word back to itself changes nothing in
   running. The layout is that of the monitor's own RAM, from
   `0xFFFFF000`, and the screen's rows, and a change of either refuses
   the older images: version 2 has the 28 rows of #157, where version
-  1 had 25. Neither number shows what an entry does: `fs_open` and
+  1 had 25, and version 3 the jumps and calls of one word of nice_cpu
+  V3.0 (#172), which a core before V3.0 halts at. Neither number shows what an entry does: `fs_open` and
   `fs_delete` take paths from `V2.5.1` on (#168), so a BASIC from then
   on reaches the folders inside `NICE` only on a core from then on,
   and gets error 20 for a path on the core of `V2.5`.

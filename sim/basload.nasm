@@ -13,7 +13,7 @@ MON_PUTC        .EQU    0x06            ; entry 3
                 MOVE    R15, t_cold     ; 0x3000, the cold start, two words
                 MOVE    R15, t_cold     ; 0x3002, the warm start
                 .DAT    0x5341424E      ; 0x3004, NBAS
-                .DAT    0x00020025      ; 0x3005, layout 2, 37 entries
+                .DAT    0x00030025      ; 0x3005, layout 3, 37 entries
                 .DAT    0               ; 0x3006, the length
                 .DAT    0               ; 0x3007, the checksum
                 .DAT    T_TEXT          ; 0x3008, the version's text

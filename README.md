@@ -56,7 +56,7 @@ There are three ways to use the system:
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
    `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
-   and R3A, where TAG is the release, such as `V2.6`. A core file holds
+   and R3A, where TAG is the release, such as `V3.0`. A core file holds
    its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
@@ -182,21 +182,17 @@ a newer one, with no new core file. The Nexys4DDR's ROM takes no
 writes, so it always runs its bitstream's BASIC. A BASIC file fits
 only the cores of its own layout of the ROM and the screen: the files
 before V2.4 fit the cores before V2.4, those of V2.4 and V2.4.1 fit
-the cores of V2.4 and V2.4.1, and those from V2.5 on fit the cores
-from V2.5 on. The monitor passes over a file that does not fit, and runs
-the BASIC of its core. A name with a path, such as
-`LOAD "GAMES/CHESS.BIN"`, also needs a core from V2.5.1 on, as the
-monitor walks the path: on the core of V2.5 it is `File error 20, not a
-valid name`. The blocks and arrows of the screen's font are in the
-core, from V2.6 on: on an older core they are blank, also in a newer
-BASIC. Each release has its BASIC as a file of its
-own, such as `BASIC-V2.6.ROM`. To use it:
+the cores of V2.4 and V2.4.1, those from V2.5 to V2.6 fit the cores
+from V2.5 to V2.6, and those from V3.0 on fit the cores from V3.0 on.
+The monitor passes over a file that does not fit, and runs the BASIC
+of its core. Each release has its BASIC as a file of its
+own, such as `BASIC-V3.0.ROM`. To use it:
 
 1. Copy the file into the folder `NICE` of a card. Older ones may stay
    there, as the monitor takes the highest version.
 2. Switch the board off and on. The monitor loads the file and names
-   it, `BASIC-V2.6.ROM from card 0`, before the banner, which shows
-   both versions: `NiceMon V2.6, BASIC V2.6`.
+   it, `BASIC-V3.0.ROM from card 0`, before the banner, which shows
+   both versions: `NiceMon V3.0, BASIC V3.0`.
 
 The monitor checks the file first. One that fails, such as a file cut
 short, gets a line that says why, and the next highest version is
@@ -206,10 +202,10 @@ is switched on: the reset button and `SYS 0` keep the BASIC that runs.
 
 If a BASIC from a card hangs at its start, take the card out and
 switch the board off and on, so that the core's own BASIC runs. Then put
-the card back, and remove the file with `DELETE "BASIC-V2.6.ROM"`.
+the card back, and remove the file with `DELETE "BASIC-V3.0.ROM"`.
 
 Over the network, `tools/nicemon.py load --eth 192.168.1.65 --basic
-BASIC-V2.6.ROM` puts a BASIC into the ROM at once, until the board is
+BASIC-V3.0.ROM` puts a BASIC into the ROM at once, until the board is
 switched off ([tools/README.md](tools/README.md#loading-basic-into-the-rom)).
 
 ### The on-board debugger

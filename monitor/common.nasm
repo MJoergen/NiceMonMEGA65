@@ -31,7 +31,7 @@ BASIC_WORDS     .EQU    0x800           ; as this BASIC's header has them, which
 MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices,
 MON_VARS        .EQU    0x1000          ; MON_VARS words, with the I/O page
 STACK_ROOM      .EQU    0x400           ; the stack's first words, down from SP's start, which no load writes, and HIMEM leaves
-MON_LAYOUT      .EQU    2               ; the version of the layout of the monitor's RAM and of the screen's ROWS, in BASIC's header
+MON_LAYOUT      .EQU    3               ; the version of the layout of the monitor's RAM, of the screen's ROWS, and of the jumps, in BASIC's header
 BASIC_BASE      .EQU    0x3000          ; BASIC's image, above the monitor's, to PROGRAM:
 BAS_COLD        .EQU    BASIC_BASE      ; its cold start, where mon_reset goes at its end,
 BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status,
