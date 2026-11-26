@@ -1,12 +1,6 @@
-; Uses the math unit (DEVICES.md §2), the performance counters (§3), the
-; floating-point unit (§11), and the timer (§4), and leaves the results in
-; memory at RESULT, where
-; tb_nicemon reads them over the debug link.
-;
-; The timer raises IRQ through vector 0xF0 every 200 cycles, and the
-; interrupt routine counts the requests in R6. The program waits for three,
-; and then stops the timer. The core runs far more than one instruction in
-; 200 cycles, so no request is pending when it stops.
+; Uses the math unit (DEVICES.md §2), the performance counters (§3), and
+; the floating-point unit (§11), and leaves the results in memory at
+; RESULT, where tb_nicemon reads them over the debug link.
 ;
 ; The FPU divides 1000 by 7. The reads of X_HI and X_LO come while DIV
 ; runs, so they stall until it ends, and the read of X_W waits for the
@@ -22,8 +16,6 @@ FPU_X_LO        .EQU    0xFFFFFF88
 FPU_X_HI        .EQU    0xFFFFFF89
 FPU_X_W         .EQU    0xFFFFFF8B
 FPU_CMD         .EQU    0xFFFFFF8C
-TIMER_PERIOD    .EQU    0xFFFFFF10
-TIMER_VECTOR    .EQU    0xFFFFFF12
 RESULT          .EQU    0x100
 
                 MOVE    @MPU_A, 1000
@@ -44,18 +36,4 @@ RESULT          .EQU    0x100
                 MOVE    @0x107, @FPU_X_LO  ; 0xB6DB6DB7
                 MOVE    @0x108, @FPU_X_W  ; 142
                 MOVE    @FPU_CMD, 0x14  ; SQRT, 0x4027E7920AF6B214
-
-                MOVE    @TIMER_VECTOR, 0xF0
-                MOVE    @TIMER_PERIOD, 200
-                OR      R14, R14, 0x40000000  ; E = 1
-:               CMP     R6, 3
-        ?!Z     JMP     :-
-                MOVE    @TIMER_PERIOD, 0
-                MOVE    @0x105, R6      ; 3 requests taken
                 HALT
-
-on_irq          ADD     R6, R6, 1
-                RTI
-
-                .ORG    0xF0
-                .DAT    on_irq

@@ -117,7 +117,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `ram.vhd` and `rom.vhd`), the UART (`uart_serdes.vhd`, from cmod-s7),
   which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
-  `FFFFFF10`–`7F` and its FPU at `88`–`8F` (`devices.vhd`), the board's
+  `FFFFFF20`–`7F` and its FPU at `88`–`8F` (`devices.vhd`), the board's
   registers at `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at
   `FFFFFF80`–`87` (`scr_regs.vhd`), the gate of their read data (`bus_pkg.vhd`), the
   UART's baud rates (`uart_pkg.vhd`, which
@@ -305,8 +305,12 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   50 ms for room in the full FIFO before it is lost. Version 7 starts
   the registers at `FFFFFFD0`, and has `G_WATCHES` watchpoints, 4 on
   every board, at `FFFFFFD4`–`DB`: the core pauses after a step that hit
-  one, and the link sends `w`. Version 8 has the NMI request at
-  `FFFFFFD7`, which the board keeps and does not pass to the core.
+  one, and the link sends `w`. Version 8 had the NMI request at
+  `FFFFFFD7`. Version `0x10`, major 1, from nice_cpu V3.0, drops the
+  hidden state, the wait, and the NMI request: `FFFFFFD0`–`D3` and
+  `D7` are reserved and read 0, bits 6 to 10 of the control register
+  read 0, and the halt reasons 3 and 4 do not occur. The tools stop on
+  a board of major 0.
 - The tools take `--eth HOST[:PORT]` for the board's link over TCP on
   its Ethernet port, 4510 by default, once 0xFFFFFFB0 gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and

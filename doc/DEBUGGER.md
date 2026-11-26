@@ -100,17 +100,18 @@ on dark blue, `0x004` and `0xFFF`:
   the stop's values while it is paused or has halted. While it is held
   they are dimmed: the link keeps the values of the last stop then,
   which may be another program's.
-- Row 30: the core's state, `RUNNING`, `WAITING` while it waits for an
-  interrupt after `WAIT` (bit 6 of the control register, link version
-  7), `PAUSED`, `PAUSED W` while it is paused in a wait, `BRK n` at
+- Row 30: the core's state, `RUNNING`, `PAUSED`, `BRK n` at
   breakpoint n, `WCH n` after a step that hit watchpoint n, which only a
   host of the link sets ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)), `HALTED n` with the reason of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), `HELD`, or `NO LINK`
   until the link has answered after reset; the PC; the
-  instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
-  each shown or a dot; and the instruction decoded, from column 46: the
+  instruction word at the PC; the flags of SR, X, C, Z, N, V, F0, and F1,
+  each shown, F0 and F1 as `0` and `1`, or a dot; and the instruction decoded, from column 46: the
   condition, the mnemonic with `[C]`, `[M]`, or `[CM]`, and the
   operands, in the assembler's syntax as `nicedis.py` writes it, with
-  the constant words folded in, in hex, such as `?!Z MOVE R15, 0x2`. A
+  the constant words folded in, in hex, such as `?!Z MOVE R15, 0x2`. The
+  target of a `JMP`, `JMPR`, or `CALL`, which is one word, is the address
+  after it plus its distance, in hex, as in `?Z JMP 0x8000`, and the
+  conditions F0 and F1 are `?F0` and `?F1`. A
   text longer than the 34 columns ends in `>`, and a reserved control
   word is `reserved`. The debugger reads the constant words that the
   instruction word says it takes, and none past them, which could be a
@@ -416,14 +417,14 @@ about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
   GHDL, on `nicemon`'s side port, with `sim/host.nasm` and a host on the
   UART: read the version, load a program and read it back, start it,
   read the control register while it runs and get `e02` for the memory,
-  pause, read R0–R15, and step; the UART gets `b08` and the `p` of each
+  pause, read R0–R15, and step; the UART gets `b10` and the `p` of each
   stop, and the console bytes in order; a packet on the UART is answered
   while the adapter reads, and a go on from the UART ends a long read of
   the adapter's with `e02` after the words it got while the core was
   paused; and a read of no words ends at once.
 - `tb_dbg_decode` (written): the decode against `nicedis.py`, on about
   3000 instruction words of every class, condition, modifier, and mode,
-  with their constant words, from `sim/gen_decode.py`, and a start in
+  with their addresses and constant words, from `sim/gen_decode.py`, and a start in
   the middle of a decode.
 - `tb_dbg` (written for stage 9): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
@@ -447,8 +448,7 @@ about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
   address, MAC address, and rate, which the registers take, the rates
   stepped with CRSR left and right, `bad value` for a short address, a
   byte over 255, and a rate not on the list, F10 doing nothing, and F5
-  and `m` between the two pages. It runs twice more, with
-  `sim/dbg_wait.nasm` for `WAITING` and `PAUSED W`, and with
+  and `m` between the two pages. It runs once more, with
   `sim/dbg_watch.nasm` for `WCH n`. The mask of the core's buttons in
   `system.vhd` has no test of its own.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's

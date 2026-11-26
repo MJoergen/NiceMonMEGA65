@@ -351,9 +351,9 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # Each test runs the monitor with its input and its program, if any, and
 # compares the console output, the dumps, and the screen with
 # test/NAME.expected. The Halted line and the registers are left out, as
-# the steps and the registers change with the code, but for VBASE, bits
+# the steps and the registers change with the code, but for U, bits
 # 23-0 of R14, which must be 0, also after hello, which returns with
-# VBASE 0x80, and so tests that a program returns to mon_exit.
+# U 0x80, and so tests that a program returns to mon_exit.
 # test/ring.py checks the ring of the history at the
 # sizes of the screen's memory of niceemu and the boards first, and
 # test/dhcp.py runs BASIC's DHCP against the frames that it builds, and
@@ -469,7 +469,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_4k.bin $(BUILD)/h
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
 	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
-	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
+	    sed -n 's/.* R14 ..\(......\) .*/U at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
 	      && echo "The image as test/sd_image.py --written makes it"; fi; \

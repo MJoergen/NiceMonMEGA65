@@ -52,6 +52,8 @@ def call_or_ret(addr: int, words: Dict[int, int]) -> Optional[Tuple[int, str]]:
     if m is None or (m ^ w) >> 28 or m & 0x0FFFC07F != 0x0003C000:
         return None
     s0 = m >> 7 & 0x7F
+    if s0 == 0x30:          # a constant alone: the long form of CALL
+        return None
     n = 2 if s0 & 0x30 == 0x30 else 1
     if words.get(addr + 1) != n or (n == 2 and addr + 3 not in words):
         return None
@@ -75,7 +77,7 @@ def pseudo(text: str) -> Optional[str]:
         d, s = ops
         if d == "R0" and s == "R0":
             new = "NOP"
-        elif d == "R15":
+        elif d == "R15" and not (s.startswith("0x") and "[" not in s):
             new = "JMP " + s
         elif d == "@--R13":
             new = "PUSH " + s
@@ -203,7 +205,7 @@ def main() -> None:
         if need not in shown:
             fail = 1
             print(f"FAIL monitor dis: no {need} row")
-    for need in (".DAT", "reserved control word", "(s1: ", "INT 255", "?!I", "[CM]", "BPR"):
+    for need in (".DAT", "reserved control word", "(s1: ", "JMPR 0x", "?!F1", "?F0", "[CM]", "BPR"):
         if need not in texts:
             fail = 1
             print(f"FAIL monitor dis: no row with {need}")

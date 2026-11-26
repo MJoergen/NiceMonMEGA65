@@ -21,9 +21,9 @@
 ;  8  the clock's seconds after it, from the snapshot, 0x6AF85571
 ;  9  the clock's "set", 1
 ; 10  net_servers, 0, with none at H16_SRV
-; 11  mon_restore, 0, after the program stopped the cursor and set the
-;     timer, and put the cursor at column 85 and row 30
-; 12  the timer after it, 0
+; 11  mon_restore, 0, after the program stopped the cursor, set F1, F0,
+;     and U of the SR, and put the cursor at column 85 and row 30
+; 12  F1, F0, and U after it, 0
 ; 13  the screen's control word after it, 0x60
 ; 14  scr_getxy after it, the column, 79
 ; 15  and the row, 27
@@ -42,7 +42,7 @@ H16_SECS        .EQU    0x6AF85571      ; 2026-11-14 12:34:57
 H16_USEC        .EQU    0xFFFFFF46      ; the clock's microseconds, whose read takes a snapshot
 H16_CLOCK       .EQU    0xFFFFFF47      ; of the seconds, bits 31..0
 H16_STATUS      .EQU    0xFFFFFF49      ; and its "set"
-H16_TIMER       .EQU    0xFFFFFF10
+H16_SOFT        .EQU    0xC0FFFFFF      ; F1, F0, and U, the SR's bits of software
 H16_CTL         .EQU    0xFFFFFF80
 H16_X           .EQU    0xFFFFFF81
 H16_Y           .EQU    0xFFFFFF82
@@ -87,12 +87,12 @@ h16_main
                 MOVE    @R7++, R1
 ; mon_restore
                 MOVE    @H16_CTL, 0
-                MOVE    @H16_TIMER, 1000
+                MOVE    R14, H16_SOFT
                 MOVE    @H16_X, 85
                 MOVE    @H16_Y, 30
                 CALL    _mon_restore
                 MOVE    @R7++, R1
-                MOVE    @R7++, @H16_TIMER
+                AND     @R7++, R14, H16_SOFT
                 MOVE    @R7++, @H16_CTL
                 CALL    _mon_scr_getxy
                 MOVE    @R7++, R1

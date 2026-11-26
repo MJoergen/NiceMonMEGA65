@@ -210,8 +210,8 @@ the monitor's write of a word back to itself changes nothing in
 
 | Address | What it holds |
 |---|---|
-| `0x3000` | `JMP` to the cold start, two words, as now |
-| `0x3002` | `JMP` to the warm start, two words, as now |
+| `0x3000` | `MOVE R15, label` to the cold start, two words |
+| `0x3002` | `MOVE R15, label` to the warm start, two words |
 | `0x3004` | The magic word, `NBAS` in packed ASCII |
 | `0x3005` | The interface: in bits 31..16 the version of the layout of the monitor's RAM, and in bits 15..0 the number of entries of the dispatch table that the image calls |
 | `0x3006` | The image's length in words, from `0x3000`, at most 20480 |

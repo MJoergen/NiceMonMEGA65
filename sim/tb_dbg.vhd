@@ -79,11 +79,6 @@
 --    page, F10 does nothing, F5 shows it again, m shows the memory page instead, and n the
 --    settings page again.
 --
--- With G_WAIT, G_ROM_FILE is sim/dbg_wait.nasm, a WAIT that no request
--- ends, and only this runs after step 1: the toggle enters Focus with the
--- core WAITING, F3 pauses it, PAUSED W, with the PC at the HALT after the
--- WAIT, and F3 goes on, WAITING again.
---
 -- With G_WATCH, G_ROM_FILE is sim/dbg_watch.nasm, which reads one word for
 -- good, and only this runs after step 1: F3 pauses the core, the page
 -- writes the enable bit of the reads of watchpoint 1 at 0xFFFFFFD4 and the
@@ -101,8 +96,6 @@ library ieee;
 entity tb_dbg is
    generic (
       G_ROM_FILE : string;
-      -- G_ROM_FILE is sim/dbg_wait.nasm, and only the steps of G_WAIT run
-      G_WAIT     : boolean := false;
       -- G_ROM_FILE is sim/dbg_watch.nasm, and only the steps of G_WATCH run
       G_WATCH    : boolean := false
    );
@@ -221,20 +214,12 @@ architecture simulation of tb_dbg is
       end procedure put;
 
    begin
-      if G_WAIT then
-         case a is
-            when 0      => put("WAIT");
-            when 1      => put("HALT");
-            when others => put("MOVE R0, R0");
-         end case;
-         return res_v;
-      end if;
       case a is
          when 0      => put("MOVE R1, 0x0");
          when 2      => put("ADD R1, R1, 0x1");
          when 4      => put("SUB[M] R2, R1, 0x800");
-         when 6      => put("?!Z MOVE R15, 0x2");
-         when 8      => put("HALT");
+         when 6      => put("?!Z JMP 0x2");
+         when 7      => put("HALT");
          when others => put("MOVE R0, R0");
       end case;
       return res_v;
@@ -597,23 +582,6 @@ begin
          report "tb_dbg: the debugger asked the link while Off"
          severity failure;
 
-      if G_WAIT then
-         report "tb_dbg: G_WAIT. the state of a wait for an interrupt";
-         pulse;
-         expect('1', '0', '1', "after the toggle");
-         expect_row30("WAITING ", "in a wait");
-         key(C_ESC & "OR");
-         expect_row30("PAUSED W ", "after F3 in a wait");
-         expect_stop("after F3 in a wait");
-         assert pc_v = 1
-            report "tb_dbg: the PC is " & to_hstring(pc_v) & " in a wait, not the HALT after the WAIT"
-            severity failure;
-         key(C_ESC & "OR");
-         expect_row30("WAITING ", "after F3 again in a wait");
-         report "tb_dbg: G_WAIT done";
-         stop(0);
-      end if;
-
       if G_WATCH then
          report "tb_dbg: G_WATCH. the state at a watchpoint";
          pulse;
@@ -679,7 +647,7 @@ begin
       report "tb_dbg: 6. the halt";
       expect_row30("HALTED 1", "after the halt");
       expect_stop("after the halt");
-      assert pc_v = 9 and row(28)(18 to 25) = "00000800"
+      assert pc_v = 8 and row(28)(18 to 25) = "00000800"
          report "tb_dbg: the PC is " & to_hstring(pc_v) & " and R1 " & row(28)(18 to 25) & " at the halt"
          severity failure;
       assert row(30)(31 to 43) = ". . Z . . . ."

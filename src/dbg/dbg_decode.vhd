@@ -4,8 +4,9 @@
 -- (nice_cpu/doc/ISA.md §10), as nicedis.py writes it.
 --
 -- THEORY OF OPERATION
--- start_i takes the instruction word and its constant words, in the order
--- of the fields that take one: dest, s0, then s1 (ISA.md §2.3). The text
+-- start_i takes the instruction word, its address, and its constant
+-- words, in the order of the fields that take one: dest, s0, then s1
+-- (ISA.md §2.3). The text
 -- is then written into text_o one character a cycle, from the left, by a
 -- sequencer: the condition and a space, unless it is "always"; the
 -- mnemonic, the alias where a SHIFT has one, with its modifiers, [C],
@@ -13,8 +14,9 @@
 -- separated by a comma and a space. An operand is a register, R0 to R15,
 -- with @, --, ++, or a trailing -- of its mode, or a constant, 0x and its
 -- hex digits in lower case without leading zeros, with [Rx] unless Rx is
--- R0. INT has its vector in decimal. A reserved control word is
--- "reserved", without its condition. A text longer than G_LEN characters ends in > at the last
+-- R0. JMP, JMPR, and CALL have their target, the address after the
+-- word plus the distance of bits 20..0 (ISA.md §5.3), as a constant. A
+-- reserved control word is "reserved", without its condition. A text longer than G_LEN characters ends in > at the last
 -- place. The rest is spaces. valid_o is '0' from start_i until the text
 -- is whole, then '1', and done_o is '1' for that cycle. A decode takes
 -- at most about 70 cycles.
@@ -38,10 +40,11 @@ entity dbg_decode is
    port (
       clk_i   : in  std_logic;
       rst_i   : in  std_logic;
-      -- The instruction word, and its constant words, the first in bits
-      -- 31..0, while start_i is '1'
+      -- The instruction word, its address, and its constant words, the
+      -- first in bits 31..0, while start_i is '1'
       start_i : in  std_logic;
       instr_i : in  std_logic_vector(31 downto 0);
+      addr_i  : in  std_logic_vector(31 downto 0);
       const_i : in  std_logic_vector(95 downto 0);
       -- The text, character i in bits 8 * i + 7 .. 8 * i
       text_o  : out std_logic_vector(8 * G_LEN - 1 downto 0);
@@ -63,21 +66,20 @@ architecture synthesis of dbg_decode is
    type t_words is array (0 to 2) of t_word;
 
    -- The names, 8 characters each, padded with spaces: the ALU operations
-   -- 0 to 15, the SHIFT operations 16 to 31, HALT, RTI, INT, WAIT, and a
+   -- 0 to 15, the SHIFT operations 16 to 31, HALT, JMP, JMPR, CALL, and a
    -- reserved control word. One dimension, as GHDL 4.1 cannot synthesize
    -- the read of a two-dimensional constant.
    constant C_HALT     : natural := 32;
-   constant C_RTI      : natural := 33;
-   constant C_INT      : natural := 34;
-   constant C_WAIT     : natural := 35;
+   constant C_JMP      : natural := 33;
+   constant C_CALL     : natural := 35;
    constant C_RESERVED : natural := 36;
    constant C_NAMES_S  : string  :=
                                     "MOVE    SUB     MDBL    ADD     DBL     DEC     NOT     NOR     " &
                                     "IAND    NAND    XOR     IOR     XNOR    AND     ONE     OR      " &
                                     "SHL     0<1     0<C     C<0     C<1     C<C     ROL     BPL     " &
                                     "SHR     1>0     C>0     0>C     1>C     C>C     ROR     BPR     " &
-                                    "HALT    RTI     INT     WAIT    reserved";
-   constant C_FLAGS_S  : string  := "1XCZNVEI";
+                                    "HALT    JMP     JMPR    CALL    reserved";
+   constant C_FLAGS_S  : string  := "1XCZNVFF";
 
    type t_bytes is array (natural range <>) of t_byte;
 
@@ -98,21 +100,14 @@ architecture synthesis of dbg_decode is
    constant C_NAMES : t_bytes := bytes(C_NAMES_S);
    constant C_FLAGS : t_bytes := bytes(C_FLAGS_S);
 
-   -- The decimal digits of 0 to 255, three of 4 bits each
-   type t_bcd is array (0 to 255) of std_logic_vector(11 downto 0);
-
-   function bcd return t_bcd is
-      variable res_v : t_bcd;
+   -- Whether a control word is reserved: a command but HALT, JMP, JMPR,
+   -- and CALL, or HALT with a bit of 20..0 set (ISA.md §5.3)
+   function reserved(w : std_logic_vector(31 downto 0)) return boolean is
    begin
-      for n in 0 to 255 loop
-         res_v(n) := std_logic_vector(to_unsigned(n / 100, 4)) &
-                     std_logic_vector(to_unsigned((n / 10) mod 10, 4)) &
-                     std_logic_vector(to_unsigned(n mod 10, 4));
-      end loop;
-      return res_v;
-   end function bcd;
-
-   constant C_BCD : t_bcd := bcd;
+      return w(27 downto 26) = "11" and
+             not ((w(25 downto 21) = "00000" and w(20 downto 0) = 0) or
+                  w(25 downto 21) = "00100" or w(25 downto 21) = "00101" or w(25 downto 21) = "00110");
+   end function reserved;
 
    -- A hex digit in lower case
    function hex_char(n : std_logic_vector(3 downto 0)) return t_byte is
@@ -130,7 +125,7 @@ architecture synthesis of dbg_decode is
    end function takes_const;
 
    type t_st is (
-      IDLE_ST, COND_ST, NAME_ST, MODS_ST, ARGS_ST, VEC_ST,
+      IDLE_ST, COND_ST, NAME_ST, MODS_ST, ARGS_ST,
       AT_ST, PRE_ST, ZERO_ST, X_ST, SKIP_ST, HEX_ST, LB_ST,
       R_ST, REG_ST, REG2_ST, RB_ST, POST_ST, SEP_ST, DONE_ST
    );
@@ -142,12 +137,8 @@ architecture synthesis of dbg_decode is
    signal valid : std_logic := '0';
 
    -- What start_i took
-   signal word : t_word;
-   signal vec  : std_logic_vector(11 downto 0);        -- INT's vector in decimal
-
-   -- A small table, which Vivado would otherwise put in a block RAM
-   attribute rom_style : string;
-   attribute rom_style of vec : signal is "distributed";
+   signal word   : t_word;
+   signal target : t_word;                               -- JMP's, JMPR's, or CALL's
    signal name   : natural range 0 to C_RESERVED;
    signal nops   : natural range 0 to 3;                 -- The operands shown
    signal fields : t_fields;
@@ -172,7 +163,6 @@ begin
       variable j_v    : natural range 0 to 3;
       variable opc_v  : natural range 0 to 15;
       variable cmd_v  : natural range 0 to 31;
-      variable bcd_v  : std_logic_vector(11 downto 0);
       variable mode_v : std_logic_vector(2 downto 0);
       variable dest_v : boolean;
 
@@ -199,19 +189,22 @@ begin
             when IDLE_ST =>
                null;
 
-            -- ?, !, the flag, and a space
+            -- ?, !, the flag, the 0 or 1 of F0 or F1, and a space
             when COND_ST =>
                step <= step + 1;
                case step is
                   when 0 =>
                      put_v := true;
-                     ch_v  := X"3F";                        -- ?
+                     ch_v  := X"3F";                         -- ?
                   when 1 =>
                      put_v := word(31) = '1';
-                     ch_v  := X"21";                        -- !
+                     ch_v  := X"21";                         -- !
                   when 2 =>
                      put_v := true;
                      ch_v  := C_FLAGS(to_integer(word(30 downto 28)));
+                  when 3 =>
+                     put_v := word(30 downto 29) = "11";
+                     ch_v  := X"3" & "000" & word(28);       -- 0 or 1
                   when others =>
                      put_v := true;
                      step  <= 0;
@@ -257,35 +250,22 @@ begin
                      st    <= ARGS_ST;
                end case;
 
-            -- A space, then the vector of INT or the first operand
+            -- A space, then the target of JMP, JMPR, or CALL, as a
+            -- constant, or the first operand
             when ARGS_ST =>
                step <= 0;
-               if name = C_INT then
+               if name >= C_JMP and name <= C_CALL then
                   put_v := true;
-                  st    <= VEC_ST;
+                  op    <= 0;
+                  field <= "0110000";
+                  hex   <= target;
+                  st    <= ZERO_ST;
                elsif name >= C_HALT or nops = 0 then
                   st <= DONE_ST;
                else
                   put_v := true;
                   operand(0);
                end if;
-
-            -- The vector's decimal digits, without leading zeros
-            when VEC_ST =>
-               bcd_v := vec;
-               step  <= step + 1;
-               case step is
-                  when 0 =>
-                     put_v := bcd_v(11 downto 8) /= 0;
-                     ch_v  := X"3" & bcd_v(11 downto 8);
-                  when 1 =>
-                     put_v := bcd_v(11 downto 4) /= 0;
-                     ch_v  := X"3" & bcd_v(7 downto 4);
-                  when others =>
-                     put_v := true;
-                     ch_v  := X"3" & bcd_v(3 downto 0);
-                     st    <= DONE_ST;
-               end case;
 
             -- @ for memory, then -- before, a constant, or the register
             when AT_ST =>
@@ -425,8 +405,9 @@ begin
          end if;
 
          if start_i = '1' then
-            word  <= instr_i;
-            vec   <= C_BCD(to_integer(instr_i(7 downto 0)));
+            word   <= instr_i;
+            -- The address after the word plus the distance, sign-extended
+            target <= addr_i + 1 + ((31 downto 21 => instr_i(20)) & instr_i(20 downto 0));
             text  <= (others => X"20");
             pos   <= 0;
             step  <= 0;
@@ -445,10 +426,13 @@ begin
             cmd_v := to_integer(instr_i(25 downto 21));
             if instr_i(27 downto 26) = "11" then
                nops <= 0;
-               if cmd_v > 3 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0) then
+               if reserved(instr_i) then
                   name <= C_RESERVED;
+               elsif cmd_v = 0 then
+                  name <= C_HALT;
                else
-                  name <= C_HALT + cmd_v;
+                  name <= C_JMP + cmd_v - 4;
+                  nops <= 1;
                end if;
             elsif instr_i(27) = '1' then
                name <= 16 + opc_v;
@@ -465,8 +449,7 @@ begin
             -- word, which is not an instruction
             if instr_i(30 downto 28) = 0 and instr_i(31) = '0' then
                st <= NAME_ST;
-            elsif instr_i(27 downto 26) = "11" and
-                  (cmd_v > 3 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0)) then
+            elsif reserved(instr_i) then
                st <= NAME_ST;
             else
                st <= COND_ST;

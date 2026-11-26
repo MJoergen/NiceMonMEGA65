@@ -88,33 +88,33 @@ segment 2
 exit 0
 Slot 0: What the card holds that path.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7D7 -> FFFFFFFF
-FSInfo next free: 00000028 -> 00000026
+FSInfo free count: 0001F7DE -> FFFFFFFF
+FSInfo next free: 00000021 -> 0000001F
 FAT entries changed: 4
-  38: 0FFFFFFF -> 00000000
-  41-43: 00000000 -> 0FFFFFFF
+  31: 0FFFFFFF -> 00000000
+  34-36: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
-NICE/GAMES C33 entry 4:
+NICE/GAMES C26 entry 4:
   was zeros
-  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 42 size 1
-NICE/GAMES/OLD C34 entry 2:
-  was "PONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 38 size 18
-  now "\xe5ONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 38 size 18
-NICE/GAMES/OLD C34 entry 3:
+  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 35 size 1
+NICE/GAMES/OLD C27 entry 2:
+  was "PONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 31 size 18
+  now "\xe5ONG    BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 31 size 18
+NICE/GAMES/OLD C27 entry 3:
   was zeros
-  now "NEW     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 41 size 4
-NICE/MYGAME~1 C35 entry 5:
+  now "NEW     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 34 size 4
+NICE/MYGAME~1 C28 entry 5:
   was zeros
   now long 43 "le.txt\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 58 cluster 0000
-NICE/MYGAME~1 C35 entry 6:
+NICE/MYGAME~1 C28 entry 6:
   was zeros
   now long 02 " name of a fi" attr 0F type 00 sum 58 cluster 0000
-NICE/MYGAME~1 C35 entry 7:
+NICE/MYGAME~1 C28 entry 7:
   was zeros
   now long 01 "a much longer" attr 0F type 00 sum 58 cluster 0000
-NICE/MYGAME~1 C35 entry 8:
+NICE/MYGAME~1 C28 entry 8:
   was zeros
-  now "AMUCHL~1TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 43 size 40
+  now "AMUCHL~1TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 36 size 40
 NICE/GAMES/OLD/NEW.TXT: 4 bytes, "NEW\x0a"
 NICE/GAMES/OLD/NEW.TXT: its sector 0 past the size: 508 bytes, zeros
 NICE/GAMES/HELLO.BIN: 1 bytes, "X"
@@ -122,8 +122,8 @@ NICE/GAMES/HELLO.BIN: its sector 0 past the size: 511 bytes, zeros
 NICE/MYGAME~1/AMUCHL~1.TXT: 40 bytes, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE\x0aGHIJKLMN"
 NICE/MYGAME~1/AMUCHL~1.TXT: its sector 0 past the size: 472 bytes, zeros
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128981)
-IMAGE: 12 files, 41/129022 clusters
+Free cluster summary uninitialized (should be 128988)
+IMAGE: 12 files, 34/129022 clusters
 == BASIC's DIR, LOAD, SAVE, BSAVE, RUN, and DELETE through paths, SAVE into V2.0, a folder with a dot, which gets .BAS, and names with an empty last part, which get none, and are no names
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
@@ -209,23 +209,23 @@ Halted
 exit 0
 Slot 0: What the card holds that path.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7D7 -> FFFFFFFF
-FSInfo next free: 00000028 -> 00000029
+FSInfo free count: 0001F7DE -> FFFFFFFF
+FSInfo next free: 00000021 -> 00000022
 FAT entries changed: 1
-  42: 00000000 -> 0FFFFFFF
+  35: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
-NICE/GAMES/OLD C34 entry 3:
+NICE/GAMES/OLD C27 entry 3:
   was zeros
-  now "\xe5       BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 41 size 18
-NICE/V2      0 C36 entry 2:
+  now "\xe5       BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 34 size 18
+NICE/V2      0 C29 entry 2:
   was zeros
-  now "PROG    BAS" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 42 size 14
-C41, of no file: 18 bytes not 0, SHA-256 da3c009d33bc86e9
+  now "PROG    BAS" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 35 size 14
+C34, of no file: 18 bytes not 0, SHA-256 da3c009d33bc86e9
 NICE/V2      0/PROG.BAS: 14 bytes, "10 PRINT "v2"\x0a"
 NICE/V2      0/PROG.BAS: its sector 0 past the size: 498 bytes, zeros
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128982)
-IMAGE: 11 files, 40/129022 clusters
+Free cluster summary uninitialized (should be 128989)
+IMAGE: 11 files, 33/129022 clusters
 == TAB down a path: a folder gets a /, then its names; a long name in a path, and none in a folder that is not there, nor after //, which is no path
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements

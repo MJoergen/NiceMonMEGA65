@@ -26,5 +26,5 @@ Screen:
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0

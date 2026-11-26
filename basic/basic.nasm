@@ -131,9 +131,12 @@ V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
 ; jumps to, and the header (issue #153, doc/BASIC_ROM.md, "The image").
 ; The words that are 0 here, the length, the checksum, the version as a
 ; number, and the flags, ../tools/basic_rom.py fills in after assembly.
+; Each vector is the long form of a jump, two words, as the header's
+; layout has it from before nice_cpu V3.0, where a JMP to a label became
+; one word.
                 .ORG    BASIC_BASE
-                JMP     bas_start
-                JMP     bas_warm
+                MOVE    R15, bas_start  ; +0: the cold start
+                MOVE    R15, bas_warm   ; +2: the warm start
                 .DAT    BAS_MAGIC       ; +4: the magic word, NBAS in packed ASCII
                 .DAT    65536*MON_LAYOUT+MON_ENTRIES  ; +5: the interface
                 .DAT    0               ; +6: the length in words, from BASIC_BASE

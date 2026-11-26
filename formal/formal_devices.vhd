@@ -42,7 +42,6 @@ entity formal_devices is
       link_we_i    : in  std_logic;
       link_addr_i  : in  std_logic_vector(7 downto 0);
       link_wdata_i : in  std_logic_vector(31 downto 0);
-      irq_ready_i  : in  std_logic;
       sd_dat0_i    : in  std_logic_vector(1 downto 0);
       sd_cd_n_i    : in  std_logic_vector(1 downto 0);
       sd_wp_i      : in  std_logic_vector(1 downto 0);
@@ -112,9 +111,6 @@ begin
          busy_o       => busy,
          owed_o       => owed,
          stall_o      => stall,
-         irq_valid_o  => open,
-         irq_ready_i  => irq_ready_i,
-         irq_vector_o => open,
          sd_clk_o     => open,
          sd_cmd_o     => open,
          sd_dat3_o    => open,

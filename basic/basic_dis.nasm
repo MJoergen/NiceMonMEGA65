@@ -14,8 +14,9 @@ DIS_ROWS        .EQU    20              ; the instructions that DIS shows withou
 ; disassembled, a row each: the address, the instruction's words, 1 to
 ; 4, and its text, as nicedis.py shows it (README.md). Without ADDR, the
 ; instructions after the last shown; without N, DIS_ROWS. ADD @--R13, n, R15 and MOVE R15, target,
-; with the same condition, no modifier, and n the words of the MOVE, are
-; one row, CALL target, MOVE R15, @R13++ is RET, and the other
+; with the same condition, no modifier, n the words of the MOVE, and a
+; target that is not a constant alone, are one row, CALL target, MOVE
+; R15, @R13++ is RET, and the other
 ; pseudo-instructions of nice_cpu's ISA.md §10.1 are those of U_PSEUDO,
 ; the first that matches. R7 is the address of the instruction, R8 counts
 ; the rows left, R9 is the instruction word, R10 its kind, an index of
@@ -66,6 +67,9 @@ dis_row
                 AND     R3, R2, 0x0FFFC07F
                 CMP     R3, 0x0003C000  ; MOVE R15, s0
         ?!Z     JMP     dis_find
+                AND     R3, R2, 0x00003F80
+                CMP     R3, 0x00001800  ; s0 a constant alone, the long
+        ?Z      JMP     dis_find        ; form of a one-word CALL
                 MOVE    R4, 1           ; the words of the MOVE
                 SHR     R3, R2, 7
                 AND     R3, R3, 0x30
@@ -77,8 +81,12 @@ dis_row
                 MOVE    R10, 3
                 JMP     dis_print
 ; The first entry of U_PSEUDO whose mask and value match, kind 5 for the
-; first, or kind 0, a plain instruction
+; first, or kind 0, a plain instruction. MOVE R15, a constant alone, is a
+; plain instruction, the long form of a one-word JMP.
 dis_find
+                CLR     R10
+                CMP     R1, 0x0003D800  ; MOVE R15, a constant
+        ?Z      JMP     dis_print
                 MOVE    R10, 5
                 MOVE    R2, U_PSEUDO
 :
@@ -91,20 +99,19 @@ dis_find
         ?!Z     JMP     :-
                 CLR     R10
                 JMP     dis_print
-; A control instruction, which is reserved with a command past WAIT, a bit
-; of 20..8 set, or a vector but for INT
+; A control instruction (nice_cpu's ISA.md §5.3): HALT, with bits 20..0
+; 0, or JMP, JMPR, or CALL, commands 4 to 6, kind 1; else reserved, kind 4
 dis_ctrl
-                MOVE    R10, 1
+                MOVE    R10, 4
                 SHR     R1, R9, 21
-                AND     R1, R1, 0x1F
-                CMP     R1, 4
-        ?!C     MOVE    R10, 4
-                AND[M]  R0, R9, 0x001FFF00
-        ?!Z     MOVE    R10, 4
-                CMP     R1, 2
-        ?Z      JMP     dis_print
-                AND[M]  R0, R9, 0xFF
-        ?!Z     MOVE    R10, 4
+                AND[M]  R1, R1, 0x1F    ; the command
+        ?!Z     JMP     :+
+                AND[M]  R0, R9, 0x001FFFFF
+        ?Z      MOVE    R10, 1          ; HALT
+                JMP     dis_print
+:               SUB     R1, R1, 4
+                CMP     R1, 3
+        ?C      MOVE    R10, 1          ; JMP, JMPR, or CALL
 ; The address, the words, blanks for the words that the instruction does
 ; not have, and the text of its kind
 dis_print
@@ -164,21 +171,28 @@ dis_insn
 :
                 CALL    u_stmt
                 JMP     dis_end
-; Kind 1, HALT, RTI, INT, with its vector in decimal, or WAIT
+; Kind 1, HALT, or JMP, JMPR, or CALL with its target, the address after
+; it, R12, plus the distance in bits 20..0, in hex
 dis_cmd         MOVE    R1, R9
                 CALL    u_cond
                 SHR     R1, R9, 21
                 AND     R11, R1, 0x1F
                 MOVE    R1, @U_CTRL[R11]
                 CALL    puts_b
-                CMP     R11, 2
-        ?!Z     JMP     dis_end
+                TST     R11
+        ?Z      JMP     dis_end         ; HALT
                 MOVE    R1, 0x20
                 CALL    MON_PUTC
                 MOVE    R1, HUE_NUM
                 CALL    hue
-                AND     R1, R9, 0xFF
-                CALL    _io_putdec
+                MOVE    R1, S_U0X
+                CALL    puts_b
+                AND     R1, R9, 0x001FFFFF
+                AND[M]  R0, R9, 0x00100000
+        ?!Z     OR      R1, R1, 0xFFE00000  ; a distance back
+                ADD     R1, R1, R12
+                MOVE    R2, 1
+                CALL    u_hex
                 JMP     dis_end
 ; Kind 2, RET
 dis_ret         MOVE    R1, R9
@@ -345,8 +359,16 @@ u_cond
                 CALL    MON_PUTC
 :
                 AND     R1, R5, 7
-                MOVE    R1, @TEXT_B+4*S_UFLAGS[R1]
+                CMP     R1, 6
+        ?C      JMP     :+
+                PUSH    R1              ; F0 or F1
+                MOVE    R1, 0x46        ; F
                 CALL    MON_PUTC
+                POP     R1
+                ADD     R1, R1, 0x2A    ; 0 or 1
+                JMP     :++
+:               MOVE    R1, @TEXT_B+4*S_UFLAGS[R1]
+:               CALL    MON_PUTC
                 MOVE    R1, 0x20
                 JMP     MON_PUTC        ; which returns to the caller
 
@@ -451,7 +473,7 @@ U_NAMES         .DAT    U_MOVE, U_SUB, U_MDBL, U_ADD, U_DBL, U_DEC, U_NOT, U_NOR
                 .DAT    U_IAND, U_NAND, U_XOR, U_IOR, U_XNOR, U_AND, U_ONE, U_OR
                 .DAT    U_SHL, U_S1, U_S2, U_S3, U_S4, U_S5, U_ROL, U_BPL
                 .DAT    U_SHR, U_S9, U_S10, U_S11, U_S12, U_S13, U_ROR, U_BPR
-U_CTRL          .DAT    U_HALT, U_RTI, U_INT, U_WAIT
+U_CTRL          .DAT    U_HALT, 0, 0, 0, U_JMP, U_JMPR, U_CALL
 U_NOPS          .DAT    2, 3, 3, 3, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 1, 3
 U_FIELDS
                 .DAT    U_FDEST, U_FS0, U_FS1
@@ -521,9 +543,9 @@ U_ROR           .ASCII_B 'ROR'
 U_BPR           .ASCII_B 'BPR'
 U_HALT          .ASCII_B 'HALT'
                 .DAT    0
-U_RTI           .ASCII_B 'RTI'
-U_INT           .ASCII_B 'INT'
-U_WAIT          .ASCII_B 'WAIT'
+U_JMPR          .ASCII_B 'JMPR'
+                .DAT    0
+U_CALL          .ASCII_B 'CALL'
                 .DAT    0
 U_FDEST         .ASCII_B 'dest: '
 U_FS0           .ASCII_B 's0: '
@@ -531,8 +553,7 @@ U_FS0           .ASCII_B 's0: '
 U_FS1           .ASCII_B 's1: '
                 .DAT    0
 S_UFLAGS
-                .ASCII_B '1XCZNVEI'
-                .DAT    0
+                .ASCII_B '1XCZNV'
 S_URET          .ASCII_B 'RET'
 S_UCALL         .ASCII_B 'CALL '
 S_URSVD         .ASCII_B 'reserved control word'

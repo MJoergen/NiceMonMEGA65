@@ -40,13 +40,6 @@ entity nice_core is
       dbus_data_o   : out std_logic_vector(31 downto 0);
       dbus_data_i   : in  std_logic_vector(31 downto 0);
 
-      -- Interrupt requests
-      nmi_valid_i   : in  std_logic;
-      nmi_ready_o   : out std_logic;
-      nmi_vector_i  : in  std_logic_vector(7 downto 0);
-      irq_valid_i   : in  std_logic;
-      irq_ready_o   : out std_logic;
-      irq_vector_i  : in  std_logic_vector(7 downto 0);
 
       -- Pause before the next step, and '1' while paused (nice_cpu's
       -- MICROARCH.md §6.1)
@@ -74,10 +67,6 @@ entity nice_core is
       reg_we_i      : in  std_logic                     := '0';
       reg_idx_i     : in  std_logic_vector(3 downto 0)  := (others => '0');
       reg_data_i    : in  std_logic_vector(31 downto 0) := (others => '0');
-      -- '1' while the core waits for an interrupt after WAIT, also while
-      -- paused, until a request is valid (ISA.md §7.5), for bit 6 of the
-      -- link's control register (DEBUG.md §6)
-      waiting_o     : out std_logic;
       -- '1' once the core has halted, and no bus cycle is open
       halted_o      : out std_logic;
       -- Why the core halted, while halted_o is '1', else HALT_NONE
@@ -86,13 +75,6 @@ entity nice_core is
       -- R0-R15 from the core's registers: in the cycle after a step is
       -- reported on retire_o, those of that report
       regs_o        : out t_regs;
-      -- The hidden state of ISA.md §1.4, from registers, as regs_o, for
-      -- bits 7 and 8 of the link's control register and its words
-      -- 0xFFFFFFD0 and 0xFFFFFFD1 (DEBUG.md §6)
-      in_service_o  : out std_logic;
-      after_rti_o   : out std_logic;
-      saved_pc_o    : out std_logic_vector(31 downto 0);
-      saved_sr_o    : out std_logic_vector(31 downto 0);
       -- One report per step, for simulation
       retire_o      : out t_retire;
       -- What FETCH and DECODE do in each cycle, for the fetch statistics.

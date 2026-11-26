@@ -478,7 +478,7 @@ READY.
 halt
 Halted
 ffffdfff: 00000000
-ffffe7ff: 00003126
+ffffe7ff: 000030d8
 0001e3ff: 00000005 00000000
 Screen:
 |BASIC-V10.ROM from card 0
@@ -505,7 +505,7 @@ Returned 1234ABCD
 READY.
 halt
 Halted
-00008000: 00005800 1234abcd 0003d800
+00008000: 00005800 1234abcd 0c9f7fff
 Screen:
 |NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
@@ -555,7 +555,7 @@ Returned 1234ABCD
 READY.
 halt
 Halted
-00008000: 00005800 1234abcd 0003d800
+00008000: 00005800 1234abcd 0c9f7fff
 Screen:
 |NiceMon V9.9, BASIC V9.9
 |HELP lists the statements

@@ -22,7 +22,7 @@ YOUR MOVE? e2e4
 2  P P P P . P P P
 1  R N B Q K B N R
    a b c d e f g h
-DEPTH 1, SCORE 10, b8c6, NODES 25, 1.9 S
+DEPTH 1, SCORE 10, b8c6, NODES 25, 1.7 S
 1... b8c6
 
 8  r . b q k b n r
@@ -48,7 +48,7 @@ YOUR MOVE? d2d4
 2  P P P . . P P P
 1  R N B Q K B N R
    a b c d e f g h
-DEPTH 1, SCORE 20, g8f6, NODES 29, 2.3 S
+DEPTH 1, SCORE 20, g8f6, NODES 29, 2.1 S
 2... g8f6
 
 8  r . b q k b . r
@@ -72,7 +72,7 @@ YOUR MOVE? g1f3
 2  P P P . . P P P
 1  R N B Q K B . R
    a b c d e f g h
-DEPTH 1, SCORE 100, f6e4, NODES 30, 1.8 S
+DEPTH 1, SCORE 100, f6e4, NODES 30, 1.7 S
 3... f6e4
 
 8  r . b q k b . r

@@ -237,11 +237,10 @@ The strip shows:
 | State | What it means |
 |---|---|
 | `RUNNING` | The program runs |
-| `WAITING` | The program waits for an interrupt |
-| `PAUSED` | The program is paused; `PAUSED W` when it was waiting |
+| `PAUSED` | The program is paused |
 | `BRK n` | The program stopped at breakpoint n |
 | `WCH n` | The program stopped at watchpoint n, which only a PC sets |
-| `HALTED n` | The program halted: n is 1 after `HALT`, and 2 to 4 after an error |
+| `HALTED n` | The program halted: n is 1 after `HALT`, and 2 after a reserved control word |
 | `HELD` | The processor is held in reset |
 
 | Key | Action |
@@ -467,17 +466,15 @@ the processor:
 
 <pre>
 $ <b>tools/nicemon.py mon --eth 192.168.1.65</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.8, input free 2048
-PC=0000000f
-interrupts: none
+halted: HALT, ROM hidden, control 0000000a, link version 1.0, input free 2048
+PC=0000000d
 </pre>
 
 The processor may be running, paused, at a breakpoint, held in reset,
 halted, or held after a halt, with the reason. Then come whether the
 ROM is hidden, the value of the control register, the version of the
 link as major.minor, and the free bytes in the program's input buffer.
-A paused or halted processor shows its PC too, and whether an interrupt
-is pending or being served. The ROM is hidden when a tool has loaded a
+A paused or halted processor shows its PC too. The ROM is hidden when a tool has loaded a
 program at address 0 in its place, to run it as the emulator does; the
 reset button brings the monitor back.
 
@@ -514,11 +511,11 @@ their addresses:
     0  LOOP  MOVE    R1, @CONSOLE      ; bit 8 set when a byte has arrived
     2        AND[M]  R2, R1, 0x100
     4    ?Z  JMP     LOOP              ; nothing yet
-    6        AND     R1, R1, 0xFF
-    8        MOVE    @CONSOLE, R1      ; echo the byte
-    A        SUB[M]  R2, R1, 0x2E      ; a '.'?
-    C   ?!Z  JMP     LOOP
-    E        HALT
+    5        AND     R1, R1, 0xFF
+    7        MOVE    @CONSOLE, R1      ; echo the byte
+    9        SUB[M]  R2, R1, 0x2E      ; a '.'?
+    B   ?!Z  JMP     LOOP
+    C        HALT
 
 Assemble it, and start `nicemon.py mon`. The state shown here is that after an
 earlier program halted. Load the program, and the processor is held in
@@ -529,24 +526,23 @@ reset, with the program in memory. The control register then reads
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
 $ <b>tools/nicemon.py mon --eth 192.168.1.65</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.8, input free 2048
-PC=0000000f
-interrupts: none
+halted: HALT, ROM hidden, control 0000000a, link version 1.0, input free 2048
+PC=0000000d
 'help' lists the commands, and 'q' quits.
 dbg&gt; <b>load echo.bin</b>
-loaded 15 words; the processor is held in reset
+loaded 13 words; the processor is held in reset
 dbg&gt; <b>status</b>
-held, ROM hidden, control 00000009, link version 0.8, input free 2048
-dbg&gt; <b>r 0 f</b>
-00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
-00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
+held, ROM hidden, control 00000009, link version 1.0, input free 2048
+dbg&gt; <b>r 0 d</b>
+00000000: 00007800 ffffff00 03a080b0 00000100 3c9ffffb 01a040b0 000000ff 001c0080
+00000008: ffffff00 022080b0 0000002e bc9ffff4 0c000000
 </pre>
 
 Start the program, and pause it. It waits in its loop for input. The PC
 comes with the instruction there, the next one to run. R14 is the
 status register, and it reads `0x09000000`: Z (bit 27), as no byte has
-arrived, and bit 24, which is always 1. A jump is a move to R15, the
-PC, so the shell shows `?Z JMP LOOP` as `?Z MOVE R15, 0x0`:
+arrived, and bit 24, which is always 1. The shell shows the jump `?Z JMP LOOP` as
+`?Z JMP 0x0`, with the address of `LOOP`:
 
 <pre>
 dbg&gt; <b>go</b>
@@ -559,36 +555,36 @@ R8  00000000 R9  00000000 R10 00000000 R11 00000000
 R12 00000000 R13 00000000 R14 09000000 R15 00000000
 dbg&gt; <b>s 3</b>
 PC=00000002  AND[M] R2, R1, 0x100
-PC=00000004  ?Z MOVE R15, 0x0
+PC=00000004  ?Z JMP 0x0
 PC=00000000  MOVE R1, @0xffffff00
 </pre>
 
-Set a breakpoint at 6, which the program reaches only when a byte has
+Set a breakpoint at 5, which the program reaches only when a byte has
 arrived, and go on. Send it an `A`, and it stops. R1 holds the console's
 read: bit 8 set, and `0x41`, the `A`. R14 is `0x01000000`, as Z is clear:
 
 <pre>
-dbg&gt; <b>b 6</b>
-0: 00000006
+dbg&gt; <b>b 5</b>
+0: 00000005
 dbg&gt; <b>g</b>
 dbg&gt; <b>send A</b>
-[breakpoint 0, PC=00000006  AND R1, R1, 0xff]
+[breakpoint 0, PC=00000005  AND R1, R1, 0xff]
 dbg&gt; <b>regs</b>
 R0  00000000 R1  00000141 R2  00000100 R3  00000000
 R4  00000000 R5  00000000 R6  00000000 R7  00000000
 R8  00000000 R9  00000000 R10 00000000 R11 00000000
-R12 00000000 R13 00000000 R14 01000000 R15 00000006
+R12 00000000 R13 00000000 R14 01000000 R15 00000005
 dbg&gt; <b>s</b>
-PC=00000008  MOVE @0xffffff00, R1
+PC=00000007  MOVE @0xffffff00, R1
 dbg&gt;
 A
-PC=0000000a  SUB[M] R2, R1, 0x2e
+PC=00000009  SUB[M] R2, R1, 0x2e
 dbg&gt;
-PC=0000000c  ?!Z MOVE R15, 0x0
+PC=0000000b  ?!Z JMP 0x0
 </pre>
 
 An empty line repeats the last `step` command, here one step at a time.
-The step at 8 echoes the `A`. Then disable the breakpoint, go on, and
+The step at 7 echoes the `A`. Then disable the breakpoint, go on, and
 type to the program in the console, until Ctrl-]. A `.` ends it:
 
 <pre>
@@ -599,11 +595,10 @@ console; Ctrl-] returns to the prompt
 Hello
 dbg&gt; <b>send .</b>
 .
-[halted: HALT, PC=0000000f]
+[halted: HALT, PC=0000000d]
 dbg&gt; <b>status</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.8, input free 2048
-PC=0000000f
-interrupts: none
+halted: HALT, ROM hidden, control 0000000a, link version 1.0, input free 2048
+PC=0000000d
 dbg&gt; <b>q</b>
 </pre>
 

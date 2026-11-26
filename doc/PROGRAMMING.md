@@ -29,7 +29,7 @@ Three documents say what a program sees:
   instruction set.
 - nice_cpu's [doc/DEVICES.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md)
   specifies the devices: the console, the math unit, the performance
-  counters, the timer, and the others. It is cited here as "nice_cpu's
+  counters, and the others. It is cited here as "nice_cpu's
   DEVICES.md".
 - [SYSTEM.md](SYSTEM.md) here has the address map of the board, with
   its screen, its keyboard, and its memory, which is 128K words on the
@@ -165,7 +165,7 @@ there in different cases:
 | 3. The libraries | `monlib.nasm`, nice_cpu's runtime, and its C library | In the program's own image, joined when it is built | The same |
 
 **The hardware.** Every program has the console at `0xFFFFFF00`, the
-math unit, the counters, the timer, the screen, the fonts, the
+math unit, the counters, the screen, the fonts, the
 keyboard, the network station, the port for Ethernet frames, and the SD
 card controller, as registers. nice_cpu's DEVICES.md specifies its
 devices, and [SYSTEM.md](SYSTEM.md) here the address map and the

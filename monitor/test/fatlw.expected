@@ -43,7 +43,7 @@ Words saved: 2, 00008000 to 00008001
 READY.
 dir
 Directory of NICE in slot 0
-my prog.bin                    14436
+my prog.bin                    11124
 mixed.Bin                         18
 lower.bin                         14
 caf?.bin                          14
@@ -125,14 +125,14 @@ Screen:
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0
 fsck.fat -n:
 Wrong checksum for long file name "bad sum.bin".
   (Short name BADSUM~1.BIN may have changed without updating the long name)
   Not auto-correcting this.
-Free cluster summary uninitialized (should be 129983)
-IMAGE: 40 files, 57/130040 clusters
+Free cluster summary uninitialized (should be 129987)
+IMAGE: 40 files, 53/130040 clusters
 Files in NICE: my prog.bin mixed.Bin lower.bin cafÉ.bin λx.bin a much longer name of a file.bin x.bin nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt PAD01.TXT PAD02.TXT PAD03.TXT PAD04.TXT PAD05.TXT PAD06.TXT PAD07.TXT PAD08.TXT PAD09.TXT PAD10.TXT across a sector.bin PAD11.TXT PAD12.TXT PAD13.TXT PAD14.TXT PAD15.TXT PAD16.TXT PAD17.TXT PAD18.TXT PAD19.TXT PAD20.TXT PAD21.TXT PAD22.TXT PAD23.TXT across a cluster.bin BADSUM~1.BIN mandelbrot.bin mandelbrot3.txt Hello.bin lower2.bin a b.bin
 mandelbrot.bin:
 00008000 1234abcd
@@ -147,14 +147,14 @@ mixed.Bin:
 00008000 1234abcd
 What the card holds that lfn.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001FBC4 -> FFFFFFFF
-FSInfo next free: 0000003F -> 00000019
+FSInfo free count: 0001FBC8 -> FFFFFFFF
+FSInfo next free: 0000003B -> 00000015
 FAT entries changed: 5
-  64-68: 00000000 -> 0FFFFFFF
+  60-64: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
 NICE C3+0 entry 5:
-  was "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 19 size 14
-  now "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 19 size 18
+  was "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 15 size 14
+  now "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 15 size 18
 NICE C3+0 entry 10:
   was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 8C cluster 0000
   now long 43 "le.bin\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum C6 cluster 0000
@@ -162,50 +162,50 @@ NICE C3+0 entry 11:
   was long 01 "mandelbrot1.t" attr 0F type 00 sum 8C cluster 0000
   now long 02 " name of a fi" attr 0F type 00 sum C6 cluster 0000
 NICE C3+0 entry 12:
-  was "MANDEL~1TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 23 size 17
+  was "MANDEL~1TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 19 size 17
   now long 01 "a much longer" attr 0F type 00 sum C6 cluster 0000
 NICE C3+0 entry 13:
   was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 6C cluster 0000
-  now "AMUCHL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 23 size 36
+  now "AMUCHL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 19 size 36
 NICE C3+0 entry 14:
   was long 01 "mandelbrot2.t" attr 0F type 00 sum 6C cluster 0000
-  now "X       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 24 size 36
+  now "X       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 20 size 36
 NICE C3+0 entry 15:
-  was "MANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 24 size 17
-  now "\xe5ANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 24 size 17
-NICE C62+0 entry 4:
+  was "MANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 17
+  now "\xe5ANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 17
+NICE C58+0 entry 4:
   was zeros
   now long 42 "n\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 7A cluster 0000
-NICE C62+0 entry 5:
+NICE C58+0 entry 5:
   was zeros
   now long 01 "mandelbrot.bi" attr 0F type 00 sum 7A cluster 0000
-NICE C62+0 entry 6:
+NICE C58+0 entry 6:
   was zeros
-  now "MANDEL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 64 size 36
-NICE C62+0 entry 7:
+  now "MANDEL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 60 size 36
+NICE C58+0 entry 7:
   was zeros
   now long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum CC cluster 0000
-NICE C62+0 entry 8:
+NICE C58+0 entry 8:
   was zeros
   now long 01 "mandelbrot3.t" attr 0F type 00 sum CC cluster 0000
-NICE C62+0 entry 9:
+NICE C58+0 entry 9:
   was zeros
-  now "MANDEL~3TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 65 size 36
-NICE C62+0 entry 10:
+  now "MANDEL~3TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 61 size 36
+NICE C58+0 entry 10:
   was zeros
   now long 41 "Hello.bin\u0000\uffff\uffff\uffff" attr 0F type 00 sum DF cluster 0000
-NICE C62+0 entry 11:
+NICE C58+0 entry 11:
   was zeros
-  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 66 size 36
-NICE C62+0 entry 12:
+  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 62 size 36
+NICE C58+0 entry 12:
   was zeros
-  now "LOWER2  BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 67 size 36
-NICE C62+0 entry 13:
+  now "LOWER2  BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 63 size 36
+NICE C58+0 entry 13:
   was zeros
   now long 41 "a b.bin\u0000\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum DA cluster 0000
-NICE C62+0 entry 14:
+NICE C58+0 entry 14:
   was zeros
-  now "AB~1    BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 68 size 36
+  now "AB~1    BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 64 size 36
 NICE/MIXED.BIN: 18 bytes, "00008000 1234abcd\x0a"
 NICE/MIXED.BIN: its sector 0 past the size: 494 bytes, zeros
 NICE/AMUCHL~1.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
@@ -223,10 +223,10 @@ NICE/LOWER2.BIN: its sector 0 past the size: 476 bytes, zeros
 NICE/AB~1.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
 NICE/AB~1.BIN: its sector 0 past the size: 476 bytes, zeros
 Sector writes, 64:
-mount 0, C62+0, FSInfo, FAT1+0, FAT2+0, C64+0, C62+0, FSInfo, C62+0,
-FAT1+0, FAT2+0, C65+0, C62+0, FSInfo, C62+0, FAT1+0, FAT2+0, C66+0,
-C62+0, FSInfo, C62+0, FAT1+0, FAT2+0, C67+0, C62+0, FSInfo, C62+0,
-FAT1+0, FAT2+0, C68+0, C62+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo,
-FAT1+0, FAT2+0, C19+0, C3+0, FSInfo, C3+0 x3, FAT1+0, FAT2+0, FSInfo,
-C3+0 x3, FAT1+0, FAT2+0, FSInfo, C3+0, FAT1+0, FAT2+0, C23+0, C3+0,
-FSInfo, C3+0, FAT1+0, FAT2+0, C24+0, C3+0, FSInfo
+mount 0, C58+0, FSInfo, FAT1+0, FAT2+0, C60+0, C58+0, FSInfo, C58+0,
+FAT1+0, FAT2+0, C61+0, C58+0, FSInfo, C58+0, FAT1+0, FAT2+0, C62+0,
+C58+0, FSInfo, C58+0, FAT1+0, FAT2+0, C63+0, C58+0, FSInfo, C58+0,
+FAT1+0, FAT2+0, C64+0, C58+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo,
+FAT1+0, FAT2+0, C15+0, C3+0, FSInfo, C3+0 x3, FAT1+0, FAT2+0, FSInfo,
+C3+0 x3, FAT1+0, FAT2+0, FSInfo, C3+0, FAT1+0, FAT2+0, C19+0, C3+0,
+FSInfo, C3+0, FAT1+0, FAT2+0, C20+0, C3+0, FSInfo

@@ -101,28 +101,28 @@ romsize` writes it (`tools/romsize.py`).
 <!-- romsize demo -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `demo.nasm`, from `0x8000` | The entry, the vector of the timer's interrupt at `0x8041`, and the unused words before it | 66 | 0 |
-| `demo.nasm`, `TYPEW` | F1, the typewriter, with `CELL`, `FILL`, and `PRINT`, which the other demos call too | 216 | 0 |
-| `demo.nasm`, `KCODES` | F3, the key codes | 118 | 0 |
-| `demo.nasm`, `CHARS` | F5, the characters and the colors | 101 | 0 |
-| `demo.nasm`, `COUNTS` | F7, the counters and the prime sieve, with `DEC64`, which F9 and F11 call too | 409 | 0 |
-| `demo.nasm`, `GAME` | F9, the comet | 333 | 0 |
-| `demo.nasm`, `BOARD` | F11, the self-tests and the network's addresses | 812 | 0 |
-| `demo.nasm`, `MONITOR` | F12, the return to the monitor | 24 | 0 |
-| `demo.nasm`, `POLL` | The keys and their escape sequences, the frame of the screen, and the scroll | 216 | 0 |
+| `demo.nasm`, from `0x8000` | The entry, which jumps to the typewriter | 3 | 0 |
+| `demo.nasm`, `TYPEW` | F1, the typewriter, with `CELL`, `FILL`, and `PRINT`, which the other demos call too | 162 | 0 |
+| `demo.nasm`, `KCODES` | F3, the key codes | 94 | 0 |
+| `demo.nasm`, `CHARS` | F5, the characters and the colors | 81 | 0 |
+| `demo.nasm`, `COUNTS` | F7, the counters and the prime sieve, with `DEC64`, which F9 and F11 call too | 335 | 0 |
+| `demo.nasm`, `GAME` | F9, the comet | 267 | 0 |
+| `demo.nasm`, `BOARD` | F11, the self-tests and the network's addresses | 594 | 0 |
+| `demo.nasm`, `MONITOR` | F12, the return to the monitor | 21 | 0 |
+| `demo.nasm`, `POLL` | The keys and their escape sequences, the frame of the screen, and the scroll | 167 | 0 |
 | `demo.nasm`, `FKEYS` | The function keys, the menu, the title bar, and the welcome | 186 | 114 |
 | `demo.nasm`, `K_TEXTS` | The texts of F3 | 273 | 257 |
 | `demo.nasm`, `C_TEXTS` | The texts and the colors of F5 | 230 | 196 |
 | `demo.nasm`, `P_TEXTS` | The texts of F7 | 298 | 240 |
 | `demo.nasm`, `G_TEXTS` | The texts and the steps of F9, and the shifts of F11's MAC address | 113 | 96 |
-| `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
+| `demo.nasm`, `S_TEXTS` | The texts of F11 | 834 | 797 |
 | `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
 | `colors.nasm` | The names of the colors, which take no words | 0 | 0 |
 | `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 564 | 564 |
 | `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
-| In all | | 5014 | 2382 |
+| In all | | 4324 | 2269 |
 
-The code is 2295 words, and the texts and tables 2719. They are at `0x8000`–`0x9395`, in 4953 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
+The code is 1724 words, and the texts and tables 2600. They are at `0x8000`–`0x90E3`, in 4324 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
 <!-- /romsize demo -->
 
 The demo changes only with a tag of nice_cpu, but its version and

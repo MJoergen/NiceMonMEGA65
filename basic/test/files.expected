@@ -124,7 +124,7 @@ READY.
 NEW
 READY.
 RUN "HELLO.BIN"
-Words loaded: 802, 00008000 to 00008321
+Words loaded: 618, 00008000 to 00008269
 Hello from 00008000, table 00010008
 at column 40
 on the line only
@@ -246,7 +246,7 @@ NEW
 READY.
 DIR
 Directory of NICE in slot 0
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 PC.BAS                            94
 BAD.BAS                           53
 NONUM.BAS                         38
@@ -274,7 +274,7 @@ Screen:
 |READY.
 |DIR
 |Directory of NICE in slot 0
-|HELLO.BIN                      14436
+|HELLO.BIN                      11124
 |PC.BAS                            94
 |BAD.BAS                           53
 |NONUM.BAS                         38
@@ -290,11 +290,11 @@ Screen:
 |READY.
 |HALT
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128982)
-IMAGE: 13 files, 40/129022 clusters
+Free cluster summary uninitialized (should be 128989)
+IMAGE: 13 files, 33/129022 clusters
 Files in NICE: HELLO.BIN PC.BAS BAD.BAS NONUM.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS IND.BAS BRK.BAS
 PROG.BAS:
    1   0       R   E   M       S   T   A   G   E       4   :    

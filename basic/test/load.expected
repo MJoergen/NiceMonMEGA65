@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 808, 00008000 to 0001E3FF
+Words loaded: 624, 00008000 to 0001E3FF
 Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E3FF
 READY.
 load
@@ -33,7 +33,7 @@ Screen:
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 808, 00008000 to 0001E3FF
+|Words loaded: 624, 00008000 to 0001E3FF
 |Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E3FF
 |READY.
 |load
@@ -53,5 +53,5 @@ Screen:
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0

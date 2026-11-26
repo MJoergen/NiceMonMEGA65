@@ -61,8 +61,6 @@ architecture formal of nice_core is
    signal dbus_we   : std_logic;
    signal dbus_addr : std_logic_vector(31 downto 0);
    signal dbus_data : std_logic_vector(31 downto 0);
-   signal nmi_ready : std_logic;
-   signal irq_ready : std_logic;
    signal paused    : std_logic;
    signal halted    : std_logic;
    signal reason    : std_logic_vector(2 downto 0);
@@ -97,8 +95,6 @@ architecture formal of nice_core is
    attribute anyseq of dbus_we   : signal is true;
    attribute anyseq of dbus_addr : signal is true;
    attribute anyseq of dbus_data : signal is true;
-   attribute anyseq of nmi_ready : signal is true;
-   attribute anyseq of irq_ready : signal is true;
    attribute anyseq of paused    : signal is true;
    attribute anyseq of halted    : signal is true;
    attribute anyseq of reason    : signal is true;
@@ -127,8 +123,6 @@ begin
    dbus_we_o   <= dbus_we;
    dbus_addr_o <= dbus_addr;
    dbus_data_o <= dbus_data;
-   nmi_ready_o <= nmi_ready;
-   irq_ready_o <= irq_ready;
    paused_o    <= paused;
    halted_o    <= halted;
    retire_o    <= retire;
@@ -143,9 +137,7 @@ begin
       case reason is
          when "000"  => halt_reason_o <= HALT_NONE;
          when "001"  => halt_reason_o <= HALT_HALT;
-         when "010"  => halt_reason_o <= HALT_RESERVED;
-         when "011"  => halt_reason_o <= HALT_NESTED_INT;
-         when others => halt_reason_o <= HALT_RTI_OUTSIDE_ISR;
+         when others => halt_reason_o <= HALT_RESERVED;
       end case;
    end process p_reason;
 
@@ -230,10 +222,6 @@ begin
    --    {dbus_accept and not rst_i} |=> {dbus_cyc or rst_i};
    -- psl f_dbus_max : assume always dbus_wait <= C_DBUS_MAX;
    -- psl f_dbus_reset : assume always {rst_i} |=> {not dbus_cyc and not dbus_stb};
-
-   -- The interrupt ports
-   -- psl f_nmi_ready : assume always nmi_ready -> nmi_valid_i and not rst_i;
-   -- psl f_irq_ready : assume always irq_ready -> irq_valid_i and not rst_i;
 
    -- The halt
    -- psl f_halt_reset : assume always {rst_i} |=> {not halted};

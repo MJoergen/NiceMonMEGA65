@@ -522,7 +522,7 @@ ecma55: $(ROM_TEST)
 # the dumps, and the screen with test/NAME.expected. The Halted line and
 # the registers are left out, as the steps and the registers change with
 # the code, and so are those of a stop at the step limit, of which its
-# words stay, but for VBASE, bits 23-0 of R14, which must be 0.
+# words stay, but for U, bits 23-0 of R14, which must be 0.
 # test/dis.py
 # checks the rows of DIS against nicedis.py and niceasm first,
 # test/ntp.py NTP, with DHCP and DNS before it, test/web.py HTTP$ and
@@ -598,7 +598,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	  { sed -e '/^Halted (HALT)/,/^R12 /d' \
 	      -e '/Stopped at the step limit/,/^R12 /{/Stopped/!d;s/Stopped at the step limit.*/Stopped at the step limit/;}' \
 	      $(BUILD)/$$t.raw; \
-	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
+	    sed -n 's/.* R14 ..\(......\) .*/U at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = time ]; then \
 	      $(PYTHON) $(MON_TEST)/fat_check.py $(BUILD)/time0.img; \

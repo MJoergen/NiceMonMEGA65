@@ -270,8 +270,8 @@ int mon_clock_set(unsigned secs, unsigned usecs);
 // gave, each 0 for none, written to srv. 0. Entry 35.
 MON_ENTRY(net_servers) int mon_net_servers(unsigned srv[2]);
 
-// The state after a program, for a program that runs another: E, the
-// timer, the FPU, VBASE, the font base, and the mode word cleared, the
+// The state after a program, for a program that runs another: F1, F0,
+// and U of the SR, the FPU, the font base, and the mode word cleared, the
 // network closed, and the cursor shown at its registers. 0. Entry 36.
 int mon_restore(void);
 

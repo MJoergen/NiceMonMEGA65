@@ -247,7 +247,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE in slot 0
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 Files: 1, directories: 0
 READY.
 halt
@@ -337,7 +337,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE in slot 0
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 F01.TXT                            0
 F02.TXT                            0
 F03.TXT                            0
@@ -379,7 +379,7 @@ HELP lists the statements
 READY.
 dir 1
 Directory of NICE in slot 1
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 Files: 1, directories: 0
 READY.
 dir -1

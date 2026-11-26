@@ -258,8 +258,7 @@ def demo_tables(args: argparse.Namespace) -> dict[str, list[str]]:
                 # the variables, which are not in it
                 if re.match(r"^\s+\.ORG\s+0x8000\b", line):
                     marker.part("`demo.nasm`, from `0x8000`",
-                                "The entry, the vector of the timer's interrupt at "
-                                "`0x8041`, and the unused words before it")
+                                "The entry, which jumps to the typewriter")
         else:
             marker.part(f"`demo/{base}`" if base == "text.nasm" else source_name(path),
                         DEMO_FILES[base])

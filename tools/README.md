@@ -617,9 +617,7 @@ undefined ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEB
 
 ### Step counts
 
-The step count is the core's instruction counter. The emulator's steps
-include interrupt entries, and the instruction counter does not, so a
-program with interrupts has more steps in the emulator. A read of the
+The step count is the core's instruction counter. A read of the
 console in the emulator waits for the next byte, but on the board it
 returns 0 while no byte has arrived. So a program that waits for input in
 a loop runs more steps on the board, and its step count differs.

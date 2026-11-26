@@ -182,8 +182,7 @@ These facts bound the design:
 - **The FPU is there.** nice_cpu `V2.2` has it, in the emulator and
   in `fpu.vhd`, and every board has it since #136.
 - **A console read takes its byte.** Nothing tells that a byte waits
-  without taking it, until the console's interrupt of nice_cpu V2.1
-  (#104). From a file, as in the tests, a read never finds "no byte":
+  without taking it. From a file, as in the tests, a read never finds "no byte":
   it gives the next byte of the file. And in `niceemu --window`, two
   reads that find no byte within 1000 steps put the emulator to sleep
   (nice_cpu's DEVICES.md §1.6).
@@ -873,7 +872,7 @@ The review of 2026-11-11 changed the list of #54 in these places:
   command for the clock of the time of day. The counter is `TI`, and
   the clock `TIME$`, set by assignment, when strings are there.
 - **`WAIT`** was the wait for a time, and is V2's wait on a memory
-  word, and a NICE instruction. The wait for a time is `SLEEP`, as
+  word. The wait for a time is `SLEEP`, as
   BASIC 65 has it.
 - **`DIR`** was under what is not included, and #60 has it.
 - **Storage** was "when #24 has storage". #24 is closed, and the file

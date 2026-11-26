@@ -25,7 +25,7 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b08` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b10` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
@@ -36,7 +36,7 @@
 --    link's after it, also through a byte window, and stays locked
 --    through a start and a reset. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 8, and the free space 16, the
+--    emulator. The version register reads 0x10, and the free space 16, the
 --    whole FIFO. The network station at 0xFFFFFFB0 has its addresses after
 --    reset, IP 0 and MAC 02:4E:49:43:45:00, which a write sets, its counts
 --    at 0, and NET_STATUS with the port and no host; a start keeps the
@@ -76,12 +76,12 @@
 --    CLOCK_USEC took, and "set". The words around it are still the
 --    counters'. A clear of "set" keeps the time.
 -- 8. Hold the core, load G_DEVICES_FILE, and run it. It uses the math unit,
---    the performance counters, the floating-point unit (FPU), and the
---    timer, whose interrupts it counts, and leaves the results in memory,
+--    the performance counters, and the floating-point unit (FPU), and
+--    leaves the results in memory,
 --    which the link reads back after the core has halted. It divides on
 --    the FPU and reads the quotient while the command runs, so that the
 --    reads wait, and leaves a square root there: the link reads it and
---    the FPU's status. The link reads and writes the timer too. The start
+--    the FPU's status. The start
 --    kept the clock and its "set", as only a reset of the system resets
 --    it.
 -- 9a. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
@@ -104,7 +104,7 @@
 -- 9c. Then G_COUNTERS_FILE reads through the core's data bus what the link
 --    reads elsewhere: the fetch statistics, which the start cleared and the
 --    program stops, so FS_CYCLES is small, the FS_CAUSE words sum to it, and
---    with the multi-cycle core only FS_CAUSE + 14 counts; the microsecond
+--    with the multi-cycle core only FS_CAUSE + 13 counts; the microsecond
 --    counter, right after the cycle counter; the LEDs, which it writes; and
 --    the buttons and switches; and the fonts, a row of the font RAM that
 --    it writes and reads at once, a row of the ROM, which drops its write,
@@ -122,25 +122,18 @@
 --    signed halfword through the windows, and writes a byte, which leaves
 --    the rest of its word.
 -- 12. Load G_BREAK_FILE, with breakpoint 0 at the address of its label READ,
---    an instruction that reads memory, and 1 at V3, the first of its
---    interrupt routine, and start it. The core stops at READ, the link
+--    an instruction that reads memory, and 1 at ROUTINE, the first of the
+--    routine that it calls, and start it. The core stops at READ, the link
 --    sends `x00`, bit 4 reads 1, and the stop register holds 0x100. A go on
---    stops at V3 with `x01`. Then, with the breakpoints disabled, a go on
+--    stops at ROUTINE with `x01`. Then, with the breakpoints disabled, a go on
 --    runs it to its halt, and the stop register reads 0. Then the four
 --    watchpoints (link version 7): watchpoint 0 on the reads of 0x200
 --    stops after READ with `w00`, R15 at the next instruction,
 --    0xFFFFFFD6 at READ, and 0x200 in the stop register; watchpoint 1 on
---    the writes there stops after STORE, in the interrupt routine, with
---    `w01`, and 0x201. Disabled, a go on runs to the halt, and 0xFFFFFFD6
---    and the stop register read 0. A start stops at READ again, and the
---    clear before step 13 ends the stop.
--- 13. Load G_WAIT_FILE, and start it. It waits for the timer's IRQ, and
---    bit 6 of the control register reads 1, also while paused, with the
---    timer stopped. Once it goes on, the IRQ ends the wait, and the routine
---    spins. Paused there, bit 6 reads 0, bit 7, in_service, and bit 10, the
---    timer's next request, read 1, and saved_pc at 0xFFFFFFD0 and saved_sr
---    at 0xFFFFFFD1 hold the word after the WAIT and the SR before the
---    entry (link version 7).
+--    the writes there stops after STORE, in the routine, with `w01`, and
+--    0x201. Disabled, a go on runs to the halt, and 0xFFFFFFD6 and the
+--    stop register read 0. A start stops at READ again.
+-- 13. A clear ends the stop: the stop register reads 0.
 -- 14. Load G_EOF_FILE, and run it. It echoes its input until the line's
 --    input ends, which a break on the UART does, and halts with 0x200 in
 --    R1. Console bytes sent after the halt are dropped.
@@ -187,7 +180,7 @@
 --    quiet, is answered at the old rate, and so is a read until the UART
 --    has sent nothing for 1 ms after the write; then the link answers at
 --    2 Mbaud.
--- 20. A reset while G_ECHO_FILE runs: the link sends `b08` at
+-- 20. A reset while G_ECHO_FILE runs: the link sends `b10` at
 --    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
 --    and the board's registers, the baud rate, the station's addresses,
 --    and the breakpoints are cleared.
@@ -224,7 +217,6 @@ entity tb_nicemon is
       G_EOF_FILE       : string;
       G_COUNTERS_FILE  : string;
       G_BREAK_FILE     : string;
-      G_WAIT_FILE      : string;
       G_SD_FILE        : string;
       -- The image of the card in slot 0, sim/Makefile's sd.img
       G_SD_IMAGE       : string;
@@ -898,13 +890,13 @@ begin
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b08, and the ROM";
-      expect_pkt("b08#CA");
+      report "tb_nicemon: b10, and the ROM";
+      expect_pkt("b10#C3");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000008");         -- the version
+      check("FFFFFFF2", "00000010");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("FFFFFF9E", "00001000");         -- the RAM's words, 2 ** G_RAM_ADDR_BITS
       wr("FFFFFF9E", "00000001");            -- dropped
@@ -1136,18 +1128,12 @@ begin
       check("00000102", "FFFFFF72");         -- -1000 / 7 = -142
       check("00000103", "FFFFE4A8");         -- -1000 * 7 = -7000
       check("00000104", "00000001");         -- instructions between two reads
-      check("00000105", "00000003");         -- interrupts of the timer taken
       check("00000106", "4061DB6D");         -- 1000.0 / 7.0 in the FPU
       check("00000107", "B6DB6DB7");
       check("00000108", "0000008E");         -- as a word, 142
       check("FFFFFF89", "4027E792");         -- its square root, X, over the link
       check("FFFFFF88", "0AF6B214");
       check("FFFFFF8D", "00200001");         -- the status: depth 1, fits
-      check("FFFFFF10", "00000000");         -- the timer: stopped,
-      check("FFFFFF11", "00000000");
-      check("FFFFFF12", "000000F0");         -- with its vector
-      wr("FFFFFF12", "00000123");            -- the link writes the timer
-      check("FFFFFF12", "00000023");         -- bits 7..0 only
       check("FFFFFF49", "00000001");         -- the start kept the clock
       read_word("FFFFFF46", micros_v);
       check("FFFFFF48", "00000009");
@@ -1401,16 +1387,16 @@ begin
       wr("FFFFFFF0", "0000000D");
       check("FFFFFFF5", "00000004");         -- four breakpoints
       load(G_BREAK_FILE, first_v);
-      wr("FFFFFFF8", "0000000C");            -- 0 at READ
-      wr("FFFFFFF9", "00000013");            -- 1 at V3
+      wr("FFFFFFF8", "0000000B");            -- 0 at READ
+      wr("FFFFFFF9", "00000012");            -- 1 at ROUTINE
       wr("FFFFFFF4", "00000003");
       check("FFFFFFF4", "00000003");
       wr_stop("00000008", pkt('x', "00"));
       check("FFFFFFF0", "00000018");         -- paused
-      check("FFFFFFEF", "0000000C");         -- R15
+      check("FFFFFFEF", "0000000B");         -- R15
       check("FFFFFFF6", "00000100");         -- the stop
       wr_stop("00000008", pkt('x', "01"));
-      check("FFFFFFEF", "00000013");
+      check("FFFFFFEF", "00000012");
       check("FFFFFFF6", "00000101");
       wr("FFFFFFF4", "00000000");
       wr("FFFFFFF0", "00000008");
@@ -1427,12 +1413,12 @@ begin
       wr("FFFFFFF0", "00000009");
       wr_stop("00000008", pkt('w', "00"));
       check("FFFFFFF0", "00000018");         -- paused
-      check("FFFFFFEF", "0000000D");         -- R15 at TWO, after READ
-      check("FFFFFFD6", "0000000C");         -- the hit at READ
+      check("FFFFFFEF", "0000000C");         -- R15 at TWO, after READ
+      check("FFFFFFD6", "0000000B");         -- the hit at READ
       check("FFFFFFF6", "00000200");         -- the stop
       wr("FFFFFFD4", "00000008");            -- 1 on its writes
       wr_stop("00000008", pkt('w', "01"));
-      check("FFFFFFD6", "00000015");         -- the hit at STORE
+      check("FFFFFFD6", "00000014");         -- the hit at STORE
       check("FFFFFFF6", "00000201");
       check("00000200", "00001234");
       wr("FFFFFFD4", "00000000");
@@ -1445,26 +1431,14 @@ begin
       wr_stop("00000008", pkt('x', "00"));
       check("FFFFFFF6", "00000100");
 
-      report "tb_nicemon: load " & G_WAIT_FILE;
+      report "tb_nicemon: the clear ends the stop";
       wr("FFFFFFF0", "0000000D");
-      check("FFFFFFF6", "00000000");         -- the clear ends the stop
+      check("FFFFFFF6", "00000000");
       check("FFFFFFF0", "00000009");
       wr("FFFFFFF4", "00000000");
-      load(G_WAIT_FILE, first_v);
-      wr("FFFFFFF0", "00000008");
-      check("FFFFFFF0", "00000048");         -- waiting
-      wr_pause("00000018");
-      check("FFFFFFF0", "00000058");         -- paused, and still waiting
-      wr("FFFFFFF0", "00000008");
-      wait for 1300 us;                      -- two periods of the timer
-      wr_pause("00000018");
-      check("FFFFFFF0", "00000498");         -- in service, and an IRQ pending
-      check("FFFFFFD0", "00000009");         -- saved_pc: AFTER
-      check("FFFFFFD1", "41000000");         -- saved_sr: E, and bit 24
-      check("FFFFFFEF", "00000042");         -- R15: the routine's loop
 
       report "tb_nicemon: load " & G_EOF_FILE;
-      wr("FFFFFFF0", "0000000D");            -- bits 7 and 8 are not defined now
+      wr("FFFFFFF0", "0000000D");
       load(G_EOF_FILE, first_v);
       wr("FFFFFFF0", "00000008");
       send_con("ab");
@@ -1700,7 +1674,7 @@ begin
       bit_time <= C_BIT_2M;
       wait for 1 us;                         -- for the new bit time to show
       check("FFFFFF9F", "001E8480");         -- at 2 Mbaud
-      check("FFFFFFF2", "00000008");
+      check("FFFFFFF2", "00000010");
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");
@@ -1722,7 +1696,7 @@ begin
       rst <= '0';
       -- The core boots from the ROM again, and the UART is back at
       -- G_UART_BAUDRATE
-      expect_pkt("b08#CA");
+      expect_pkt("b10#C3");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

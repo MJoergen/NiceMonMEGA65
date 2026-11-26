@@ -172,7 +172,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   registers, and the debug link.
 - `mem.vhd`, with `ram.vhd` and `rom.vhd`, is the memory.
 - `rx_fifo.vhd` is the core's input FIFO.
-- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`, its
+- `devices.vhd` has nice_cpu's devices at `0xFFFFFF20`–`7F`, its
   floating-point unit, the FPU, at `0xFFFFFF88`–`8F`, and the SD card
   controller, the network station, and the port for Ethernet frames at
   `0xFFFFFFA0`–`CF`.
@@ -327,17 +327,15 @@ The testbenches are these:
   address, and rate, chosen with CRSR down and stepped with CRSR left
   and right, are written, and the registers take them; a short address,
   a byte over 255, and a rate not on the list say `bad value`; F10 does
-  nothing; and F5 and `m` switch between the two pages. A second run,
-  with `sim/dbg_wait.nasm` in the ROM, a `WAIT` that no request ends,
-  shows WAITING, PAUSED W after F3, with the PC at the HALT after the
-  `WAIT`, and WAITING after F3 again. A third run, with
+  nothing; and F5 and `m` switch between the two pages. A second run, with
   `sim/dbg_watch.nasm`, which reads one word for good, writes a
   watchpoint on its reads from the page, and shows WCH 1 after `g`, with
   the PC after the read, PAUSED after `s`, and WCH 1 after `g` again.
 - `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 30
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,
-  modifier, and mode, with constant words, and the text nicedis writes
+  modifier, and mode, with constant words, each at an address, as the
+  target of a jump or a call depends on it, and the text nicedis writes
   for each, which the decode must write too, also after a start in the
   middle of another decode.
 - `sim/tb_dbg_host.vhd` tests the debugger's adapter against the debug
@@ -505,13 +503,12 @@ Then it loads and runs these programs:
 |---|---|
 | `sim/echo.nasm` | Echoes what it receives. The testbench pauses it: the `p` notice, the memory, R15, and the stopped cycle counter while paused, a write of R5 that the core keeps until its halt, and a byte that waits until it goes on. A write of R5 while it runs gets `e04`. |
 | `sim/fifo.nasm` | The input FIFO, which has 16 bytes there, so that the test of a full FIFO is short. |
-| `sim/devices.nasm` | The math unit, the performance counters, the FPU, with a `DIV` whose result the program reads while the command runs, so that the reads wait, and the timer's interrupts. The testbench also uses the math unit over the link, and reads the FPU's top value and its status. |
+| `sim/devices.nasm` | The math unit, the performance counters, the FPU, with a `DIV` whose result the program reads while the command runs, so that the reads wait. The testbench also uses the math unit over the link, and reads the FPU's top value and its status. |
 | `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
 | `sim/bytewin.nasm` | The byte windows: reads of bytes and halfwords, zero- and sign-extended, writes that change only their byte or halfword, and an indexed operand, as nice_cpu's `bytewin.nasm` checks them, without its words beyond the RAM and its fetch from a window, which alias the RAM here. The testbench reads and writes through the windows over the link. |
 | `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, whose causes sum to their cycles, and with the multi-cycle core every cycle is of cause OTHER. |
 | `sim/break.nasm` | The breakpoints, and the `x` notice, and the watchpoints on the word that it reads and writes, and the `w` notice. |
-| `sim/wait.nasm` | `WAIT`, and the hidden state of an interrupt routine (link version 7): bit 6 of the control register while the core waits, also paused, and bits 7 and 10, `saved_pc`, and `saved_sr` while it is paused in the timer's routine. |
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
 | `sim/sd.nasm` | nice_cpu's test of the SD card controller, for a card of 1024 sectors (`sim/sd_card_model.vhd`) in slot 0 and none in slot 1: Init, Read, Write, and the errors. The controller holds the end of a command, as nice_cpu's simulation does, so the step count and the 32 result words equal niceemu's with `--sd0` and `sim/Makefile`'s image. The testbench then reads the buffer over the link. |
@@ -976,21 +973,16 @@ bitstream has one. Then it hides the ROM and uses the link:
   each step with `niceemu --trace`.
 - It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
   address, one disabled, a step that ends at one, the second word of a
-  two-word instruction, an interrupt routine, and a `HALT`, each with the
+  two-word instruction, a `CALL` of a routine, and a `HALT`, each with the
   `x` notice, R15, and the stop register. Then to its watchpoints: one
   on the reads of the word that `READ` reads, and one on its writes in
-  the interrupt routine, each with the `w` notice, R15 after the step,
+  the routine, each with the `w` notice, R15 after the step,
   the address of the step at `0xFFFFFFD6`, and the stop register.
-- It clears the memory, and runs `sim/wait.nasm`, which waits for the
-  timer's interrupt with `WAIT`: bit 6 of the control register shows the
-  wait, also while paused, and when the program is paused in its
-  interrupt routine, bits 7 and 10, `saved_pc`, and `saved_sr` show the
-  state that the routine returns to.
 - It checks the size of the RAM at `0xFFFFFF9E`,
   128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
   the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
   at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
-  halt, with the instruction and event counters as `niceemu` counts them, and checks that the cycle counter and the timer stop at the halt.
+  halt, with the instruction and event counters as `niceemu` counts them, and checks that the cycle counter stops at the halt, and that `0xFFFFFF10` and `0xFFFFFF11` are memory, as in niceemu.
   It sets the clock of the time of day to the host's time, and checks
   that it is set, and counts as the host's clock does over a start,
   which keeps it.
@@ -1035,7 +1027,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   word beyond the RAM that `0xFFFFFF9E` gives, under the monitor and
   without it.
 - Then it runs the demo's self-test, F11, with `nicemon.py run`, and checks that
-  its four tests pass. The timer's test and the counters' test check
+  its three tests pass. The counters' test checks
   counts of the core's pipeline, not of the ISA, so a core whose timing
   changes fails them. The rest of that screen, the Ethernet station's
   addresses and counts, differs from board to board and is not compared.
@@ -1134,7 +1126,7 @@ server, or with no time server that answers, is named there too.
 Without `ETH`, the summary names the Ethernet station there.
 
 The reset button is not tested: press it with a terminal open, and the
-`b08` notice comes again. Nor is card detect: take a card out, and the
+`b10` notice comes again. Nor is card detect: take a card out, and the
 present bit of `SD_CSR` falls.
 
 ## The tools and niceemu
@@ -1191,8 +1183,7 @@ and its servers, the entries 26 to 31 (issue #111). It has two parts.
   runs a case again with the answers to the frames that the last run
   sent, until it needs no new one. Between its polls the program writes
   the time to the next one to `TIME_SKIP`, `0xFFFFFF5F`, which `niceemu`
-  with `--step-time` counts at once, so minutes take a second, and no
-  interrupt is needed. It
+  with `--step-time` counts at once, so minutes take a second. It
   checks the SYN's 15 seconds, the 120 seconds of giving up, the 60
   seconds after our FIN, the probes of a zero window out to 60 seconds,
   a connection idle for 4300 seconds, past a wrap of the microseconds,

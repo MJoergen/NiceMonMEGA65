@@ -118,7 +118,7 @@ not the model.
 
 ### The dispatch table
 
-Each entry is one `JMP routine`, two words, so entry n is at address
+Each entry is one `MOVE PC, routine`, two words, so entry n is at address
 2n, and entry 0 is the reset. A program calls entry n as it calls any
 routine, `CALL 2n`, through the names that `mon.nasm` gives: an `.EQU`
 for each entry, such as `MON_PUTC` and `SCR_CLS`, and a stub for each,
@@ -155,12 +155,9 @@ C, `mon.nasm` also has `_mon_scr_getx` and `_mon_scr_gety`, as
 `scr_getxy` returns two values. Such a program runs only with the ROM visible, as
 every program built at `0x8000` for the monitor does.
 
-VBASE is 0 at reset and stays 0. The monitor has no interrupts of its
-own, as the debugger is hardware and the board has no NMI source, and it
-keeps E at 0, so the vector table that would overlap the dispatch table
-is never read. A program that wants interrupts sets VBASE to a page of
-its own image, and the monitor clears E, stops the timer, and sets VBASE
-back to 0 at every return. It sets the font base and the mode word back
+NICE has no interrupts, so a program polls, and the monitor does too.
+At every return the monitor clears F1, F0, and U of the status register,
+as at reset, in case the program used them. It sets the font base and the mode word back
 to 0 then too, so that the screen shows text in Spleen, and leaves the font RAM as the program left
 it. It also shows the cursor again, blinking, and turns the display
 offset off, as a program may have hidden the one or used the other. And
@@ -169,8 +166,8 @@ program starts with none of the values that this one left there.
 
 | # | Addr | Name | Arguments → result |
 |---|---|---|---|
-| 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, BASIC's main loop. The RAM from `0x8000` is left alone. |
-| 1 | `02` | `mon_exit` | R1 a status. Back to BASIC's main loop with a fresh stack, with E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
+| 0 | `00` | `mon_reset` | Cold start: F1, F0, and U of the SR, the FPU, the font base, and the mode word cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, BASIC's main loop. The RAM from `0x8000` is left alone. |
+| 1 | `02` | `mon_exit` | R1 a status. Back to BASIC's main loop with a fresh stack, with F1, F0, and U of the SR, the FPU, the font base, and the mode word cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
 | 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010008`, 1.8. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, the blocks and arrows of the character ROM at `0x80` to `0x99`, blank at `0x9A` to `0x9F`, and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2240 words at `0xFFFF0000`, as in `niceemu`. It keeps the word of `scr_links`: a wrap past the last column links the next row to its row, and a LF does not. A character that goes to column 0 of a row makes that row a line of its own, unless the cursor came there by that wrap: so a row written again from its start, after `scr_moveto` or a CR, is not part of the line above it. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
@@ -205,7 +202,7 @@ program starts with none of the values that this one left there.
 | 33 | `42` | `bin_line` | R1 the word address of a line, one character a word up to a 0 word, R2 the word address of 7 words, which the program clears before the first line of a load. Parses a line of a `.bin` file, `ADDR WORD` in hex, and writes the word, when the address is in a program's RAM, below the stack's first 1K words, as `LOAD` does ([basic/README.md](../basic/README.md#loading-without-a-host)). The 7 words count: the words written, the lowest and the highest address written, the lines skipped, the number of the first, and the lines, and the last is the end of a program's RAM, which it writes. → R1 1 when the word was written, 0 for a line of blanks only, or -1 when the line was skipped. Table 1.6. |
 | 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
 | 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
-| 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor. → R1 0. Table 1.6. |
+| 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: F1, F0, and U of the SR, the FPU, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor. → R1 0. Table 1.6. |
 | 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.6`, for BASIC's banner. Table 1.7. |
 | 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, and once at a call that does not wait, it keeps the network going, as `con_getline` does. Table 1.7. |
 | 39 | `4E` | `scr_back` | R1 a number of rows: the scrollback that many rows further back when it is above 0, forward when below 0, and the screen again when it is 0 or reaches the screen. → R1 the rows shown back now, 0 for the screen. Table 1.7. |
@@ -215,8 +212,8 @@ program starts with none of the values that this one left there.
 By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
 console at `0xFFFFFF00` is the same on every board and in the emulator,
 with the line and the keyboard merged by the hardware, and nice_cpu's
-`nice_getc` and `nice_pollc` read it; and no `mon_setvec`, as the
-monitor keeps no vector table. `mon_out` is one routine and one piece of
+`nice_getc` and `nice_pollc` read it; and no `mon_setvec`, as NICE
+has no vector table. `mon_out` is one routine and one piece of
 state in place of a `scr_putc` and a `ser_putc`: the line is the
 console, which any program can write, and the screen's memory is the
 same everywhere, so what the HAL adds is the terminal, the cursor, the
@@ -668,7 +665,7 @@ of Programs below.
   Zig, or Rust program so. `test/hello.nasm` and `test/hello.c` are two
   such programs, and the Makefile shows how they are built.
 - The monitor runs a program as a subroutine on its own stack: it pushes
-  a return address and jumps to `0x8000` with E = 0, R1 = the address of
+  a return address and jumps to `0x8000` with R1 = the address of
   `mon_putc`'s entry, and R2 = 0 and R3 = 0, `argc` and `argv` for a
   command line later. The start-up code stores R1 in `___putc_vector`, so
   `nice_putc`, `nice_print`, the C library's `printf`, and the trap report

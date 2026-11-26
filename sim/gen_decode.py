@@ -5,9 +5,10 @@ writes (nice_cpu/assembler/nicedis.py).
 
 Usage: gen_decode.py [--seed N] [--count N] > decode.txt
 
-A line is the instruction word and three constant words in hex, then the
-text, padded with spaces to LEN characters. A text longer than LEN ends in
-> at the last place. A reserved control word is "reserved"."""
+A line is the instruction's address, its word, and three constant words
+in hex, then the text, padded with spaces to LEN characters. A text
+longer than LEN ends in > at the last place. A reserved control word is
+"reserved"."""
 
 import argparse
 import os
@@ -21,9 +22,9 @@ import nicedis  # noqa: E402
 LEN = 34
 
 
-def text(word: int, consts: list[int]) -> str:
-    mem = {0: word, 1: consts[0], 2: consts[1], 3: consts[2]}
-    insn = nicedis.decode(0, mem.get)
+def text(addr: int, word: int, consts: list[int]) -> str:
+    mem = {addr: word, addr + 1: consts[0], addr + 2: consts[1], addr + 3: consts[2]}
+    insn = nicedis.decode(addr, mem.get)
     if insn.reserved:
         s = "reserved"
     else:
@@ -56,10 +57,10 @@ def word() -> int:
     cond = random.randrange(16) << 28 if random.randrange(2) else 0
     if k == 0:
         return random.randrange(1 << 32)
-    if k == 1:  # a valid control word
-        cmd = random.randrange(4)
-        vec = random.randrange(256) if cmd == 2 else 0
-        return cond | 3 << 26 | cmd << 21 | vec
+    if k == 1:  # a valid control word: HALT, or JMP, JMPR, or CALL
+        cmd = random.choice([0, 4, 5, 6])
+        dist = random.randrange(1 << 21) if cmd else 0
+        return cond | 3 << 26 | cmd << 21 | dist
     # ALU or SHIFT, with fields of every mode
     cls = random.choice([0, 0, 2])
     mods = random.randrange(4)
@@ -75,15 +76,21 @@ def main() -> None:
     ap.add_argument("--count", type=int, default=3000)
     args = ap.parse_args()
     random.seed(args.seed)
-    fixed = [0x00000000, 0x0C000000, 0x0C200000, 0x0C4000FF, 0x0C400000,
-             0x8C000000, 0x0C000001, 0x0FE00000, 0x0C600000, 0x9C600000,
-             0x0C600001, 0x0C800000]
+    # HALT, the former RTI, INT, and WAIT, HALT with a bit of 20..0, a
+    # command past CALL, JMP, JMPR, and CALL to the next word, to
+    # themselves, as far as they reach both ways, and with conditions,
+    # ?F0 and ?!F1 among them
+    fixed = [0x00000000, 0x0C000000, 0x0C200000, 0x0C4000FF, 0x0C600000,
+             0x8C000000, 0x0C000001, 0x0FE00000, 0x0CE00000, 0x9C600000,
+             0x0C800000, 0x0CA00000, 0x0CC00000, 0x0C9FFFFF, 0x0C8FFFFF,
+             0x0CB00000, 0x6CC00010, 0xFC9FFFF0, 0x60000000, 0xF0000000]
     # The longest: three constants of 8 digits with R10 to R15
     fixed.append(0x01 << 25 | 0x3 << 21 | 0x7F << 14 | 0x7E << 7 | 0x7D)
     for i in range(len(fixed) + args.count):
         w = fixed[i] if i < len(fixed) else word()
         c = [const() for _ in range(3)]
-        print(f"{w:08X} {c[0]:08X} {c[1]:08X} {c[2]:08X} {text(w, c)}")
+        a = random.choice([0, 0x8000, 0xFFFFFFF0, random.randrange(1 << 32)])
+        print(f"{a:08X} {w:08X} {c[0]:08X} {c[1]:08X} {c[2]:08X} {text(a, w, c)}")
 
 
 if __name__ == "__main__":

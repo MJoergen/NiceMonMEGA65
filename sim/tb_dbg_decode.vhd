@@ -8,8 +8,8 @@
 -- nonzero exit status. The test ends with stop(0).
 --
 -- THEORY OF OPERATION
--- p_main reads G_FILE a line at a time: the instruction word, three
--- constant words, and the text. It gives the words to the decode with
+-- p_main reads G_FILE a line at a time: the instruction's address, its
+-- word, three constant words, and the text. It gives the words to the decode with
 -- start, waits for done, and compares the text and valid. Every tenth
 -- case starts again before the decode is done, which must not matter.
 
@@ -35,6 +35,7 @@ architecture simulation of tb_dbg_decode is
    signal rst   : std_logic := '1';
    signal start : std_logic := '0';
    signal instr : std_logic_vector(31 downto 0);
+   signal addr  : std_logic_vector(31 downto 0);
    signal const : std_logic_vector(95 downto 0);
    signal txt   : std_logic_vector(8 * C_LEN - 1 downto 0);
    signal valid : std_logic;
@@ -67,6 +68,7 @@ begin
          rst_i   => rst,
          start_i => start,
          instr_i => instr,
+         addr_i  => addr,
          const_i => const,
          text_o  => txt,
          valid_o => valid,
@@ -95,6 +97,8 @@ begin
       file_open(f, G_FILE, read_mode);
       while not endfile(f) loop
          readline(f, l);
+         hread(l, w_v);
+         addr <= w_v;
          hread(l, w_v);
          instr <= w_v;
          for i in 0 to 2 loop

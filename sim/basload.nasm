@@ -10,8 +10,8 @@
 T_COUNT         .EQU    0xE000
 MON_PUTC        .EQU    0x06            ; entry 3
 
-                JMP     t_cold          ; 0x3000, the cold start
-                JMP     t_cold          ; 0x3002, the warm start
+                MOVE    R15, t_cold     ; 0x3000, the cold start, two words
+                MOVE    R15, t_cold     ; 0x3002, the warm start
                 .DAT    0x5341424E      ; 0x3004, NBAS
                 .DAT    0x00020025      ; 0x3005, layout 2, 37 entries
                 .DAT    0               ; 0x3006, the length

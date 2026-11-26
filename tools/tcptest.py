@@ -955,8 +955,10 @@ def timers(tmp: str) -> None:
         check(f"timers {case}: every TCP checksum is right", all(x.tcp_ok for x in segs))
         t = r[-3] if case != 3 else r[-2]
         if case == 1:
+            # The time runs from tcp_open's stamp, the program's from its
+            # return, which the SYN's send takes up to a millisecond after
             check("timers 1: no SYN-ACK: E_TTIMEOUT after 15 seconds",
-                  r[:2] == [0, TO] and 15 * S <= t < 15 * S + 50_000, f"{r}")
+                  r[:2] == [0, TO] and 15 * S - 1_000 <= t < 15 * S + 50_000, f"{r}")
             check("timers 1: the SYN, and again after 1, 2, 4, and 8 seconds",
                   len(segs) == 4 and all(x.flags == SYN and x.seq == segs[0].seq for x in segs),
                   f"{segs}")

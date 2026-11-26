@@ -83,16 +83,16 @@ target          MOVE    R1, R2
         ?Z      MOVE    R1, R2
         ?N      MOVE    R1, R2
         ?V      MOVE    R1, R2
-        ?E      MOVE    R1, R2
-        ?I      MOVE    R1, R2
+        ?F0     MOVE    R1, R2
+        ?F1     MOVE    R1, R2
         ?!1     MOVE    R1, R2
         ?!X     MOVE    R1, R2
         ?!C     MOVE    R1, R2
         ?!Z     MOVE    R1, R2
         ?!N     MOVE    R1, R2
         ?!V     MOVE    R1, R2
-        ?!E     MOVE    R1, R2
-        ?!I     MOVE    R1, R2
+        ?!F0    MOVE    R1, R2
+        ?!F1    MOVE    R1, R2
 ; The modifiers
                 ADD[C]  R1, R2, R3
                 SUB[M]  R0, R1, 0x20
@@ -100,19 +100,25 @@ target          MOVE    R1, R2
         ?!C     SUB[CM] R1, R2, R3
                 SHL[M]  R1, R2, 1
                 MOVE[M] R0, @R1
-; The control instructions
+; The control instructions: HALT, and JMP, JMPR, and CALL of one word,
+; forward, back, to themselves, and as far as they reach both ways
                 HALT
-                RTI
-                INT     0
-                INT     255
-        ?Z      INT     7
-        ?!E     HALT
-; The reserved control words: a command past INT, a bit of 20..8, a
-; vector of HALT and of RTI, and command 31 with a condition
+                JMP     target
+        ?Z      JMPR    target
+        ?!F0    CALL    target
+:               JMP     :-
+                CALL    :+
+:               JMPR    :-
+                .DAT    0x0C8FFFFF, 0x0CB00000
+        ?F1     HALT
+; The reserved control words: the former RTI, INT, and WAIT, a command
+; past CALL, a bit of 20..0 of HALT, and command 31 with a condition
+                .DAT    0x0C200000
+                .DAT    0x0C400003
                 .DAT    0x0C600000
+                .DAT    0x0CE00000
                 .DAT    0x0C000100
                 .DAT    0x0C000005
-                .DAT    0x0C200001
                 .DAT    0x8FE00000
 ; The unused fields that are not R0: s1 of MOVE, with and without a
 ; constant, s1 of DEC, s0 and s1 of ONE, and s1 of NOT after a constant of
@@ -122,9 +128,12 @@ target          MOVE    R1, R2
                 .DAT    0x00A00053
                 .DAT    0x01C04082
                 .DAT    0x00DFC030, 0x10, 0x20
-; CALL and RET
-                CALL    target
-        ?Z      CALL    target
+; CALL and RET, in the long form; a target that is a constant alone is
+; no CALL, as CALL then means the one-word form
+                ADD     @--R13, 2, R15
+                MOVE    R15, 0x12345678[R1]
+        ?Z      ADD     @--R13, 2, R15
+        ?Z      MOVE    R15, target
         ?!N     CALL    R7
                 CALL    @R7
                 CALL    @0x10[R3]
@@ -132,7 +141,7 @@ target          MOVE    R1, R2
                 RET
         ?C      RET
         ?!1     RET
-; Pairs that are no CALL: another condition; ADD with [M], with [C]; an n
+; Pairs that are no CALL: a constant alone, above; another condition; ADD with [M], with [C]; an n
 ; that is not the words of the MOVE, both ways; a MOVE with [M], one to
 ; R14, and one with s1 not R0, which is a .DAT
         ?Z      ADD     @--R13, 2, R15
@@ -161,7 +170,7 @@ target          MOVE    R1, R2
                 MOVE    R15, R3         ; JMP
                 MOVE    R15, @R3++
                 MOVE    R15, @0x10[R3]
-        ?!C     MOVE    R15, 0x8000
+        ?!C     MOVE    R15, 0x8000     ; no JMP: a constant alone
                 MOVE    @--R13, R1      ; PUSH
                 MOVE    @--R13, 0x12345678
                 MOVE    @--R13, @0x10[R3]

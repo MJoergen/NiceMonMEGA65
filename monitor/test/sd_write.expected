@@ -16,6 +16,6 @@ Screen:
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0
 The image as test/sd_image.py --written makes it

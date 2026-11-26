@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE in slot 0
-my prog.bin                    14436
+my prog.bin                    11124
 mixed.Bin                         14
 lower.bin                         14
 caf?.bin                          14
@@ -41,7 +41,7 @@ BADSUM~1.BIN                      15
 Files: 34, directories: 0
 READY.
 load "my prog.bin"
-Words loaded: 802, 00008000 to 00008321
+Words loaded: 618, 00008000 to 00008269
 READY.
 sys 0x8000
 Hello from 00008000, table 00010008
@@ -50,10 +50,10 @@ on the line only
 Returned 0000002A
 READY.
 load "MYPROG~1.BIN"
-Words loaded: 802, 00008000 to 00008321
+Words loaded: 618, 00008000 to 00008269
 READY.
 load "MY PROG.BIN"
-Words loaded: 802, 00008000 to 00008321
+Words loaded: 618, 00008000 to 00008269
 READY.
 load "mixed.bin"
 Words loaded: 0
@@ -79,7 +79,7 @@ Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 READY.
 load "my prog.bin
-Words loaded: 802, 00008000 to 00008321
+Words loaded: 618, 00008000 to 00008269
 READY.
 load "caf?.bin"
 Words loaded: 0
@@ -107,7 +107,7 @@ Screen:
 |Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 |READY.
 |load "my prog.bin
-|Words loaded: 802, 00008000 to 00008321
+|Words loaded: 618, 00008000 to 00008269
 |READY.
 |load "caf?.bin"
 |Words loaded: 0
@@ -122,5 +122,5 @@ Screen:
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0

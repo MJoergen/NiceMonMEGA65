@@ -82,16 +82,14 @@ Checks, in this order:
       loop, holds the sum of its series each time, with the bits of
       Python's floats. A hold keeps the FPU's values (issue #136)
     - the memory is cleared
-    - sim/wait.nasm waits for the timer's IRQ, which bit 6 shows, also
-      paused, and paused in its interrupt routine, bits 7 and 10,
-      saved_pc, and saved_sr show the hidden state (link version 7)
     - 0xFFFFFF9E reads the RAM's words, and the top word of the RAM holds
       a word, apart from the word of a RAM half the size
     - 0xFFFFFF9F reads the UART's rate, --baud, and the link answers at
       every rate the board takes once it is written there, then at --baud
       again
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
-      counter and the timer stop there
+      counter stops there; 0xFFFFFF10, where the timer was before nice_cpu
+      V3.0, is memory, as in niceemu
     - the clock of the time of day, set to the host's local time, counts as
       the host's clock does, over a start too, and is left at that time
     - the byte windows of nice_cpu's DEVICES.md §9: the link reads bytes
@@ -177,9 +175,8 @@ Checks, in this order:
       number
     - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
       the monitor and without it
-    And the demo's self-test, F11, runs with nicemon.py run, and its four
-    tests must pass, as their timer and instruction counts depend on the
-    core.
+    And the demo's self-test, F11, runs with nicemon.py run, and its three
+    tests must pass, as its instruction counts depend on the core.
     The programs run with the ROM hidden, so the RAM is at 0, but for
     the one under the monitor in the board's ROM.
     With --eth, last of all, the Ethernet station, which no failure above
@@ -662,52 +659,6 @@ def test_clear(link: Link) -> None:
     check("memory cleared", got == 0, f"{got:08X}")
 
 
-# The link's words of the hidden state of version 7 (DEBUG.md §6)
-SAVED_PC = 0xFFFFFFD0
-SAVED_SR = 0xFFFFFFD1
-
-
-def test_wait(link: Link, prog: str, at: dict[str, int], board: str) -> None:
-    """WAIT and the hidden state of DEBUG.md §6, version 7, on
-    sim/wait.nasm, with the timer's period a quarter of a second: bit 6
-    while the core waits, also while paused, as the timer stops then;
-    then, paused in the routine after two periods, bit 6 clear, bit 7,
-    in_service, and bit 10, the timer's next request, set, saved_pc the
-    word after the WAIT, and saved_sr the SR that the program set. It
-    leaves the core held, after a start that resets the hidden state."""
-    period = CLOCK_HZ[board] // 4
-    words = [(a, period if a == at["SET_PERIOD"] + 2 else w)
-             for a, w in read_bin(prog)]
-    link.halts.clear()
-    load_words(link, words)
-    start(link)
-    check("wait: bit 6 while waiting", ctl(link) == "00000048", ctl(link))
-    n = link.pauses
-    link.control(PAUSE | RAM)
-    require("wait: pause sends p", wait_pause(link, n))
-    check("wait: bit 6 while paused in the wait", ctl(link) == "00000058",
-          ctl(link))
-    link.control(RAM)
-    time.sleep(2.5 * period / CLOCK_HZ[board])
-    n = link.pauses
-    link.control(PAUSE | RAM)
-    require("wait: pause in the routine sends p", wait_pause(link, n))
-    check("wait: in service, an IRQ pending, no wait",
-          ctl(link) == "00000498", ctl(link))
-    pc, sr = rd(link, SAVED_PC), rd(link, SAVED_SR)
-    check("wait: saved_pc is the word after the WAIT",
-          pc == at["AFTER"], f"{pc:08X}")
-    check("wait: saved_sr is the SR before the entry",
-          sr == 0x41000000, f"{sr:08X}")
-    r15 = rd(link, REGS + 15)
-    check("wait: R15 in the routine", r15 == at["on_timer"], f"{r15:08X}")
-    n = link.pauses
-    link.control(HOLD | PAUSE | RAM)
-    link.control(PAUSE | RAM)
-    wait_pause(link, n)
-    link.control(HOLD | RAM)
-
-
 def test_ram_size(link: Link, board: str) -> None:
     """The words of the RAM at FFFFFF9E, 128K on the MEGA65 and 64K on the
     Nexys4DDR, which takes no write. The top word of the RAM holds what is
@@ -779,7 +730,7 @@ def steps(path: str) -> int:
 
 
 # The low words of the event counters of DEVICES.md §3: data reads, stores,
-# skips, jumps, and interrupts
+# skips, jumps, and the word after them, which reads 0 since nice_cpu V3.0
 EVENTS = (0xFFFFFF4A, 0xFFFFFF4C, 0xFFFFFF4E, 0xFFFFFF50, 0xFFFFFF52)
 
 
@@ -970,7 +921,7 @@ def trace_regs(path: str) -> list[list[int]]:
     after: list[list[int]] = []
     explicit: list[bool] = []
     for line in r.stdout.splitlines():
-        m = re.match(r"([0-9a-f]{8}) [0-9a-f]{8}|(IRQ|NMI) [0-9a-f]{2}", line)
+        m = re.match(r"([0-9a-f]{8}) [0-9a-f]{8}", line)
         if m:
             if m.group(1) and explicit and not explicit[-1]:
                 after[-1][15] = int(m.group(1), 16)
@@ -1053,8 +1004,8 @@ def test_break(link: Link, prog: str, at: dict[str, int]) -> None:
     two breakpoints at one address, which send the lower number, one
     disabled, a skipped instruction, a step that ends at a breakpoint, an
     instruction with a read from memory, the second word of a two-word
-    instruction, which does not match, the first instruction of an
-    interrupt routine and the one after its RTI, and a HALT at a
+    instruction, which does not match, the first instruction of a
+    routine that a CALL called and the one after its RET, and a HALT at a
     breakpoint, which halts after a go on. Each stop sends x, never p, with
     R15 at the breakpoint and its number in the stop register, which reads
     0 again after the halt. A system without breakpoints passes this."""
@@ -1090,17 +1041,17 @@ def test_break(link: Link, prog: str, at: dict[str, int]) -> None:
     link.write(BRK_EN, [0b1110])
     link.control(RAM)
     stop("the loop's third pass, breakpoint 0 disabled", "LOOP", 1)
-    link.set_breaks([at["SKIP"], at["READ"], at["TWO"] + 1, at["V3"]])
+    link.set_breaks([at["SKIP"], at["READ"], at["TWO"] + 1, at["ROUTINE"]])
     link.control(RAM)
     stop("a skipped instruction", "SKIP", 0)
     reason = link.step()
     check("break: a step sends no h", reason is None, str(reason))
     stop("a step that ends at one", "READ", 1)
     link.control(RAM)
-    stop("an interrupt routine, past a read and a second word", "V3", 3)
+    stop("a routine, past a read and a second word", "ROUTINE", 3)
     link.set_breaks([at["AFTER"], at["DONE"]])
     link.control(RAM)
-    stop("the instruction after RTI", "AFTER", 0)
+    stop("the instruction after RET", "AFTER", 0)
     link.control(RAM)
     stop("a HALT", "DONE", 1)
     link.control(RAM)
@@ -1125,7 +1076,7 @@ def test_watch(link: Link, prog: str, at: dict[str, int]) -> None:
     """The watchpoints of DEBUG.md §6 (link version 7) on sim/break.nasm,
     at the word 0x200 that READ reads and STORE writes: a watchpoint on
     its reads stops after READ, one on its writes after STORE in the
-    interrupt routine, each with w and its number, R15 at the next
+    routine, each with w and its number, R15 at the next
     instruction, the step's address at 0xFFFFFFD6, and 0x200 plus the
     number in the stop register. One on the reads and the writes of a
     word the program never touches does not stop it, and after the halt
@@ -1162,7 +1113,7 @@ def test_watch(link: Link, prog: str, at: dict[str, int]) -> None:
     check("watch: bit 4 reads 1", ctl(link) == "00000018", ctl(link))
     link.set_watches([None, (0x200, WCH_WRITE)])
     link.control(RAM)
-    stop("a write in an interrupt routine, after STORE", "STORE",
+    stop("a write in a routine, after STORE", "STORE",
          at["STORE"] + 1, 1)
     link.write(WCH_EN, [0])
     link.control(RAM)
@@ -1468,16 +1419,17 @@ def test_fpu(link: Link, prog: str, at: dict[str, int]) -> None:
 
 
 def test_counters_stop(link: Link) -> None:
-    """After a halt the cycle counter and the timer's COUNT do not change."""
+    """After a halt the cycle counter does not change. 0xFFFFFF10 and
+    0xFFFFFF11, the timer's words before nice_cpu V3.0, are memory, as
+    in niceemu: a word written there reads back."""
     first = rd(link, 0xFFFFFF40)
     time.sleep(0.5)
     check("cycle counter stops at a halt", rd(link, 0xFFFFFF40) == first,
           f"{first:08X}")
-    check("W TIMER_PERIOD", wr(link, 0xFFFFFF10, 0x00FFFFFF))
-    count = rd(link, 0xFFFFFF11)
-    time.sleep(0.5)
-    check("timer COUNT stops at a halt",
-          count != 0 and rd(link, 0xFFFFFF11) == count, f"{count:08X}")
+    ok = wr(link, 0xFFFFFF10, 0x00FFFFFF) and wr(link, 0xFFFFFF11, 0x12345678)
+    got = (rd(link, 0xFFFFFF10), rd(link, 0xFFFFFF11))
+    check("0xFFFFFF10-11 are memory", ok and got == (0x00FFFFFF, 0x12345678),
+          f"{got[0]:08X} {got[1]:08X}")
 
 
 # The clock of the time of day of nice_cpu's DEVICES.md section 10
@@ -2745,8 +2697,11 @@ def test_bas(link_args: list[str], tmp: str, in_rom: bool = False,
                              stdin=subprocess.DEVNULL, capture_output=True)
         board = subprocess.run(run_py + ["--rom", monitor, "--screen", prog],
                                stdin=subprocess.DEVNULL, capture_output=True)
+        # The registers at BASIC's halt hold the top of its memory, which
+        # the RAM's size sets: 128K words in niceemu, 64K on the Nexys4DDR
         for r in (emu, board):
             r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
+            r.stdout = re.sub(rb"(?m)^R\d.*\n", b"", r.stdout)
         board.stdout = BG_DHCP.sub(b"", board.stdout)
         same = (emu.stdout == board.stdout and
                 emu.returncode == board.returncode == 0 and
@@ -2812,10 +2767,9 @@ def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
 
 def test_selftest(link_args: list[str], tmp: str) -> None:
     """Runs the self-test of the demo's F11 with run.py, and checks that
-    its four tests pass. Two of them depend on the core's pipeline, not on
-    the ISA: the timer's 10 interrupts must come in 9500 to 10499 cycles,
-    and the instruction counter must count 9 between two reads of it. So a
-    core that times them otherwise fails here. Below the tests, the screen
+    its three tests pass. One of them depends on the core's pipeline, not
+    on the ISA: the instruction counter must count a known sequence. So a
+    core that counts otherwise fails here. Below the tests, the screen
     shows the Ethernet station's addresses and counts, which differ from
     board to board, so it is not compared with niceemu. link_args are
     run.py's options for the link. The port must be closed meanwhile."""
@@ -2830,7 +2784,7 @@ def test_selftest(link_args: list[str], tmp: str) -> None:
     rows = [line[1:] for line in
             board.stdout.decode(errors="replace").splitlines()
             if line.startswith("|")]
-    for name in ("RAM", "Math unit", "Timer", "Performance counters"):
+    for name in ("RAM", "Math unit", "Performance counters"):
         row = next((r for r in rows if r.startswith(f"    {name}")), "")
         ok = row[50:54] == "PASS"
         check(f"demo self-test: {name}", ok,
@@ -3374,7 +3328,6 @@ def main() -> None:
         pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
         step = assemble(f"{REPO}/sim/step.nasm", tmp)
         brk, brk_at = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
-        wait, wait_at = assemble_labels(f"{REPO}/sim/wait.nasm", tmp)
         step_at = assemble_labels(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
         bytewin = assemble(f"{REPO}/sim/bytewin.nasm", tmp)
@@ -3429,7 +3382,6 @@ def main() -> None:
                 test_write_regs(link, *step_at)
                 test_fpu(link, *fpusum)
                 test_clear(link)
-                test_wait(link, wait, wait_at, board)
                 test_ram_size(link, board)
                 test_baud(link, uart, args.baud)
                 test_readback(link, emu)

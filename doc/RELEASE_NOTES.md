@@ -21,6 +21,48 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V3.0 (unreleased)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V3.0`, and NICE has no interrupts
+  ([#169](https://github.com/MJoergen/NiceMonMEGA65/issues/169),
+  [nice_cpu#162](https://github.com/MJoergen/nice_cpu/issues/162)):
+  no IRQ, NMI, `INT`, `RTI`, or `WAIT`, and no timer. The words of
+  `INT`, `RTI`, and `WAIT` are reserved control words, which halt the
+  core with reason 2. Bits 31, 30, and 23..0 of the SR are F1, F0,
+  and U, storage for software, with the conditions `?F1` and `?F0`.
+  A program that used the timer polls the microsecond counter instead.
+- `0xFFFFFF10`–`0xFFFFFF1F`, where the timer was, are memory, as in
+  `niceemu`. The interrupt counter at `0xFFFFFF52` reads 0, and the
+  fetch statistics have 14 causes, with OTHER at `0xFFFFFF7D`.
+- `JMP`, `JMPR`, and `CALL` to an address are one word
+  ([#172](https://github.com/MJoergen/NiceMonMEGA65/issues/172),
+  [nice_cpu#192](https://github.com/MJoergen/nice_cpu/issues/192)),
+  and `CALL` pushes through R13 in one step. The monitor is 22%
+  smaller, 8427 words, and BASIC 23%, 13692 words, and BASIC takes
+  6% fewer steps in `examples/sieve.bas`. A program that niceasm of `V3.0` assembles halts on
+  a board of `V2.6` or older at its first such jump or call.
+- The dispatch table keeps two words an entry, each now
+  `MOVE PC, routine`, so a program built for an older table runs
+  unchanged, and so do BASIC's two vectors, so a card's `BASIC*.ROM`
+  of `V2.6` still loads.
+- The debug link is version `0x10`, major 1: `0xFFFFFFD0`–`D3` and
+  `0xFFFFFFD7` read 0, bits 6 to 10 of the control register read 0,
+  and the reset notice is `b10`. The tools of `V3.0` stop on a board
+  of `V2.6` or older, and those of `V2.6` on a board of `V3.0`.
+- At a cold start and after a program, the monitor clears F1, F0, and
+  U of the SR, where it cleared E and VBASE and stopped the timer.
+- BASIC's `DIS` shows `JMP`, `JMPR`, and `CALL` of one word with
+  their target, the conditions 6 and 7 as `?F0` and `?F1`, and the
+  former `INT`, `RTI`, and `WAIT` as reserved control words. A
+  `MOVE R15` of a constant alone is no longer shown as `JMP`, as that
+  is now the one-word form, nor is the long form of a call to a
+  constant shown as `CALL`.
+- The on-board debugger has no states WAITING and PAUSED W, and its
+  row 30 decodes `JMP`, `JMPR`, and `CALL` with their target.
+- The demo's self-test has three tests, without the timer's.
+
 ## V2.6 (2026-11-24)
 
 **Upgrade notes.**

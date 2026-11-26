@@ -10,13 +10,13 @@
 ;
 ; A start of the core clears the fetch statistics, and the program stops
 ; them first, so FS_CYCLES holds the few cycles before the stop, and the
-; 15 FS_CAUSE words sum to it. The loop that sums them, and the wait after
+; 14 FS_CAUSE words sum to it. The loop that sums them, and the wait after
 ; it, take more than a microsecond, so the microsecond counter is not 0
 ; when it is read, right after the cycle counter.
 FS_CTRL         .EQU    0xFFFFFF60
 FS_CYCLES       .EQU    0xFFFFFF61
 FS_CAUSE        .EQU    0xFFFFFF70      ; + the cause of the cycle
-FS_OTHER        .EQU    0xFFFFFF7E      ; cause 14, every cycle of a multi-cycle core
+FS_OTHER        .EQU    0xFFFFFF7D      ; cause 13, every cycle of a multi-cycle core
 CYCLE_LO        .EQU    0xFFFFFF40
 TIME_LO         .EQU    0xFFFFFF44
 TIME_HI         .EQU    0xFFFFFF45
@@ -32,7 +32,7 @@ RESULT          .EQU    0x100
                 MOVE    @RESULT, @FS_CYCLES  ; the cycles before the stop
                 MOVE    @0x101, @FS_OTHER  ; those of cause OTHER
                 MOVE    R2, FS_CAUSE
-                MOVE    R3, 15
+                MOVE    R3, 14
 :               ADD     R1, R1, @R2++
                 SUB[M]  R3, R3, 1
         ?!Z     JMP     :-

@@ -148,8 +148,6 @@ SCREEN_HEIGHT_2004 = 25  # the rows of niceemu -2004, as the 2004 IDE
 REASONS = {
     1: "HALT",
     2: "reserved control instruction",
-    3: "INT inside an interrupt routine",
-    4: "RTI outside an interrupt routine",
 }
 
 # The default wasm trap handler, and the meaning of a trap's code in R1

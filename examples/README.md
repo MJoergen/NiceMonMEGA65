@@ -124,13 +124,13 @@ the whole program in the emulator against a server of the test
 with the sieve of Eratosthenes, as BYTE's benchmark does, and the
 program prints how long each took:
 
-    Words loaded: 48, 0000C000 to 0000C02F
+    Words loaded: 42, 0000C000 to 0000C029
     BASIC:
-    1899 PRIMES IN 14022 MS
+    1899 PRIMES IN 13135 MS
     MACHINE CODE:
     Returned 00000000
     1899 PRIMES IN 154 MS
-    MACHINE CODE IS 90 TIMES AS FAST
+    MACHINE CODE IS 84 TIMES AS FAST
 
 Those times are from `niceemu`'s test, which counts a microsecond for
 each instruction, so the ratio is that of the instructions. The boards
@@ -140,7 +140,7 @@ run both faster, the MEGA65 at 100 MHz and the Nexys4DDR at 90 MHz:
 |---|---:|---:|---:|
 | MEGA65 R6, V2.4.1 | 393 ms | 4 ms | 83 times as fast |
 | Nexys4DDR, V2.5 | 437 ms | 5 ms | 84 times as fast |
-| `niceemu`, a microsecond an instruction | 14022 ms | 154 ms | 90 times as fast |
+| `niceemu`, a microsecond an instruction | 13135 ms | 154 ms | 84 times as fast |
 
 The routine's time is whole milliseconds, so its ratio on a board is
 rough.

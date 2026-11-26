@@ -272,10 +272,10 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2A6C` | 10861 |
-| Free | `0x2A6D`–`0x2FFF` | 1427 |
-| BASIC | `0x3000`–`0x7505` | 17670 |
-| Free | `0x7506`–`0x7FFF` | 2810 |
+| The monitor | `0x0000`–`0x20EA` | 8427 |
+| Free | `0x20EB`–`0x2FFF` | 3861 |
+| BASIC | `0x3000`–`0x657B` | 13692 |
+| Free | `0x657C`–`0x7FFF` | 6788 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -288,19 +288,19 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1125 | 0 |
-| `monitor_sd.nasm` | The sector routines | 85 | 0 |
-| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 3058 | 0 |
-| `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
-| `monitor_tcp.nasm` | TCP | 2414 | 0 |
-| `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
-| `monitor_basic.nasm` | The loader of BASIC's image from a card | 818 | 51 |
-| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
-| `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 92 | 0 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 897 | 0 |
+| `monitor_sd.nasm` | The sector routines | 63 | 0 |
+| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2318 | 0 |
+| `monitor_eth.nasm` | The network, and its entries | 1885 | 10 |
+| `monitor_tcp.nasm` | TCP | 1939 | 0 |
+| `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 264 | 0 |
+| `monitor_basic.nasm` | The loader of BASIC's image from a card | 604 | 51 |
+| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 194 | 5 |
+| `monlib.nasm` | The routines that programs join | 212 | 0 |
+| `mon.nasm` | The stubs of the entries | 46 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10861 | 71 |
+| In all | | 8427 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -498,7 +498,7 @@ compared with `test/NAME.expected`:
 | `hal17` | `test/hal17.nasm`, with `ab` typed after `SYS`, and `super.img` | The entries of table 1.7, through `mon.nasm`'s stubs: `mon_build`'s text, `con_key` with a wait, without, and with no key, `scr_back` back, forward, and past either end after 40 rows, and `fs_complete` on a line, plainly and through the word window, as a C stub calls it. |
 | `hal18` | `test/hal18.nasm` | The entry of table 1.8, `scr_links`, through `mon.nasm`'s stub: the word after `scr_cls`, after a wrap, a CR LF, a wrap and a LF at the last row, which scroll, and a TAB at its last column, the bits that a write drops, and a row written again from its column 0, after `scr_moveto` and after a CR, which is a line of its own, where one written from column 1, or right after a wrap, is not; after a wrap and `scr_moveto` to where it left the cursor, it is one too. |
 | `links` | `test/links.nasm`, three programs that `SYS` runs | The word of `scr_links` after a program, as `DUMP` shows it: kept after one that wraps a line and returns, 0 after one that moves the cursor through its registers, and 0 after one whose wrap left the cursor at the start of the row where the status goes. |
-| `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set the timer, and moved the cursor off the screen. |
+| `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set F1, F0, and U of the SR, and moved the cursor off the screen. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `SAVE`, `LOAD`, `DIR`, and `DELETE`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `DELETE`. |
 | `fatl` | The monitor, with `lfn.img`, long names that mtools wrote | `DIR` and `LOAD` by long names, in quotes and in either case, and by 8.3 names: a long name with a blank, one in mixed case, one of 255 characters, one outside ASCII, an 8.3 name with the lower-case flags, sets of long-name entries across a sector and across a cluster, and one with a wrong checksum, which only its 8.3 name reaches. |
@@ -631,7 +631,7 @@ seconds and no hundredths.
 The expected files were checked by hand. After a change that alters an
 expected output, check the new output the same way before you copy it
 from `build/` to `test/`. The `Halted` line and the registers are left
-out, as they change with the code, except for VBASE, which must be 0
+out, as they change with the code, except for U, bits 23 to 0 of R14, which must be 0
 after every run.
 
 A change of `monitor_fat.nasm` that is not meant to change its behavior

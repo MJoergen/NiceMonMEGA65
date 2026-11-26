@@ -1,6 +1,5 @@
--- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F, 88-8F, and A0-CF
--- (src/nicemon.vhd): the timer of DEVICES.md §4 at 10-1F, the math unit
--- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-5F, but for
+-- The devices of nice_cpu/hdl/src at 0xFFFFFF20-7F, 88-8F, and A0-CF
+-- (src/nicemon.vhd): the math unit (MPU) of DEVICES.md §2 at 20-3F, the performance counters of §3 at 40-5F, but for
 -- the clock of the time of day of §10 at 46-49, the fetch statistics at
 -- 60-7F, the floating-point unit (FPU) of §11 at 88-8F
 -- (nice_cpu/hdl/src/fpu.vhd), with G_SD_SLOTS > 0 the SD card controller
@@ -48,9 +47,8 @@
 -- not reset while the core is held, so that the link can read them after
 -- a halt. A hold resets the core, and drops what is owed to it; a device
 -- that has taken its request may still acknowledge it, while the core is
--- held or in the cycle after. The counters, the timer, and the fetch
--- statistics count only while run_i is high. The timer is the only device
--- that raises an interrupt, so its request goes straight to the core's IRQ.
+-- held or in the cycle after. The counters and the fetch statistics
+-- count only while run_i is high.
 -- The SD card controller's registers are reset when the core starts, but
 -- its engine and its pins only with the system (src/sd/sd.vhd), and it
 -- runs while the core is held, paused, or halted (DEVICES.md §5). The
@@ -143,10 +141,6 @@ entity devices is
       busy_o            : out std_logic;
       owed_o            : out std_logic;
       stall_o           : out std_logic;
-      -- The timer's interrupt request, for the core's IRQ port
-      irq_valid_o       : out std_logic;
-      irq_ready_i       : in  std_logic;
-      irq_vector_o      : out std_logic_vector(7 downto 0);
       -- The SD card slots' pins (src/sd/sd.vhd)
       sd_clk_o          : out std_logic_vector(1 downto 0);
       sd_cmd_o          : out std_logic_vector(1 downto 0);
@@ -188,7 +182,7 @@ end entity devices;
 
 architecture synthesis of devices is
 
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD, DEV_NET, DEV_ETH, DEV_TOD, DEV_FPU);
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_FS, DEV_SD, DEV_NET, DEV_ETH, DEV_TOD, DEV_FPU);
 
    -- The device of the low byte of a device's address
    function dev_of(addr : std_logic_vector(7 downto 0)) return t_dev is
@@ -207,10 +201,8 @@ architecture synthesis of devices is
          return DEV_SD;
       elsif addr(7 downto 4) = X"B" then
          return DEV_NET;
-      elsif addr(7 downto 4) = X"C" then
-         return DEV_ETH;
       end if;
-      return DEV_TIMER;
+      return DEV_ETH;
    end function dev_of;
 
    -- The hold in the cycle before, for a pulse when the core starts, and
@@ -222,12 +214,12 @@ architecture synthesis of devices is
    -- same one-hot, by t_dev'pos, so that rdata_o is one AND-OR of the
    -- devices' words, on the path from a device to the core, which has
    -- little slack (as nicemon.vhd's rd_src)
-   signal sel    : t_dev                        := DEV_TIMER;
-   signal sel_oh : std_logic_vector(8 downto 0) := (t_dev'pos(DEV_TIMER) => '1', others => '0');
+   signal sel    : t_dev                        := DEV_PERF;
+   signal sel_oh : std_logic_vector(7 downto 0) := (t_dev'pos(DEV_PERF) => '1', others => '0');
 
    -- The one-hot bit of a device
    function onehot(dev : t_dev) return std_logic_vector is
-      variable res_v : std_logic_vector(8 downto 0) := (others => '0');
+      variable res_v : std_logic_vector(7 downto 0) := (others => '0');
    begin
       res_v(t_dev'pos(dev)) := '1';
       return res_v;
@@ -255,43 +247,39 @@ architecture synthesis of devices is
    signal io_stall : std_logic;   -- the latched device's
    signal io_ack   : std_logic;   -- any device's
 
-   signal mpu_stb     : std_logic;
-   signal mpu_stall   : std_logic;
-   signal mpu_ack     : std_logic;
-   signal mpu_data    : std_logic_vector(31 downto 0);
-   signal perf_stb    : std_logic;
-   signal perf_stall  : std_logic;
-   signal perf_ack    : std_logic;
-   signal perf_data   : std_logic_vector(31 downto 0);
-   signal fs_stb      : std_logic;
-   signal fs_stall    : std_logic;
-   signal fs_ack      : std_logic;
-   signal fs_data     : std_logic_vector(31 downto 0);
-   signal timer_stb   : std_logic;
-   signal timer_stall : std_logic;
-   signal timer_ack   : std_logic;
-   signal timer_data  : std_logic_vector(31 downto 0);
-   signal sd_stb      : std_logic;
-   signal sd_stall    : std_logic;
-   signal sd_ack      : std_logic;
-   signal sd_data     : std_logic_vector(31 downto 0);
-   signal net_stb     : std_logic;
-   signal net_stall   : std_logic;
-   signal net_ack     : std_logic;
-   signal net_data    : std_logic_vector(31 downto 0);
-   signal eth_stb     : std_logic;
-   signal eth_stall   : std_logic;
-   signal eth_ack     : std_logic;
-   signal eth_data    : std_logic_vector(31 downto 0);
-   signal tod_stb     : std_logic;
-   signal tod_stall   : std_logic;
-   signal tod_ack     : std_logic;
-   signal tod_data    : std_logic_vector(31 downto 0);
-   signal tod_addr    : std_logic_vector(1 downto 0);
-   signal fpu_stb     : std_logic;
-   signal fpu_stall   : std_logic;
-   signal fpu_ack     : std_logic;
-   signal fpu_data    : std_logic_vector(31 downto 0);
+   signal mpu_stb    : std_logic;
+   signal mpu_stall  : std_logic;
+   signal mpu_ack    : std_logic;
+   signal mpu_data   : std_logic_vector(31 downto 0);
+   signal perf_stb   : std_logic;
+   signal perf_stall : std_logic;
+   signal perf_ack   : std_logic;
+   signal perf_data  : std_logic_vector(31 downto 0);
+   signal fs_stb     : std_logic;
+   signal fs_stall   : std_logic;
+   signal fs_ack     : std_logic;
+   signal fs_data    : std_logic_vector(31 downto 0);
+   signal sd_stb     : std_logic;
+   signal sd_stall   : std_logic;
+   signal sd_ack     : std_logic;
+   signal sd_data    : std_logic_vector(31 downto 0);
+   signal net_stb    : std_logic;
+   signal net_stall  : std_logic;
+   signal net_ack    : std_logic;
+   signal net_data   : std_logic_vector(31 downto 0);
+   signal eth_stb    : std_logic;
+   signal eth_stall  : std_logic;
+   signal eth_ack    : std_logic;
+   signal eth_data   : std_logic_vector(31 downto 0);
+   signal tod_stb    : std_logic;
+   signal tod_stall  : std_logic;
+   signal tod_ack    : std_logic;
+   signal tod_data   : std_logic_vector(31 downto 0);
+   signal tod_addr   : std_logic_vector(1 downto 0);
+   signal fpu_stb    : std_logic;
+   signal fpu_stall  : std_logic;
+   signal fpu_ack    : std_logic;
+   signal fpu_data   : std_logic_vector(31 downto 0);
    -- The FPU has taken a request and not yet acknowledged it
    signal fpu_wait : std_logic := '0';
    -- With G_FORMAL, the acknowledges that the free FPU owes
@@ -403,50 +391,45 @@ begin
    io_addr  <= lnk_addr when busy = '1' else core_addr_i(5 downto 0);
    io_wdata <= lnk_wdata when busy = '1' else core_wdata_i;
 
-   mpu_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_MPU else
+   mpu_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_MPU else
                 core_stb_i when core_sel = DEV_MPU else
                 '0';
-   perf_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_PERF else
+   perf_stb <= lnk_stb when busy = '1' and lnk_sel = DEV_PERF else
                 core_stb_i when core_sel = DEV_PERF else
                 '0';
-   fs_stb    <= lnk_stb when busy = '1' and lnk_sel = DEV_FS else
+   fs_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_FS else
                 core_stb_i when core_sel = DEV_FS else
                 '0';
-   timer_stb <= lnk_stb when busy = '1' and lnk_sel = DEV_TIMER else
-                core_stb_i when core_sel = DEV_TIMER else
-                '0';
-   sd_stb    <= lnk_stb when busy = '1' and lnk_sel = DEV_SD else
+   sd_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_SD else
                 core_stb_i when core_sel = DEV_SD else
                 '0';
-   net_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_NET else
+   net_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_NET else
                 core_stb_i when core_sel = DEV_NET else
                 '0';
-   eth_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_ETH else
+   eth_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_ETH else
                 core_stb_i when core_sel = DEV_ETH else
                 '0';
-   tod_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_TOD else
+   tod_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_TOD else
                 core_stb_i when core_sel = DEV_TOD else
                 '0';
-   fpu_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_FPU else
+   fpu_stb  <= lnk_stb when busy = '1' and lnk_sel = DEV_FPU else
                 core_stb_i when core_sel = DEV_FPU else
                 '0';
-   io_stall  <= mpu_stall when lnk_sel = DEV_MPU else
+   io_stall <= mpu_stall when lnk_sel = DEV_MPU else
                 perf_stall when lnk_sel = DEV_PERF else
                 fs_stall when lnk_sel = DEV_FS else
                 sd_stall when lnk_sel = DEV_SD else
                 net_stall when lnk_sel = DEV_NET else
-                eth_stall when lnk_sel = DEV_ETH else
                 tod_stall when lnk_sel = DEV_TOD else
                 fpu_stall when lnk_sel = DEV_FPU else
-                timer_stall;
-   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack or net_ack or eth_ack or tod_ack or
-                fpu_ack;
+                eth_stall;
+   io_ack   <= mpu_ack or perf_ack or fs_ack or sd_ack or net_ack or eth_ack or tod_ack or
+               fpu_ack;
 
    core_ack_o <= owed and io_ack;
    link_ack_o <= busy and io_ack;
    rdata_o    <= gate(perf_data, sel_oh(t_dev'pos(DEV_PERF))) or
                  gate(mpu_data, sel_oh(t_dev'pos(DEV_MPU))) or
-                 gate(timer_data, sel_oh(t_dev'pos(DEV_TIMER))) or
                  gate(fs_data, sel_oh(t_dev'pos(DEV_FS))) or
                  gate(sd_data, sel_oh(t_dev'pos(DEV_SD))) or
                  gate(net_data, sel_oh(t_dev'pos(DEV_NET))) or
@@ -577,24 +560,6 @@ begin
          wb_data_o  => fs_data
       ); -- i_fetch_stats
 
-   i_timer : entity work.timer
-      port map (
-         clk_i        => clk_i,
-         rst_i        => dev_rst,
-         tick_i       => run_i,
-         wb_cyc_i     => io_cyc,
-         wb_stb_i     => timer_stb,
-         wb_stall_o   => timer_stall,
-         wb_ack_o     => timer_ack,
-         wb_we_i      => io_we,
-         wb_addr_i    => io_addr(3 downto 0),
-         wb_data_i    => io_wdata,
-         wb_data_o    => timer_data,
-         irq_valid_o  => irq_valid_o,
-         irq_ready_i  => irq_ready_i,
-         irq_vector_o => irq_vector_o
-      ); -- i_timer
-
 
    gen_sd : if G_SD_SLOTS > 0 generate
 
@@ -706,15 +671,15 @@ begin
 
    gen_formal : if G_FORMAL generate
       -- The stb of each device, by t_dev'pos, and the acknowledge of each
-      signal f_stb : std_logic_vector(8 downto 0);
-      signal f_ack : std_logic_vector(8 downto 0);
+      signal f_stb : std_logic_vector(7 downto 0);
+      signal f_ack : std_logic_vector(7 downto 0);
       -- A device that stalls
       signal f_stall : std_logic;
       -- The core's requests taken and not yet acknowledged, which a hold
       -- drops
       signal f_core_wait : natural range 0 to 3 := 0;
       -- sel, one-hot
-      signal f_onehot : std_logic_vector(8 downto 0);
+      signal f_onehot : std_logic_vector(7 downto 0);
    begin
 
       f_onehot <= onehot(sel);
@@ -733,8 +698,8 @@ begin
          end if;
       end process p_core_wait;
 
-      f_stb   <= fpu_stb & tod_stb & eth_stb & net_stb & sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
-      f_ack   <= fpu_ack & tod_ack & eth_ack & net_ack & sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
+      f_stb   <= fpu_stb & tod_stb & eth_stb & net_stb & sd_stb & fs_stb & mpu_stb & perf_stb;
+      f_ack   <= fpu_ack & tod_ack & eth_ack & net_ack & sd_ack & fs_ack & mpu_ack & perf_ack;
       f_stall <= mpu_stall or sd_stall or eth_stall or fpu_stall or fpu_wait;
 
       -- psl default clock is rising_edge(clk_i);
@@ -806,7 +771,7 @@ begin
       -- psl f_rdata : assert always
       --    (core_ack_o = '1' or link_ack_o = '1') ->
       --    (mpu_ack = '1' and rdata_o = mpu_data) or (perf_ack = '1' and rdata_o = perf_data) or
-      --    (fs_ack = '1' and rdata_o = fs_data) or (timer_ack = '1' and rdata_o = timer_data) or
+      --    (fs_ack = '1' and rdata_o = fs_data) or
       --    (sd_ack = '1' and rdata_o = sd_data) or (net_ack = '1' and rdata_o = net_data) or
       --    (eth_ack = '1' and rdata_o = eth_data) or (tod_ack = '1' and rdata_o = tod_data) or
       --    (fpu_ack = '1' and rdata_o = fpu_data);

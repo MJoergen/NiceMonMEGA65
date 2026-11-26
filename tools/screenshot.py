@@ -90,9 +90,7 @@ KEYS_ROW   = (" F1 step F3 pause/go F4 restart F5 link F11 page"
 # niceemu's halt reasons, and their numbers in DEBUG.md section 6
 # A stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)
 Stop = tuple[str, int]
-HALT_REASONS = {"HALT": 1, "reserved control instruction": 2,
-                "INT inside an interrupt routine": 3,
-                "RTI outside an interrupt routine": 4}
+HALT_REASONS = {"HALT": 1, "reserved control instruction": 2}
 
 
 def font_at(mem: dict[int, int], base: int) -> list[int]:

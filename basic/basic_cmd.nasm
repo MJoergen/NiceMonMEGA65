@@ -12,8 +12,8 @@
 ; storage. Each line is shown in one row of the screen, which the next
 ; line clears, and not on the line, so that no line scrolls the screen
 ; and a paste at 2 Mbaud keeps up. SYS, st_sys, calls a program at its
-; address as a subroutine, with R1 = the entry of mon_putc, R2 = 0, R3 =
-; 0, and E = 0 (ABI.md, "Programs under a monitor"), and at its return
+; address as a subroutine, with R1 = the entry of mon_putc, R2 = 0, and R3
+; = 0 (ABI.md, "Programs under a monitor"), and at its return
 ; restores what mon_exit restores and shows the status. DIR lists the
 ; folder NICE of an SD card's FAT32 file system, LOAD "NAME.BIN" reads a
 ; .bin file from it as LOAD reads lines, SAVE writes one, LOAD "NAME"

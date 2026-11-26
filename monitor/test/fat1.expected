@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE in slot 1
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 Files: 1, directories: 0
 READY.
 halt
@@ -14,10 +14,10 @@ Screen:
 |READY.
 |dir
 |Directory of NICE in slot 1
-|HELLO.BIN                      14436
+|HELLO.BIN                      11124
 |Files: 1, directories: 0
 |READY.
 |halt
 |Halted
-VBASE at the halt 000000
+U at the halt 000000
 exit 0

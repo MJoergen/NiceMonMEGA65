@@ -27,7 +27,7 @@ These words are used here and in the other documents and sources:
 | Hide | Bit 3 of the control register is 1: the ROM is out of the way, so the RAM is at 0, as in the emulator. |
 | Clear | A write with bit 2 set fills the RAM, the screen, and the font RAM with 0, and sets the screen's registers as a reset does. |
 | Pause | Bit 4 of the control register is 1: the core stops between two instructions, and the link reaches all of memory and the core's registers. Writing 0 to bit 4 makes the program go on. |
-| Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
+| Step | Bits 4 and 5 written to a paused core: it runs one instruction, and pauses again. |
 | Notice | A packet that the board sends on its own, such as `h` when the core halts (see [The line](#the-line)). |
 | Break | The end of the line's input: a break on the UART, or a host's half-close over TCP. The program then reads the end of its input from the console. |
 
@@ -47,7 +47,7 @@ The board sends these notices:
 
 | Notice | When |
 |---|---|
-| `b08` | At reset. The link's version is 8. |
+| `b10` | At reset. The link's version is 0x10. |
 | `h` and the reason | The core has halted. |
 | `p` | The core has paused. |
 | `x` and a number | The core has paused at a breakpoint. |
@@ -81,7 +81,7 @@ too, as a few letters after a stray character, such as `h01#C9` after a
 | The core | The link reaches |
 |---|---|
 | Runs | Only its debug registers, `0xFFFFFFD0`–`FF`, with R0–R15 live. A request for any other word gets the error answer `e` with code 02. |
-| Is paused | The whole address map, and R0–R15 as the program left them. The counters and the timer stop. |
+| Is paused | The whole address map, and R0–R15 as the program left them. The counters stop. |
 | Is held in reset, or has halted | The whole address map. |
 
 A write to the control register that holds the core works at any time,
@@ -122,10 +122,10 @@ reads `0x00000009`, also after a halt. A hold alone keeps them.
   before the `k` that answers the write. A write of `0x00000008` makes
   the program go on.
 - **Step.** A write of `0x00000038` to a paused core runs one step, an
-  instruction or an interrupt entry, and the core pauses again: the
+  instruction, and the core pauses again: the
   link sends `p`, or `h` if the step halted. Bit 5 reads 0, and does
   nothing unless the core is paused. During the step the link reaches
-  only its debug registers, and the counters and the timer run.
+  only its debug registers, and the counters run.
 - **From the first instruction.** A write of `0x00000018` to a held
   core starts it paused at address 0, so a host can step a program from
   its first instruction.
@@ -165,23 +165,13 @@ they load a program.
 [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)
 has the rules of both.
 
-## Interrupts and waiting
-
-Bits 6 to 10 of the control register show what the core's interrupts
-are doing: whether the core waits for an interrupt after `WAIT`,
-whether it is in an interrupt routine, and whether a request is pending
-(see [The control register](#the-control-register)). `0xFFFFFFD0` and
-`D1` read `saved_pc` and `saved_sr`, the PC and the status register
-that an interrupt routine returns to.
-
 ## Versions
 
-The link's version is 8, which the board sends as `b08` at reset, and
-which `0xFFFFFFF2` reads. A host written for an older version works
-unchanged. Version 8 has the NMI request at `0xFFFFFFD7`. The board
-keeps a request there, which a hold drops, but does not pass it to
-the core, so no NMI comes
-([#106](https://github.com/MJoergen/NiceMonMEGA65/issues/106)).
+The link's version is 0x10, which the board sends as `b10` at reset, and
+which `0xFFFFFFF2` reads. The major version is 1, since nice_cpu V3.0,
+which has no interrupts: `0xFFFFFFD0`–`D3` and `D7` are reserved, read 0,
+and take no write. A host of major version 0 stops on the board, and the
+tools stop on a board of major version 0.
 [DEBUG.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#9-versions)
 has the versions, and the rules that a host follows.
 
@@ -195,11 +185,7 @@ has the versions, and the rules that a host follows.
 | 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
 | 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |
 | 5 | Step | A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`. It reads 0. |
-| 6 | Waiting | Read only. 1 while the core waits for an interrupt after `WAIT`, also while paused, until a request is pending. |
-| 7 | In service | Read only. 1 from the entry of an interrupt routine until its `RTI`, read as R0–R15 are, so not defined after a clear. |
-| 8 | After RTI | Read only. 1 from an `RTI` until the next instruction completes, read as R0–R15 are. |
-| 9 | NMI pending | Read only. Always 0, as the board raises no NMI. |
-| 10 | IRQ pending | Read only. 1 while the timer's request is pending, also while E = 0 or an interrupt routine keeps it from being taken, and 0 while the core is held or has halted. |
+| 6 to 10 | | Read only, always 0. |
 
 The tools write these values:
 

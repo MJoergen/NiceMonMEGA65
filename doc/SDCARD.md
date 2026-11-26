@@ -206,9 +206,6 @@ requests of 8 words at `SD_BUF0`, and writes one likewise. The step undo of
   card is present. The buffer's contents are not defined. Busy may read 1
   after reset for as long as the Write takes, so a program waits for busy
   before its first command, as before any other.
-- An interrupt or NMI routine does not use the card. `SD_CHUNK`, `SD_LBA`,
-  `SD_SELECT`, the buffer, and a running command are shared with the program
-  it interrupts.
 
 The registers derive from QNICE-FPGA's at `0xFF20`, which QNICE's monitor
 and M2M use. Three other designs were rejected:

@@ -5,8 +5,10 @@
 ; statements are typed on the keyboard or sent over the line, and shown
 ; on the screen and the line.
 ;
-; The dispatch table has one JMP routine per entry, two words, so that
-; entry n is at address 2n, and entry 0 is the reset. The routines follow
+; The dispatch table has one MOVE PC, routine per entry, two words, so
+; that entry n is at address 2n, and entry 0 is the reset. A JMP to a
+; label is one word since nice_cpu V3.0, so the entries keep the long
+; form, and the programs built for the table before it still work. The routines follow
 ; the C ABI of nice_cpu/runtime/ABI.md: the arguments in R1-R4, the result
 ; in R1, R1-R6 changed, and R7-R13 kept. mon.nasm has the address of each
 ; entry as an .EQU, and a stub that jumps to it.
@@ -14,8 +16,8 @@
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
 ; screen, and goes to BASIC's cold start, the vector BAS_COLD at
 ; BASIC_BASE (common.nasm), which prints the banner and runs BASIC's main
-; loop. At mon_exit, the monitor clears E, stops the
-; timer, clears the FPU, sets VBASE to 0, and shows the cursor,
+; loop. At mon_exit, the monitor clears F1, F0, and U of the SR and the
+; FPU, and shows the cursor,
 ; blinking, with mon_restore, takes a fresh stack, and goes to BASIC's
 ; warm start, the vector BAS_WARM, which prints the status, R1, and goes
 ; back to its main loop; a program that SYS called and that returns has
@@ -124,7 +126,6 @@ SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
 SCR_MODE        .EQU    0xFFFFFF87      ; the mode word: 0 shows the text, 1 the chunky mode
-TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 FPU_CMD         .EQU    0xFFFFFF8C      ; the FPU's command: 0x101, CLEAR 1, empties its stack and clears its flags
 
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -248,52 +249,52 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; too, for monlib.nasm, so the labels of the routines have no _ in front
 ; of them, such as udp_open, as the names of its stubs, such as
 ; _udp_open, would clash with them.
-                JMP     mon_reset       ; 0 at 0x00, monitor.nasm
-                JMP     mon_exit        ; 1 at 0x02, monitor.nasm
-                JMP     mon_version     ; 2 at 0x04, monitor.nasm
-                JMP     mon_putc        ; 3 at 0x06, monitor.nasm
-                JMP     mon_out         ; 4 at 0x08, monitor.nasm
-                JMP     scr_cls         ; 5 at 0x0A, monitor.nasm
-                JMP     scr_moveto      ; 6 at 0x0C, monitor.nasm
-                JMP     scr_getxy       ; 7 at 0x0E, monitor.nasm
-                JMP     scr_color       ; 8 at 0x10, monitor.nasm
-                JMP     fs_mount        ; 9 at 0x12, monitor_fat.nasm
-                JMP     fs_open         ; 10 at 0x14, monitor_fat.nasm
-                JMP     fs_read         ; 11 at 0x16, monitor_fat.nasm
-                JMP     fs_readdir      ; 12 at 0x18, monitor_fat.nasm
-                JMP     fs_close        ; 13 at 0x1A, monitor_fat.nasm
-                JMP     fs_write        ; 14 at 0x1C, monitor_fat.nasm
-                JMP     fs_delete       ; 15 at 0x1E, monitor_fat.nasm
-                JMP     udp_open        ; 16 at 0x20, monitor_eth.nasm
-                JMP     udp_send        ; 17 at 0x22, monitor_eth.nasm
-                JMP     udp_recv        ; 18 at 0x24, monitor_eth.nasm
-                JMP     udp_close       ; 19 at 0x26, monitor_eth.nasm
-                JMP     fs_readname     ; 20 at 0x28, monitor_fat.nasm
-                JMP     net_config      ; 21 at 0x2A, monitor_eth.nasm
-                JMP     net_set         ; 22 at 0x2C, monitor_eth.nasm
-                JMP     net_dhcp        ; 23 at 0x2E, monitor_eth.nasm
-                JMP     net_poll        ; 24 at 0x30, monitor_eth.nasm
-                JMP     dns_lookup      ; 25 at 0x32, monitor_eth.nasm
-                JMP     tcp_open        ; 26 at 0x34, monitor_tcp.nasm
-                JMP     tcp_state       ; 27 at 0x36, monitor_tcp.nasm
-                JMP     tcp_send        ; 28 at 0x38, monitor_tcp.nasm
-                JMP     tcp_recv        ; 29 at 0x3A, monitor_tcp.nasm
-                JMP     tcp_close       ; 30 at 0x3C, monitor_tcp.nasm
-                JMP     tcp_listen      ; 31 at 0x3E, monitor_tcp.nasm
-                JMP     con_getline     ; 32 at 0x40, monitor.nasm
-                JMP     bin_line        ; 33 at 0x42, monitor.nasm
-                JMP     clock_set       ; 34 at 0x44, monitor_clock.nasm
-                JMP     net_servers     ; 35 at 0x46, monitor_eth.nasm
-                JMP     mon_restore     ; 36 at 0x48, monitor.nasm
-                JMP     mon_build       ; 37 at 0x4A, monitor.nasm
-                JMP     con_key         ; 38 at 0x4C, monitor.nasm
-                JMP     scr_back        ; 39 at 0x4E, monitor.nasm
-                JMP     fs_complete     ; 40 at 0x50, monitor.nasm
-                JMP     scr_links       ; 41 at 0x52, monitor.nasm
+                MOVE    PC, mon_reset   ; 0 at 0x00, monitor.nasm
+                MOVE    PC, mon_exit    ; 1 at 0x02, monitor.nasm
+                MOVE    PC, mon_version  ; 2 at 0x04, monitor.nasm
+                MOVE    PC, mon_putc    ; 3 at 0x06, monitor.nasm
+                MOVE    PC, mon_out     ; 4 at 0x08, monitor.nasm
+                MOVE    PC, scr_cls     ; 5 at 0x0A, monitor.nasm
+                MOVE    PC, scr_moveto  ; 6 at 0x0C, monitor.nasm
+                MOVE    PC, scr_getxy   ; 7 at 0x0E, monitor.nasm
+                MOVE    PC, scr_color   ; 8 at 0x10, monitor.nasm
+                MOVE    PC, fs_mount    ; 9 at 0x12, monitor_fat.nasm
+                MOVE    PC, fs_open     ; 10 at 0x14, monitor_fat.nasm
+                MOVE    PC, fs_read     ; 11 at 0x16, monitor_fat.nasm
+                MOVE    PC, fs_readdir  ; 12 at 0x18, monitor_fat.nasm
+                MOVE    PC, fs_close    ; 13 at 0x1A, monitor_fat.nasm
+                MOVE    PC, fs_write    ; 14 at 0x1C, monitor_fat.nasm
+                MOVE    PC, fs_delete   ; 15 at 0x1E, monitor_fat.nasm
+                MOVE    PC, udp_open    ; 16 at 0x20, monitor_eth.nasm
+                MOVE    PC, udp_send    ; 17 at 0x22, monitor_eth.nasm
+                MOVE    PC, udp_recv    ; 18 at 0x24, monitor_eth.nasm
+                MOVE    PC, udp_close   ; 19 at 0x26, monitor_eth.nasm
+                MOVE    PC, fs_readname  ; 20 at 0x28, monitor_fat.nasm
+                MOVE    PC, net_config  ; 21 at 0x2A, monitor_eth.nasm
+                MOVE    PC, net_set     ; 22 at 0x2C, monitor_eth.nasm
+                MOVE    PC, net_dhcp    ; 23 at 0x2E, monitor_eth.nasm
+                MOVE    PC, net_poll    ; 24 at 0x30, monitor_eth.nasm
+                MOVE    PC, dns_lookup  ; 25 at 0x32, monitor_eth.nasm
+                MOVE    PC, tcp_open    ; 26 at 0x34, monitor_tcp.nasm
+                MOVE    PC, tcp_state   ; 27 at 0x36, monitor_tcp.nasm
+                MOVE    PC, tcp_send    ; 28 at 0x38, monitor_tcp.nasm
+                MOVE    PC, tcp_recv    ; 29 at 0x3A, monitor_tcp.nasm
+                MOVE    PC, tcp_close   ; 30 at 0x3C, monitor_tcp.nasm
+                MOVE    PC, tcp_listen  ; 31 at 0x3E, monitor_tcp.nasm
+                MOVE    PC, con_getline  ; 32 at 0x40, monitor.nasm
+                MOVE    PC, bin_line    ; 33 at 0x42, monitor.nasm
+                MOVE    PC, clock_set   ; 34 at 0x44, monitor_clock.nasm
+                MOVE    PC, net_servers  ; 35 at 0x46, monitor_eth.nasm
+                MOVE    PC, mon_restore  ; 36 at 0x48, monitor.nasm
+                MOVE    PC, mon_build   ; 37 at 0x4A, monitor.nasm
+                MOVE    PC, con_key     ; 38 at 0x4C, monitor.nasm
+                MOVE    PC, scr_back    ; 39 at 0x4E, monitor.nasm
+                MOVE    PC, fs_complete  ; 40 at 0x50, monitor.nasm
+                MOVE    PC, scr_links   ; 41 at 0x52, monitor.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
-; call. E is cleared, the timer stopped, the FPU's stack emptied and its
-; flags cleared (issue #141), VBASE set to 0, the font base and the mode
+; call. F1, F0, and U of the SR are cleared, the FPU's stack emptied and
+; its flags cleared (issue #141), the font base and the mode
 ; word set to 0, so that the screen shows text in Spleen, and the port
 ; for Ethernet frames disabled, as at a return, after a RST for each TCP
 ; connection that a program left open, the mask, the gateway, the DNS
@@ -308,8 +309,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; with clock_rtc (issue #105). The RAM from 0x8000 is left alone, so
 ; that a program a host has loaded is still there.
 mon_reset
-                CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
-                CLR     @TIMER
+                CLR     R14             ; F1, F0, and U 0, as at reset; bit 24 stays 1
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1, as a reset of the core does
                 CLR     @SCR_FONT
                 CLR     @SCR_MODE       ; the text, not the chunky mode
@@ -366,8 +366,8 @@ mon_reset
                 JMP     BAS_COLD        ; BASIC's cold start
 
 ; mon_exit: entry 1, and where a program returns to. Back to BASIC's
-; warm start, bas_warm, with R1 the status, which it prints: E cleared, the timer stopped, the FPU's
-; stack empty and its flags clear, VBASE 0, the font base and the mode
+; warm start, bas_warm, with R1 the status, which it prints: F1, F0,
+; and U clear, the FPU's stack empty and its flags clear, the font base and the mode
 ; word 0, the network
 ; closed, net_close, the cursor shown and blinking with the display
 ; offset off, a fresh stack, and the status printed where the program left
@@ -384,8 +384,8 @@ mon_exit
                 JMP     BAS_WARM        ; BASIC's warm start
 
 ; mon_restore: entry 36, the state after a program, for a caller that
-; ran one, as SYS does: E cleared, the timer stopped, the FPU's stack
-; empty and its flags clear, VBASE 0, the font base and the mode word 0,
+; ran one, as SYS does: F1, F0, and U clear, the FPU's stack empty and
+; its flags clear, the font base and the mode word 0,
 ; the network closed, net_close, and the cursor shown and blinking with
 ; the display offset off, where the program left the cursor's registers.
 ; The cursor is taken from its registers, SCR_X and SCR_Y, as a program
@@ -399,8 +399,7 @@ mon_exit
 ; or READY., starts a line of its own, and is not more of the program's
 ; last line. R1 = 0. Uses R1-R6.
 mon_restore
-                CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
-                CLR     @TIMER
+                CLR     R14             ; F1, F0, and U 0, as at reset; bit 24 stays 1
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1: no values or flags for the next program
                 CLR     @SCR_FONT       ; Spleen, whatever the program chose
                 CLR     @SCR_MODE       ; the text, whatever the program chose

@@ -84,7 +84,7 @@ HELP lists the statements
 READY.
 dir 1
 Directory of NICE in slot 1
-HELLO.BIN                      14436
+HELLO.BIN                      11124
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin
                                    0
 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin
@@ -193,23 +193,23 @@ Halted
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7DF -> FFFFFFFF
-FSInfo next free: 00000020 -> 00000021
+FSInfo free count: 0001F7E6 -> FFFFFFFF
+FSInfo next free: 00000019 -> 0000001A
 FAT entries changed: 1
-  34: 00000000 -> 0FFFFFFF
+  27: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "\xe5EBRA   BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 18
+  now "\xe5EBRA   BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 26 size 18
 NICE C3 entry 4:
   was zeros
   now long 41 "Hz.BIN\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 86 cluster 0000
 NICE C3 entry 5:
   was zeros
-  now "HZ      BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 34 size 18
-C33, of no file: 18 bytes not 0, SHA-256 c440f3b4c55e0e5c
+  now "HZ      BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 27 size 18
+C26, of no file: 18 bytes not 0, SHA-256 c440f3b4c55e0e5c
 NICE/HZ.BIN: 18 bytes, "00008000 00000000\x0a"
 NICE/HZ.BIN: its sector 0 past the size: 494 bytes, zeros
 Sector writes, 17:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, C3, FSInfo, C3, FAT1+0, FAT2+0,
-C34, C3, FSInfo, C3, FAT1+0, FAT2+0, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C26, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C27, C3, FSInfo, C3, FAT1+0, FAT2+0, FSInfo

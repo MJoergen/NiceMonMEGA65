@@ -147,10 +147,10 @@ call_again
                 PUSH    R2
                 PUSH    R3
                 PUSH    R4
-                ADD     @--SP, 3, PC    ; the return address, after JMP R6
+                PUSH    :+              ; the return address, after JMP R6
                 MOVE    @V_FSP, SP
                 JMP     R6
-                MOVE    R5, R1
+:               MOVE    R5, R1
                 POP     R4
                 POP     R3
                 POP     R2
@@ -278,10 +278,10 @@ mounted
         ?!Z     JMP     mount
                 PUSH    @V_FSP          ; mount(0), with its errors caught
                 CLR     R1
-                ADD     @--SP, 4, PC
+                PUSH    :+              ; the return address, after JMP mount
                 MOVE    @V_FSP, SP
                 JMP     mount
-                POP     @V_FSP
+:               POP     @V_FSP
                 TST     R1
         ?!X     JMP     :+              ; not -1
                 CMP     @SD_SLOTS, 2
@@ -1722,10 +1722,10 @@ read_b
                 MOVE    R9, R3
                 CLR     R7              ; the bytes read
                 PUSH    @V_FSP          ; the loop, with its errors caught
-                ADD     @--SP, 4, PC
+                PUSH    :+              ; the return address, after JMP read_loop
                 MOVE    @V_FSP, SP
                 JMP     read_loop
-                POP     @V_FSP
+:               POP     @V_FSP
                 CMP     R1, -26
         ?!Z     RET
                 TST     R7

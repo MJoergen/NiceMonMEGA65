@@ -50,9 +50,8 @@
 -- the core runs too; a word that the link refuses while the core runs
 -- ends the request with the code 02, which the page shows as `not
 -- paused`, and any other code as `e` and its two digits. Until the
--- first answer after reset the state is NO LINK. Bit 6 of the control
--- register shows a wait for an interrupt: WAITING while the core runs,
--- and PAUSED W while it is paused. Bit 9 of the stop register shows a
+-- first answer after reset the state is NO LINK. Bit 9 of the stop
+-- register shows a
 -- stop at a watchpoint, WCH n, as bit 8 one at a breakpoint, BRK n; the
 -- debugger sets no watchpoints itself.
 --
@@ -581,7 +580,7 @@ architecture synthesis of dbg is
 
    -- The names of the states, in C_STATE_LEN characters each, and the
    -- position of the digit of BRK n, WCH n, and HALTED n
-   type t_names is array (0 to 8, 0 to C_STATE_LEN - 1) of t_byte;
+   type t_names is array (0 to 6, 0 to C_STATE_LEN - 1) of t_byte;
 
    constant C_ST_NOLINK  : natural := 0;
    constant C_ST_RUNNING : natural := 1;
@@ -589,17 +588,15 @@ architecture synthesis of dbg is
    constant C_ST_BRK     : natural := 3;
    constant C_ST_HALTED  : natural := 4;
    constant C_ST_HELD    : natural := 5;
-   constant C_ST_WAITING : natural := 6;
-   constant C_ST_PAUSEDW : natural := 7;
-   constant C_ST_WCH     : natural := 8;
+   constant C_ST_WCH     : natural := 6;
 
    function names return t_names is
-      type     t_strings is array (0 to 8) of string(1 to C_STATE_LEN);
+      type     t_strings is array (0 to 6) of string(1 to C_STATE_LEN);
       constant C_S   : t_strings := ("NO LINK  ", "RUNNING  ", "PAUSED   ", "BRK      ", "HALTED   ", "HELD     ",
-         "WAITING  ", "PAUSED W ", "WCH      ");
+         "WCH      ");
       variable res_v : t_names;
    begin
-      for s in 0 to 8 loop
+      for s in 0 to 6 loop
          for i in 0 to C_STATE_LEN - 1 loop
             res_v(s, i) := to_byte(C_S(s)(i + 1));
          end loop;
@@ -610,7 +607,7 @@ architecture synthesis of dbg is
    constant C_NAMES     : t_names := names;
    constant C_BRK_DIG   : natural := 4;
    constant C_HALT_DIG  : natural := 7;
-   constant C_FLAG_CHAR : string(1 to 7) := "XCZNVEI";
+   constant C_FLAG_CHAR : string(1 to 7) := "XCZNV01"; -- F0 and F1 as 0 and 1
 
    -- Row 31: the keys in Focus, with the sticky setting, and the note of
    -- Strip, which names the toggle key
@@ -811,7 +808,7 @@ architecture synthesis of dbg is
    signal dec_chars : t_dec(0 to C_DEC_LEN - 1);
    signal dec_valid : std_logic;
    signal dec_done  : std_logic;
-   signal st_code   : natural range 0 to 8;
+   signal st_code   : natural range 0 to 6;
 
    -- The words of the window, read when the core is stopped
    signal mem_ram  : t_mem;
@@ -1809,6 +1806,7 @@ begin
          rst_i   => rst_i,
          start_i => dec_start,
          instr_i => instr_r,
+         addr_i  => regs_r(15),
          const_i => consts_r,
          text_o  => dec_text,
          valid_o => dec_valid,
@@ -1835,9 +1833,7 @@ begin
               C_ST_HELD when ctrl_r(0) = '1' else
               C_ST_WCH when ctrl_r(4) = '1' and stop_r(9) = '1' else
               C_ST_BRK when ctrl_r(4) = '1' and stop_r(8) = '1' else
-              C_ST_PAUSEDW when ctrl_r(4) = '1' and ctrl_r(6) = '1' else
               C_ST_PAUSED when ctrl_r(4) = '1' else
-              C_ST_WAITING when ctrl_r(6) = '1' else
               C_ST_RUNNING;
 
    lbl_k <= C_LBL_IP + set_kind when set_r = '1' else

@@ -739,29 +739,35 @@ itself with it:
 `nicemon.py mon` do, so the three disassemblers agree, but for the
 pseudo-instructions below, which only `DIS` shows:
 
-    DIS 0x8000, 5
-    00008000 0077580f 00000002 0003d800 00008123  CALL 0x8123
-    00008004 0003f680                             RET
-    00008005 022000b0 00000020                    CMP R1, 0x20
-    00008007 3003d800 00008000                    ?Z JMP 0x8000
-    00008009 3c400007                             ?Z INT 7
+    DIS 0x8000, 6
+    00008000 0cc00122                             CALL 0x8123
+    00008001 0003f680                             RET
+    00008002 022000b0 00000020                    CMP R1, 0x20
+    00008004 3c9ffffb                             ?Z JMP 0x8000
+    00008005 0c200000                             .DAT 0x0c200000 ; reserved control word
+    00008006 0077580f 00000001 0003c080           CALL R1
 
 - The text has the condition, the mnemonic with `[C]` and `[M]`, the
   SHIFT aliases, such as `SHL` and `ROR`, and the operands in the syntax
   of [nice_cpu's ISA.md §10.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#102-operands). Constants are in lower-case hex without
-  leading zeros, and INT's vector is in decimal.
-- A reserved control word, and an instruction with a field that its
+  leading zeros. `JMP`, `JMPR`, and `CALL` of one word show their
+  target, the address that the distance gives, in hex, as in `JMP 0x8000`,
+  and the conditions F0 and F1 are `?F0` and `?F1`.
+- A reserved control word, including the words of the former `RTI`,
+  `INT`, and `WAIT`, and an instruction with a field that its
   mnemonic does not use and that is not R0, are a `.DAT` of their words,
   with what they would do as a comment, as nicedis.py writes them:
   `.DAT 0x00000001 ; MOVE R0, R0 (s1: R1)`.
 - `ADD @--R13, n, R15` followed by `MOVE R15, target`, where `n` is the
-  number of words of the `MOVE`, is one row, `CALL target`, and
+  number of words of the `MOVE` and `target` is not a constant alone, is one row, `CALL target`, and
   `MOVE R15, @R13++` is `RET`: pseudo-instructions of [ISA.md §10.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#101-statements),
   which `niceasm` assembles back to the same words. A condition applies
   to both instructions of a `CALL`, so the two must have the same one,
-  as in `?Z CALL 0x8123`. A pair with two conditions, an `ADD` with a
+  as in `?Z CALL R7`. A pair with two conditions, an `ADD` with a
   modifier, an `n` that is not the length of the `MOVE`, or a `MOVE`
-  with a modifier, is two rows.
+  with a modifier, is two rows, and so is a pair whose `target` is a
+  constant alone. `MOVE R15, 0x8123` is shown as it is, as `JMP 0x8123`
+  and `CALL 0x8123` mean the one-word forms.
 - The other pseudo-instructions of §10.1 are one instruction each, and
   are shown in its place. Some words match two of them, and the first
   that matches, in this order, is shown:
@@ -770,8 +776,8 @@ pseudo-instructions below, which only `DIS` shows:
   |---|---|
   | `MOVE R0, R0`, the word 0, also of empty RAM | `NOP`, not `CLR R0` |
   | `MOVE R15, @R13++` | `RET`, not `POP R15` or `JMP @R13++` |
-  | `ADD @--R13, n, R15` and `MOVE R15, target` | `CALL target`, whose `MOVE` is no `JMP` |
-  | `MOVE R15, target` | `JMP target`, so `MOVE R15, R0` is `JMP R0`, not `CLR R15` |
+  | `ADD @--R13, n, R15` and `MOVE R15, target` | `CALL target`, whose `MOVE` is no `JMP`, and no constant alone |
+  | `MOVE R15, target`, with a target that is not a constant alone | `JMP target`, so `MOVE R15, R0` is `JMP R0`, not `CLR R15` |
   | `MOVE @--R13, x` | `PUSH x`, so `MOVE @--R13, R0` is `PUSH R0` |
   | `MOVE x, @R13++` | `POP x` |
   | `MOVE x, R0` | `CLR x` |
@@ -1047,22 +1053,22 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2537 | 1548 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1914 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2382 | 52 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 300 |
-| `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 2045 | 222 |
-| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
-| `basic_dis.nasm` | The disassembler of `DIS` | 948 | 79 |
-| `basic_edit.nasm` | The screen editor | 1281 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1609 | 11 |
-| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 1204 | 45 |
-| `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 290 | 0 |
-| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 697 | 20 |
-| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
-| `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 92 | 0 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 2291 | 1548 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1534 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1812 | 52 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1357 | 300 |
+| `basic_net.nasm` | `DHCP`, `NTP`, TFTP, `HTTP$`, and `URL$` | 1623 | 222 |
+| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 210 | 44 |
+| `basic_dis.nasm` | The disassembler of `DIS` | 721 | 78 |
+| `basic_edit.nasm` | The screen editor | 848 | 0 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1146 | 11 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DEF PROC`, `LOCAL`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 934 | 45 |
+| `basic_mach.nasm` | The machine: `TI`, `SLEEP`, `FOREGROUND`, `BACKGROUND`, `CURSOR`, and `RCURSOR` | 206 | 0 |
+| `basic_trap.nasm` | The errors in a program: `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`, and the failures, with `DS` and `DS$` | 542 | 20 |
+| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 194 | 5 |
+| `monlib.nasm` | The routines that programs join | 212 | 0 |
+| `mon.nasm` | The stubs of the entries | 46 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 17670 | 2381 |
+| In all | | 13692 | 2380 |
 <!-- /romsize basic -->

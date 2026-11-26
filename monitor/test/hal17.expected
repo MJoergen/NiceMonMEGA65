@@ -79,7 +79,7 @@ Screen:
 |x
 |x
 |HELLO.BIN"HELLO.BIN"
-VBASE at the halt 000000
+U at the halt 000000
 exit 0
 The card as super.img was
 Sector writes, 0:

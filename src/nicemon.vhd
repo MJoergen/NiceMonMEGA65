@@ -12,7 +12,7 @@
 --   start   bit 0 goes from 1 to 0: the devices reset, and the core runs
 --   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
 --   paused  bit 4 is 1: the core stops between instructions
---   notice  a packet the link sends on its own: b08 at reset, h at a halt,
+--   notice  a packet the link sends on its own: b10 at reset, h at a halt,
 --           p at a pause, x at a breakpoint, w at a watchpoint, and o for
 --           a lost input byte
 --
@@ -136,18 +136,16 @@
 --                          by the link returns 0 and does not count, and a
 --                          write by the link is dropped. It is 0 after
 --                          reset, and a start keeps it (DEVICES.md §1).
---   0xFFFFFF10-0xFFFFFF7F  The devices of nice_cpu (src/devices.vhd):
---   0xFFFFFF10-0xFFFFFF1F  The timer of DEVICES.md §4
---                          (nice_cpu/hdl/src/timer.vhd). It counts clock
---                          cycles, and its request goes to the core's IRQ.
+--   0xFFFFFF20-0xFFFFFF7F  The devices of nice_cpu (src/devices.vhd):
 --   0xFFFFFF20-0xFFFFFF3F  The math unit of DEVICES.md §2
 --                          (nice_cpu/hdl/src/mpu.vhd).
 --   0xFFFFFF40-0xFFFFFF5F  The performance counters of DEVICES.md §3
 --                          (nice_cpu/hdl/src/perf.vhd): cycles,
 --                          instructions, and microseconds, the last
 --                          derived from G_CLOCK_HZ, and the event counters
---                          at 4A-53: data reads, stores, skips, jumps,
---                          and interrupts, of the core's own requests.
+--                          at 4A-51: data reads, stores, skips, and
+--                          jumps, of the core's own requests. 52-5E read
+--                          0.
 --                          Within them, at 46-49, the clock of the time of
 --                          day of DEVICES.md §10 (nice_cpu/hdl/src/tod.vhd),
 --                          which only rst_i resets (devices.vhd).
@@ -260,15 +258,14 @@
 --                          (nice_cpu/hdl/sim/eth_sim.vhd) serves the
 --                          writes that enable and send, as in niceemu.
 --   0xFFFFFFD0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
---                          only, which debug_link holds: saved_pc and
---                          saved_sr of the core at D0 and D1, the
+--                          only, which debug_link holds: the
 --                          G_WATCHES watchpoints at D4-DB: their enable
 --                          bits, their number, the address of the step
 --                          that hit, and their addresses, R0-R15 of the
 --                          core, live while it runs and those of the stop
 --                          after a halt or at a pause (DEBUG.md §6), the
---                          control register, the halt reason (1 to 4
---                          here), the version, 8 (DEBUG.md §6), the free
+--                          control register, the halt reason (1 or 2
+--                          here), the version, 0x10 (DEBUG.md §6), the free
 --                          space of the core's input FIFO, and the
 --                          G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
@@ -283,11 +280,6 @@
 --                               a ROM
 --                            4  pause the core
 --                            5  step, with bit 4, a paused core
---                            6  the core waits for an interrupt, read
---                               only
---                            7, 8  in_service and after_rti, read only
---                            9, 10  a pending NMI, always 0 here, and a
---                               pending IRQ, read only
 --                          The core's data accesses to these words go to
 --                          the memory.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
@@ -317,12 +309,10 @@
 -- byte that the link's free-space register allowed always finds room.
 --
 -- The core starts as the emulator does: the math unit, the performance
--- counters, and the timer are reset each time bit 0 of the control
--- register goes to 0. So, after a halt, the instruction counter holds the number
--- of steps that the emulator prints, unless the program starts the timer,
--- whose interrupts come after clock cycles here, not after steps. The cycle
--- counter and the timer's counter run only while the core runs, so they
--- stop at a halt and while the core is paused, as the emulator's do, and
+-- counters are reset each time bit 0 of the control register goes to 0.
+-- So, after a halt, the instruction counter holds the number of steps that
+-- the emulator prints. The cycle counter runs only while the core runs, so
+-- it stops at a halt and while the core is paused, as the emulator's do, and
 -- run during a step. The
 -- fetch statistics are cleared at the start too, and count only while the
 -- core runs, as the counters do. A read of CYCLE_LO, INSTR_LO, or TIME_LO
@@ -339,8 +329,8 @@
 -- acknowledged a cycle later, and both buses are stalled meanwhile. The
 -- word of the fonts is not on the paths from the RAM to the core's WRITE
 -- stage, which have little slack at 100 MHz.
--- A request of the core for the MPU, the performance counters, the fetch
--- statistics, or the timer goes to src/devices.vhd in the cycle it is
+-- A request of the core for the MPU, the performance counters, the or the fetch
+-- statistics goes to src/devices.vhd in the cycle it is
 -- taken, as one for memory does, and the device acknowledges it. The MPU
 -- may stall until it does, which stalls the core and the link too, so the
 -- core's requests are acknowledged in their order. A link request for a
@@ -359,7 +349,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b08`, and
+-- cleared, or stays 1 in a build without a ROM. The link sends `b10`, and
 -- clears the breakpoints. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
@@ -564,14 +554,13 @@ architecture synthesis of nicemon is
    constant C_BRD_BASE : std_logic_vector(31 downto 4) := X"FFFFFF9";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
-   constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
-   constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
-   constant C_PERF_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "010"; -- 0xFFFFFF40-5F
-   constant C_FS_BASE    : std_logic_vector(31 downto 5) := X"FFFFFF" & "011"; -- 0xFFFFFF60-7F
-   constant C_FPU_BASE   : std_logic_vector(31 downto 3) := X"FFFFFF8" & '1';  -- 0xFFFFFF88-8F
-   constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
-   constant C_NET_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
-   constant C_ETH_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFC";        -- 0xFFFFFFC0-CF
+   constant C_MPU_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
+   constant C_PERF_BASE : std_logic_vector(31 downto 5) := X"FFFFFF" & "010"; -- 0xFFFFFF40-5F
+   constant C_FS_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "011"; -- 0xFFFFFF60-7F
+   constant C_FPU_BASE  : std_logic_vector(31 downto 3) := X"FFFFFF8" & '1';  -- 0xFFFFFF88-8F
+   constant C_SD_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
+   constant C_NET_BASE  : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
+   constant C_ETH_BASE  : std_logic_vector(31 downto 4) := X"FFFFFFC";        -- 0xFFFFFFC0-CF
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -583,7 +572,7 @@ architecture synthesis of nicemon is
          return false;
       end if;
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
-             addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
+             addr(7 downto 5) = "001" or                            -- MPU
              addr(7 downto 6) = "01" or                             -- perf, fetch statistics
              addr(7 downto 4) = X"8" or                             -- screen registers, FPU
              addr(7 downto 4) = X"9" or                             -- the board's devices
@@ -609,7 +598,7 @@ architecture synthesis of nicemon is
    function is_dev(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 5) = C_PERF_BASE or
-             addr(31 downto 4) = C_TIMER_BASE or addr(31 downto 5) = C_FS_BASE or
+             addr(31 downto 5) = C_FS_BASE or
              addr(31 downto 3) = C_FPU_BASE or
              (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0) or
              addr(31 downto 4) = C_NET_BASE or addr(31 downto 4) = C_ETH_BASE;
@@ -655,16 +644,11 @@ architecture synthesis of nicemon is
    signal cpu_regs      : t_regs;
    signal cpu_regs_flat : std_logic_vector(511 downto 0);
    -- The wait and the hidden state of the core, for the link (DEBUG.md §6)
-   signal cpu_waiting    : std_logic;
-   signal cpu_in_service : std_logic;
-   signal cpu_after_rti  : std_logic;
-   signal cpu_saved_pc   : std_logic_vector(31 downto 0);
-   signal cpu_saved_sr   : std_logic_vector(31 downto 0);
    -- '1' while the core is started and has not halted: it runs or is
    -- paused, and takes input
    signal cpu_started : std_logic;
-   -- '1' while the core runs: started, and not paused. The counters, the
-   -- timer, and the fetch statistics count only then.
+   -- '1' while the core runs: started, and not paused. The counters and
+   -- the fetch statistics count only then.
    signal cpu_running : std_logic;
    -- The halt reason, the code of nice_cpu's DEBUG.md §6
    signal halt_reason : std_logic_vector(2 downto 0);
@@ -765,10 +749,6 @@ architecture synthesis of nicemon is
    signal bus_we    : std_logic;
    signal bus_wdata : std_logic_vector(31 downto 0);
 
-   -- The timer's interrupt request, on the core's IRQ port
-   signal irq_valid  : std_logic;
-   signal irq_ready  : std_logic;
-   signal irq_vector : std_logic_vector(7 downto 0);
 
    -- The memory (src/mem.vhd): the request served, when it is to memory,
    -- and the word it reads
@@ -881,12 +861,6 @@ begin
          dbus_addr_o   => dbus_addr,
          dbus_data_o   => dbus_wdata,
          dbus_data_i   => dbus_rdata,
-         nmi_valid_i   => '0',
-         nmi_ready_o   => open,
-         nmi_vector_i  => X"00",
-         irq_valid_i   => irq_valid,
-         irq_ready_o   => irq_ready,
-         irq_vector_i  => irq_vector,
          pause_i       => cpu_pause,
          paused_o      => cpu_paused,
          brk_addr_i    => brk_addr,
@@ -898,15 +872,10 @@ begin
          reg_we_i      => reg_we,
          reg_idx_i     => reg_idx,
          reg_data_i    => reg_data,
-         waiting_o     => cpu_waiting,
          halted_o      => cpu_halted,
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
          regs_o        => cpu_regs,
-         in_service_o  => cpu_in_service,
-         after_rti_o   => cpu_after_rti,
-         saved_pc_o    => cpu_saved_pc,
-         saved_sr_o    => cpu_saved_sr,
          retire_o      => cpu_retire,
          stats_o       => cpu_stats
       ); -- i_core
@@ -1189,12 +1158,11 @@ begin
 
    ---------------------------------------------------------------------------
    -- The math unit (DEVICES.md §2), the performance counters (§3), the
-   -- fetch statistics, the timer (§4), the SD card controller (§5), the
+   -- fetch statistics, the SD card controller (§5), the
    -- network station (§6), and the port for Ethernet frames (§7) from
    -- nice_cpu, in src/devices.vhd. They are reset with the system, and all
    -- but the station also when the core starts, as the emulator's are when
-   -- it starts. The timer's request goes
-   -- straight to the core's IRQ.
+   -- it starts.
    ---------------------------------------------------------------------------
 
    i_devices : entity work.devices
@@ -1235,9 +1203,6 @@ begin
          busy_o            => dev_busy,
          owed_o            => core_owed,
          stall_o           => dev_stall,
-         irq_valid_o       => irq_valid,
-         irq_ready_i       => irq_ready,
-         irq_vector_o      => irq_vector,
          sd_clk_o          => sd_clk_o,
          sd_cmd_o          => sd_cmd_o,
          sd_dat3_o         => sd_dat3_o,
@@ -1543,13 +1508,6 @@ begin
          pause_o        => cpu_pause,
          paused_i       => cpu_paused,
          regs_i         => cpu_regs_flat,
-         waiting_i      => cpu_waiting,
-         in_service_i   => cpu_in_service,
-         after_rti_i    => cpu_after_rti,
-         saved_pc_i     => cpu_saved_pc,
-         saved_sr_i     => cpu_saved_sr,
-         nmi_pending_i  => '0',
-         irq_pending_i  => irq_valid,
          side_valid_i   => dbg_valid_i,
          side_we_i      => dbg_we_i,
          side_addr_i    => dbg_addr_i,
