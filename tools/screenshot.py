@@ -26,7 +26,7 @@ The pictures of doc/images/ are made from the ROM of the release, the
 monitor and BASIC, and the demo at 0x8000 after it, all with its tag, and SYS 0x8000 and
 CR first, which start the demo:
 
-    make rom VERSION=V2.6 && make -C demo VERSION=V2.6
+    make rom VERSION=V3.0 && make -C demo VERSION=V3.0
     cat build/rom.bin demo/build/demo.bin > rom_demo.bin
     printf 'SYS 0x8000\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png rom_demo.bin
@@ -40,7 +40,7 @@ doc/images/ethernet.png, the demo's F11, with:
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 82573 --debugger \\
+    tools/screenshot.py -i in.txt -n 70143 --debugger \\
         -o doc/images/debugger.png rom_demo.bin
 
 Usage:
@@ -84,7 +84,7 @@ STRIP_COLOR = 0x004FFF
 COL_STATE, COL_PC, COL_INSTR, COL_FLAGS, COL_DEC = 1, 10, 20, 30, 46
 STATE_LEN  = 9
 DEC_LEN    = COLS - COL_DEC
-FLAG_CHARS = "XCZNVEI"
+FLAG_CHARS = "XCZNV01"  # F0 and F1 as 0 and 1, as dbg.vhd shows them
 KEYS_ROW   = (" F1 step F3 pause/go F4 restart F5 link F11 page"
               " F12 keep strip: off")
 # niceemu's halt reasons, and their numbers in DEBUG.md section 6

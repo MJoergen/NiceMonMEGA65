@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V3.0 (unreleased)
+## V3.0 (2026-11-26)
 
 **Upgrade notes.**
 
@@ -45,8 +45,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   a board of `V2.6` or older at its first such jump or call.
 - The dispatch table keeps two words an entry, each now
   `MOVE PC, routine`, so a program built for an older table runs
-  unchanged, and so do BASIC's two vectors, so a card's `BASIC*.ROM`
-  of `V2.6` still loads.
+  unchanged.
+- A `BASIC*.ROM` on a card from before this release is refused, `for
+  another monitor`, and one of this release on an older core too, as
+  the version of the layout in its header is now 3
+  ([BASIC_ROM.md](BASIC_ROM.md#the-image)): an older core would halt
+  at its first jump. Each core then runs the BASIC in its own ROM.
 - The debug link is version `0x10`, major 1: `0xFFFFFFD0`–`D3` and
   `0xFFFFFFD7` read 0, bits 6 to 10 of the control register read 0,
   and the reset notice is `b10`. The tools of `V3.0` stop on a board

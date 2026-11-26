@@ -203,7 +203,7 @@ program starts with none of the values that this one left there.
 | 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
 | 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
 | 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: F1, F0, and U of the SR, the FPU, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. When the program left them elsewhere than `mon_putc` and `scr_moveto` had the cursor, it wrote the screen itself, and the word of `scr_links` is cleared. What is put next at a row's column 0 starts a line of its own, also where a wrap of the program's left the cursor. → R1 0. Table 1.6. |
-| 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.6`, for BASIC's banner. Table 1.7. |
+| 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V3.0`, for BASIC's banner. Table 1.7. |
 | 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, and once at a call that does not wait, it keeps the network going, as `con_getline` does. Table 1.7. |
 | 39 | `4E` | `scr_back` | R1 a number of rows: the scrollback that many rows further back when it is above 0, forward when below 0, and the screen again when it is 0 or reaches the screen. → R1 the rows shown back now, 0 for the screen. Table 1.7. |
 | 40 | `50` | `fs_complete` | R1 the word address of a line, one character a word, R2 that of the cursor in it, and R3 that of the word after the last that the line may take. TAB on that line, as `con_getline` has it: completes the name of a file or a directory of the card's folder before the cursor, or of the folder that its path names, a directory with a `/` after it, or lists the matches and shows the line again, up to the cursor. → R1 the new cursor. Table 1.7. |
@@ -415,7 +415,7 @@ sets serves both.
   list of stations shows it: the host name is `nicemon-` and the last
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
-  `NiceMonMEGA65 V2.6`. The transaction's number is the microsecond counter
+  `NiceMonMEGA65 V3.0`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
   kept, and renewed while BASIC waits for a line and while a BASIC
   program runs, by the same polls. A machine-code program renews it
