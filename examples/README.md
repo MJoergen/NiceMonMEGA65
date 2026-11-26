@@ -272,9 +272,11 @@ black's in lower case. The game ends at a checkmate, a stalemate, the
 fifty-move rule, or when only the kings are left, or a king and one
 bishop or knight against a king. There is no draw by repetition.
 
-The program thinks 10 seconds on a move. Line 30 sets that:
+The program thinks 10 seconds on a move. Line 30 sets that, and line
+40 the deepest search, in plies, which a test may lower:
 
-    30 TL = 10: REM THE SECONDS THAT THE COMPUTER THINKS ON A MOVE
+    30 THINKSECONDS = 10: REM THE SECONDS THAT THE COMPUTER THINKS ON A MOVE
+    40 MAXDEPTH = 30: REM THE DEEPEST SEARCH, IN PLIES, BEFORE THE CAPTURES
 
 While it thinks, it prints a line for each depth that it has searched,
 with the score in centipawns for the side to move, the best move, the
@@ -284,13 +286,22 @@ nodes, and the seconds so far:
 
 ### How it works
 
-The board is 10 by 12 squares, `B%(119)`, with a border of 7s around
-the 8 by 8, so that a knight's jump or a slide off the board finds a 7
-and stops. A piece is 1 to 6, pawn to king, positive for white and
-negative for black. The squares of each side's pieces are kept in a
-list, `PQ%`, so that the moves are generated from 16 squares and not
-from 64. A move is a number: its square from, plus 128 times its square
-to, plus 16384 times its piece of promotion.
+The program uses BASIC's structured statements: the main loop is a
+`DO` and `LOOP`, each part of it a procedure, such as `PROCSHOWBOARD`,
+`PROCHUMANMOVE`, and `PROCCOMPUTERMOVE`, and the tests are functions,
+such as `FNATTACKED(SQUARE, BY)` and `FNEVALUATE`. The names say what
+they hold, such as `BOARD%`, `SIDE`, and `CASTLING`. Most procedures
+keep their own variables with `LOCAL`. Those that the search calls
+most often, such as `PROCGENERATE` and `FNATTACKED`, use the program's
+variables instead, as `LOCAL` takes time.
+
+The board is 10 by 12 squares, `BOARD%(119)`, with a border of 7s
+around the 8 by 8, so that a knight's jump or a slide off the board
+finds a 7 and stops. A piece is 1 to 6, pawn to king, positive for
+white and negative for black. The squares of each side's pieces are
+kept in a list, `PIECELIST%`, so that the moves are generated from 16
+squares and not from 64. A move is a number: its square from, plus 128
+times its square to, plus 16384 times its piece of promotion.
 
 The moves are generated as a piece moves, without regard to its king,
 and the search makes each move and drops it when its own king is then
@@ -305,9 +316,12 @@ not end in time. A depth that the time stops is dropped, but for a
 better move than the last depth's that it has found already. Each node
 tries the captures first, the most valuable victim first, and at depth
 0 a quiescence search goes on with the captures alone. A position with
-no legal move is a mate or a stalemate. The search's recursion is
-`GOSUB`, with the state of each ply in arrays, as `FOR` loops and
-`PROC`s would take more of BASIC's 512 words of frames.
+no legal move is a mate or a stalemate. The search is `PROCSEARCH`,
+which calls itself for each move. It keeps the state of each ply, such
+as `ALPHA%(PLY)` and `BETA%(PLY)`, in arrays and not in parameters, as
+a ply takes 12 of BASIC's 512 words of frames as it is, for the
+procedure and its `DO` loop. So the quiescence search stops at ply 32,
+`MAXPLY`, where the frames still have room.
 
 The evaluation is Tomasz Michniewski's "simplified evaluation
 function": the material, 100 for a pawn, 320 for a knight, 330 for a
@@ -323,6 +337,7 @@ but a weak one, and it may not find the mate in a won end game before
 the fifty-move rule.
 
 `make -C examples test` types the program into BASIC in `niceemu`, sets
-its time to 2 seconds, which `--step-time` makes 2 million steps, plays
-three moves of white against it, one of them typed wrong first, and
-compares what it prints with `test/chess.expected`.
+its time to 2 seconds with line 30, which `--step-time` makes 2
+million steps, plays three moves of white against it, one of them
+typed wrong first, and compares what it prints with
+`test/chess.expected`.

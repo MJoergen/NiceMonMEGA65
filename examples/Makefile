@@ -113,7 +113,7 @@ test: test/build/weather_test test/build/sieve.img $(ROM_TEST)
 	  $(ROM_TEST) | sed -e '/^Halted/,$$d' > test/build/sieve.out
 	@if cmp -s test/sieve.expected test/build/sieve.out; then echo "PASS sieve"; \
 	else echo "FAIL sieve"; diff test/sieve.expected test/build/sieve.out; exit 1; fi
-	{ cat chess.bas; printf '30 TL = 2\nRUN\nW\ne2e4\ne2e5\nd2d4\ng1f3\n'; } | tr '\n' '\r' \
+	{ cat chess.bas; printf '30 THINKSECONDS = 2\nRUN\nW\ne2e4\ne2e5\nd2d4\ng1f3\n'; } | tr '\n' '\r' \
 	  > test/build/chess.in
 	$(EMU) --step-time -n 60000000 -i test/build/chess.in $(ROM_TEST) \
 	  | sed -e '1,/^RUN/d' -e '/Stopped at the step limit/{s/Stopped at.*//;q;}' > test/build/chess.out
