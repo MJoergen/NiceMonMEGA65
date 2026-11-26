@@ -78,15 +78,17 @@ CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()
   end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past its end, {end:08X}")'
 
 # The ROM, and that of the tests: each image from its Makefile, then the
-# two joined, written only when they change. The default goal stays the
-# includer's: an empty .DEFAULT_GOAL makes it the next target.
+# two joined, written only when they change. Each make writes a file of
+# its own first, named by its shell's PID, so two that run at once do not
+# race. The default goal stays the includer's: an empty .DEFAULT_GOAL
+# makes it the next target.
 ROM_GOAL := $(.DEFAULT_GOAL)
 $(ROOT)/build/rom.bin $(ROOT)/build/rom_test.bin: $(ROOT)/build/rom%.bin: FORCE
 	@$(MAKE) -s --no-print-directory -C $(ROOT)/monitor build/monitor_image$*.bin
 	@$(MAKE) -s --no-print-directory -C $(ROOT)/basic build/basic_image$*.bin $(if $*,,build/basic.rom)
 	@mkdir -p $(ROOT)/build
-	@cat $(ROOT)/monitor/build/monitor_image$*.bin $(ROOT)/basic/build/basic_image$*.bin > $@.new
-	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi
+	@cat $(ROOT)/monitor/build/monitor_image$*.bin $(ROOT)/basic/build/basic_image$*.bin > $@.$$$$.new; \
+	  if cmp -s $@.$$$$.new $@; then rm $@.$$$$.new; else mv $@.$$$$.new $@; fi
 
 .PHONY: FORCE
 .DEFAULT_GOAL := $(ROM_GOAL)
