@@ -76,6 +76,7 @@ board that was not built then.
 | 2026-11-21 | nice_cpu V2.5 and the screen of 80×28 characters (#157), with the ROM and `FLOW=timing` | 0.290 / 0.056 | 0.028 / 0.036 |
 | 2026-11-23 | The Nexys4DDR's keyboard LEDs and keypad (#25, #165), with the ROM and `FLOW=timing`: the Nexys4DDR −0.010 placed with `ExtraTimingOpt`, on the path from DBUS to the timer; 0.001 with `AltSpreadLogic_high`; the R3 0.109 / 0.060 | 0.290 / 0.056 | 0.001 / 0.019 |
 | 2026-11-23 | nice_cpu V2.6, with the blocks and arrows in the character ROM (#171), with the ROM and `FLOW=timing` | 0.290 / 0.056 | – |
+| 2026-11-26 | nice_cpu V3.0, with no interrupts and no timer (#169), and a jump and a call in one word (#172), debug link `0x10`, with the ROM and `FLOW=timing`; the R3 0.063 / 0.020 | 0.086 / 0.036 | 0.084 / 0.033 |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.
@@ -107,6 +108,12 @@ The sizes, from the same builds:
   nice_cpu V2.3, brought the table of their constants, one block RAM,
   and the steps of their microcode, which Vivado puts into four block
   RAMs and a RAMB18 on the MEGA65 and into LUTs on the Nexys4DDR.
+- **V3.0.** The R6 has 33350 LUTs and 19620 flip-flops, where the
+  builds of 2026-11-23 had 34085 and 19989, and the Nexys4DDR 33633 and
+  18005, where they had 34585 and 18408. The core has about 550 LUTs fewer
+  than in the R6's build of 2026-11-10, without the interrupts, and the
+  debug link about 500 fewer, without the hidden state, the wait, and
+  the NMI request.
 
 ## What the builds taught
 

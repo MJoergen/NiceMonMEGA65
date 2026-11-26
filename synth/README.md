@@ -284,36 +284,30 @@ flip-flops:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 8616 / 3544 | 4881 / 1203 | 8519 / 3340 | 4970 / 1047 |
-| The debug link (`debug_link`) | 2540 / 1456 | 2623 / 1285 | 2570 / 1456 | 2644 / 1285 |
-| The devices (`devices.vhd`): the math unit, the FPU, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 14222 / 6506 | 4269 / 2857 | 14325 / 6534 | 6669 / 3005 |
-| Of which the FPU (nice_cpu's `fpu.vhd`) | 9284 / 2735 | – | 9296 / 2788 | – |
-| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 2770 / 2755 | 3248 / 2865 |
-| Of which the TCP server (`eth/eth_tcp.vhd`) | 1904 / 1897 | 1902 / 1897 | 1632 / 1920 | 1633 / 1920 |
-| The on-board debugger (`dbg/dbg.vhd`) | 3028 / 2853 | 3026 / 2838 | 3072 / 2942 | 3282 / 2959 |
-| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 138 / 178 | 142 / 178 |
-| The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
-| The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
-| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 719 / 552 | 746 / 530 | 733 / 637 | 629 / 631 |
-| Total | 34085 / 19989 | 19767 / 13446 | 34585 / 18408 | 21819 / 12059 |
-| Total, of the FPGA | 25.5 % / 7.5 % | 14.8 % / 5.0 % | 54.6 % / 14.5 % | 34.4 % / 9.5 % |
+| The core (`nice_core`) | 8070 / 3493 | 4881 / 1203 | 8056 / 3318 | 4970 / 1047 |
+| The debug link (`debug_link`) | 2057 / 1353 | 2623 / 1285 | 2016 / 1358 | 2644 / 1285 |
+| The devices (`devices.vhd`): the math unit, the FPU, the counters, the fetch statistics, the SD card controller, the network station's registers, and the port for Ethernet frames | 14803 / 6350 | 4269 / 2857 | 16086 / 6402 | 6669 / 3005 |
+| Of which the FPU (nice_cpu's `fpu.vhd`) | 11001 / 2901 | – | 9739 / 2823 | – |
+| The Ethernet station (`eth/eth.vhd`) | 2782 / 2732 | 2763 / 2732 | 2787 / 2732 | 3248 / 2865 |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1903 / 1897 | 1902 / 1897 | 1907 / 1897 | 1633 / 1920 |
+| The on-board debugger (`dbg/dbg.vhd`) | 3054 / 2860 | 3026 / 2838 | 3178 / 2950 | 3282 / 2959 |
+| The text display (`text.vhd`) | 145 / 206 | 139 / 202 | 127 / 178 | 142 / 178 |
+| The keyboard | 728 / 600 | 720 / 592 | 356 / 181 | 235 / 89 |
+| The HDMI output | 601 / 1207 | 600 / 1207 | – | – |
+| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 1110 / 819 | 746 / 530 | 1027 / 886 | 629 / 631 |
+| Total | 33350 / 19620 | 19767 / 13446 | 33633 / 18005 | 21819 / 12059 |
+| Total, of the FPGA | 24.9 % / 7.3 % | 14.8 % / 5.0 % | 53.0 % / 14.2 % | 34.4 % / 9.5 % |
 
-In the pipelined columns, the totals are from the builds of 2026-11-23,
-the R6's with nice_cpu V2.6 and the Nexys4DDR's with V2.5, so the rows
-above do not add up to them. The devices and the FPU are from
-the builds of 2026-11-15 with the FPU (issue #136), and the other rows
-from the builds of 2026-11-10, with `FLOW=timing`, which have the 4
-watchpoints of the debug link (issue #99) and the clock of the time of
-day (issue #97); the multi-cycle columns are older and have no FPU. The
-watchpoints take about 900 to 1000 LUTs of the core, and the FPU about
-9300 LUTs, 2700 flip-flops, and 5 DSPs, in those builds, which were
-before its functions and their block RAMs (see
-[Block RAM](#block-ram)). The R3's
-pipelined build of 2026-11-23, with nice_cpu V2.5 and `FLOW=timing`,
-takes 34196 LUTs and 20101 flip-flops, 25.6 % and 7.5 % of the FPGA.
+The pipelined columns are the builds of 2026-11-26, with nice_cpu V3.0
+and `FLOW=timing`, which have no interrupts and no timer; the
+multi-cycle columns are older and have no FPU. The FPU takes 5 DSPs,
+and its functions' constants and microcode take block RAM on the MEGA65
+and LUTs on the Nexys4DDR (see [Block RAM](#block-ram)). The
+watchpoints take about 900 to 1000 LUTs of the core. The R3's pipelined build of the same day takes 33393 LUTs
+and 19750 flip-flops, 25.0 % and 7.4 % of the FPGA.
 
-The pipelined core is 6.4 % of the LUTs of the R6's FPGA, and 13.4 % of
-the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
+The pipelined core is 6.0 % of the LUTs of the R6's FPGA, and 12.7 % of
+the Nexys4DDR's. The multi-cycle core has about three fifths of its LUTs,
 3.6 % and 7.8 %, and a third of its flip-flops. The Nexys4DDR's
 multi-cycle column is from before issue #103 put five memories into
 block RAM (see [Block RAM](#block-ram)), so its devices still have about
@@ -332,34 +326,32 @@ These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.290 | 0.056 |
+| R6, pipelined | 100 MHz | 0.086 | 0.036 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
-| R3, pipelined | 100 MHz | 0.109 | 0.060 |
-| Nexys4DDR, pipelined | 90 MHz | 0.001 | 0.019 |
+| R3, pipelined | 100 MHz | 0.063 | 0.020 |
+| Nexys4DDR, pipelined | 90 MHz | 0.084 | 0.033 |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-The pipelined builds are those of 2026-11-23, with `FLOW=timing`: the
-R6's with nice_cpu V2.6 and the font's blocks and arrows, and the R3's
-and the Nexys4DDR's with nice_cpu V2.5, as the release V2.5.1 has
-them. The multi-cycle ones are older
+The pipelined builds are those of 2026-11-26, with nice_cpu V3.0 and
+`FLOW=timing`. The multi-cycle ones are older
 and have no FPU. The pipelined core meets its clock on
-every board with `FLOW=timing` only, and the Nexys4DDR with next to
-nothing to spare. In the default flow, the R6 misses by about 0.15 ns
+every board with `FLOW=timing` only, by less than a tenth of a
+nanosecond. In the default flow, the R6 misses by about 0.15 ns
 inside the core, in the check of a store into fetched code (issue #107).
 
-The R6's worst path is inside the core, from WRITE's register file to
-PREPARE's register of the instruction's constant words. Its paths out
-of the core have 0.366 ns, from DBUS to the timer's count, and those
-into it 0.448 ns, from the SD card controller's buffer. Before
+The R6's worst path is out of the core, from FETCH's count of the
+fetches in flight to a write enable of the RAM, and its paths into the
+core have 0.211 ns, from the send buffer of the port for Ethernet
+frames into WRITE's register file. Before
 issue #107, the RAM's cascaded block RAMs made the read data of the RAM into
-WRITE's register file the worst path of the R6. The R3's worst path is
-inside the core too, within WRITE, from its register file to the
-register of its micro-operation. Its paths out of the core have
-0.399 ns, to the timer's register of the interrupt vector, and those
-into it 0.378 ns, from the RAM. The Nexys4DDR's
-worst path is out of the core, from DBUS to the timer's count, and its
-paths into the core have 0.025 ns, from the math unit's
-acknowledge. A write to BASIC's part of the ROM, which only the MEGA65
+WRITE's register file the worst path of the R6. The R3's worst path is into
+the core, from the receive queue of the port for Ethernet frames into
+WRITE's register file, and its paths out of the core have 0.290 ns,
+from DBUS to a write enable of the screen. The Nexys4DDR's worst path
+is inside the core, within WRITE, from the register of its
+micro-operation to its register file. Its paths out of the core have
+0.221 ns, from DBUS to the clock of the time of day, and those into it
+0.273 ns, from the RAM. A write to BASIC's part of the ROM, which only the MEGA65
 has, is far from the limit: the paths to the ROM's write enables and
 to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3,
 with the part's start a comparison of the address with `G_ROM_BASIC`. With
@@ -374,8 +366,8 @@ than the watchpoints. `verified.json` records
 the build of the latest release's bump, and the badge shows it.
 
 Every build writes the five worst paths into the TCP server, within it,
-and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.397 ns on
-the R6, 1.468 ns on the R3, and 0.944 ns on the Nexys4DDR, in the
+and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.185 ns on
+the R6, 0.934 ns on the R3, and 0.816 ns on the Nexys4DDR, in the
 builds of the table above.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
